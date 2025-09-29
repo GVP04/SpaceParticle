@@ -183,6 +183,8 @@
     </ResourceCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="CDrawDlg.h" />
+    <ClInclude Include="CFindDlg.h" />
     <ClInclude Include="CSDataArray.h" />
     <ClInclude Include="CSP_Group.h" />
     <ClInclude Include="framework.h" />
@@ -194,8 +196,11 @@
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CDrawDlg.cpp" />
+    <ClCompile Include="CFindDlg.cpp" />
     <ClCompile Include="CSDataArray.cpp" />
     <ClCompile Include="CSP_Group.cpp" />
+    <ClCompile Include="FindSub.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
