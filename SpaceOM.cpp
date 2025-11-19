@@ -28,6 +28,30 @@ CSpaceOMApp::CSpaceOMApp()
 
 	// TODO: add construction code here,
 	// Place all significant initialization in InitInstance
+
+
+	//SPos pointVel; pointVel.SET(1.0, 1.0, 0.0);
+	//SPos plainVel; plainVel.SET(0.0, 0.0, 0.0);
+	//SPos norm; norm.SET(-1.5, 0.1, 0.0);
+	//SPos refl, refl2, refl__;
+
+	//refl2.SET_AS_REFLECT(pointVel, plainVel, norm);
+	//refl.SET_AS_REFLECT(pointVel, norm);
+
+	//refl.NORMALIZE();
+
+
+	//SData p1, p2;
+	//p1.position.SET(1.0, 1.0, 1.0);
+	//p2.position.SET(1000.0, 1.0, 10.0);
+
+	//p1.Speed.SET(1.0, 10.0, 0.0);
+	//p2.Speed.SET(1.0, -10.0, 0.0);
+
+	//SPos relSP;
+	//double rs = SData::GetRelativeSpeed(p1, p2, &relSP);
+	//relSP.SET(1.0, 1.0, 1.0);
+
 }
 
 
@@ -71,9 +95,9 @@ BOOL CSpaceOMApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CSpaceOMDlg dlg;
-	m_pMainWnd = &dlg;
-	INT_PTR nResponse = dlg.DoModal();
+	CSpaceOMDlg *dlg = new CSpaceOMDlg;
+	m_pMainWnd = dlg;
+	INT_PTR nResponse = dlg->DoModal();
 	if (nResponse == IDOK)
 	{
 		// TODO: Place code here to handle when the dialog is
@@ -102,6 +126,8 @@ BOOL CSpaceOMApp::InitInstance()
 
 	// Since the dialog has been closed, return FALSE so that we exit the
 	//  application, rather than start the application's message pump.
+
+	delete dlg;
 	return FALSE;
 }
 
