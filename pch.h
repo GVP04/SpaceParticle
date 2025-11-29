@@ -11,14 +11,15 @@
 #include "framework.h"
 #include "CSpParticle.h"
 
+#define READPARAMS_NOT_USE_DEFS		0x1
+#define READPARAMS_USE_DEFS			0x0
+
 
 UINT DoCalc_Find(LPVOID pParam);
 UINT DoCalc_1(LPVOID pParam);
-void ReadCalcParam(char* in_Src, char* in_Mask, SPos& data, double defValue);
-void ReadCalcParam(char* in_Src, char* in_Mask, int& data, int defValue);
-void ReadCalcParam(char* in_Src, char* in_Mask, double& data, double defValue);
+
 void SaveBitmap(char* in_FileName, HDC in_hdc, HBITMAP in_hBMP);
-void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos &delta);
+void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta);
 void SaveBitmap(char* in_FileName, HDC in_hdc, HBITMAP in_hBMP);
 
 #endif //PCH_H

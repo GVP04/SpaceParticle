@@ -12,7 +12,7 @@ public:
 	CDrawDlg(SP_Calc* in_pData, CWnd* pParent = nullptr);   // standard constructor
 	virtual ~CDrawDlg();
 
-	double SetMltpl(double in_Mltpl);
+	void SetMltplSliderPos();
 
 
 	double CDrawDlg::SetViewPrc(double in_Prc);
@@ -23,7 +23,7 @@ public:
 
 	SP_Calc* m_pData;
 	int m_uRedrawFlag;
-	double m_ViewMltpl;
+	//double m_ViewMltpl;
 	double m_ViewPrc;
 	double m_ViewSpread;
 
@@ -34,7 +34,6 @@ public:
 #endif
 
 private:
-	SPos m_WindowPos; //сдвиг окна просмотра от вершины картинки
 	HBITMAP m_hDCBitmap;
 	int m_XYZ;
 
@@ -53,9 +52,6 @@ public:
 	afx_msg void OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 	afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
 
-	virtual BOOL OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult);
-	afx_msg void OnReleasedcaptureSlidermgnf(NMHDR* pNMHDR, LRESULT* pResult);
-	afx_msg void OnThumbposchangingSlidermgnf(NMHDR* pNMHDR, LRESULT* pResult);
 	CSliderCtrl m_SliderMgnf;
 	afx_msg void OnBnClicked_Refresh();
 	afx_msg void OnBnClicked_Save();
@@ -64,4 +60,6 @@ public:
 	CSliderCtrl m_SliderSpread;
 	CSliderCtrl m_SliderViewPrc;
 	afx_msg void OnBnClickedButtonXyz();
+	afx_msg void OnBnClickedButtoncmd();
+	afx_msg void OnBnClickedButtonGroup();
 };

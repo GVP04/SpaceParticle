@@ -32,10 +32,15 @@ void CSpParticle::Clear()
 	m_Data->Init();
 }
 
-
 SData* CSpParticle::GetCurData()
 {
 	return m_Data == NULL || m_Data->CurPos < 0 ? &CSDataArray::EmptyData : m_Data->GetCurData();
+}
+
+
+SData* CSpParticle::GetDataById(int in_Id)
+{
+	return m_Data == NULL || m_Data->m_Array == NULL || m_Data->CurPos < 0 || in_Id  < 0 || in_Id > m_Data->CurPos ? NULL : m_Data->m_Array +in_Id;
 }
 
 int CSpParticle::NewPoint_Begin(double in_NewTimePoint)
@@ -53,7 +58,7 @@ int CSpParticle::NewPoint_Begin(double in_NewTimePoint)
 
 double CSpParticle::GetCurTime() 
 {
-	return m_Data ? m_Data->GetCurData()->TimePoint : 0.0; 
+	return m_Data && m_Data->CurPos >=0 ? m_Data->GetCurData()->TimePoint : 0.0;
 }
 
 double CSpParticle::GetPrevTime(int n_StepsBefore)
@@ -248,7 +253,6 @@ int CSpParticle::FindViewPoint(SData* out_Data, SData* in_Pos, double in_ViewTim
 						else idMin += kk;
 				}
 
-
 				while (idMax > idMin)
 				{
 					int idMid = ((idMax - idMin + 1) >> 1) + idMin;
@@ -403,6 +407,39 @@ SData* CSpParticle::GetDataAtLowPoint(double in_ViewTime)
 	}
 	return ret;
 }
+
+int CSpParticle::GetLowIdxByTime(double in_ViewTime)
+{
+	int ret = -1;
+	if (m_Data && m_Data->CurPos >= 0)
+		ret = m_Data->GetLowIdxByTime(in_ViewTime);
+
+	return ret;
+}
+
+int CSpParticle::GetDataById(int in_Idx, SData* inout_Reseult)
+{
+	int ret = -1;
+	if (inout_Reseult)
+	{
+		if (m_Data && m_Data->m_Array && in_Idx >= 0 && in_Idx <= m_Data->CurPos)
+			*inout_Reseult = m_Data->m_Array[ret = in_Idx];
+		else
+			inout_Reseult->CLEAR();
+	}
+
+	return ret;
+}
+
+int CSpParticle::GetMaxIdx()
+{
+	int ret = -2;
+	if (m_Data)
+		ret = m_Data->CurPos;
+
+	return ret;
+}
+
 
 int CSpParticle::GetNextDataByTime(SData* out_Data, double in_ViewTime, double* out_KeyPoint)
 {

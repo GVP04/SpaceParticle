@@ -2,6 +2,7 @@
 //
 
 #include "pch.h"
+#include "CommonFunc.h"
 #include "SpaceOM.h"
 #include "afxdialogex.h"
 #include "CFindDlg.h"
@@ -22,6 +23,7 @@ CFindDlg::CFindDlg(CWnd* pParent /*=nullptr*/)
 {
 	m_pData = NULL;
 	m_hDCBitmap = NULL;
+	m_LiveCntr = 10000;
 
 	m_BMP_Size.X = 2000;
 	m_BMP_Size.Y = 1000;
@@ -53,6 +55,7 @@ BEGIN_MESSAGE_MAP(CFindDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_SAVE, &CFindDlg::OnBnClicked_Save)
 	ON_BN_CLICKED(IDC_BUTTON_NEXT, &CFindDlg::OnBnClicked_Next)
 	ON_BN_CLICKED(IDC_BUTTON_NEXTANDREPORT, &CFindDlg::OnBnClicked_NextAndReport)
+	ON_BN_CLICKED(IDC_BUTTON_REFRESHLIVE, &CFindDlg::OnBnClickedButtonRefreshlive)
 END_MESSAGE_MAP()
 
 
@@ -122,7 +125,7 @@ BOOL CFindDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
-	SetTimer(1, m_pData ? m_pData->m_FIND_REFRESH : 5000, NULL);
+	SetTimer(1, 100, NULL);
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// EXCEPTION: OCX Property Pages should return FALSE
@@ -161,6 +164,10 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 			m_pData->curCalc.DrawSet.BMP_Size.X = BMP_Size;
 			m_pData->curCalc.DrawSet.BMP_Size.Y = BMP_Size;
 
+			m_pData->curCalc.DrawSet.ViewPoint.TimeInPc = 100.0;
+			m_pData->curCalc.DrawSet.ViewPoint.Spread = 100.0;
+
+			m_pData->curCalc.Group->SetViewPoint(100.0, 100.0);
 
 			m_pData->curCalc.Group->GetMinMaxTracePos(m_pData->curCalc.DrawSet.PosMin, m_pData->curCalc.DrawSet.PosMax, 0, SP_DRAW_MAX_ID);
 			SPos TraceSize;
@@ -213,9 +220,10 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 				SPos tmp = m_pData->curCalc.Group->m_Array[i]->GetCurPosition();
 				posY += 20; 
 				DCMem->SetTextColor(mRGB[(i) % 16]);
-				TextOutA(hDC, 1, posY, "Position", 8);
-				DCMem->SetTextColor(RGB(0, 0, 0));
+				txtlen = sprintf_s(tmps, 300, "%d Position", i);
+				TextOutA(hDC, 1, posY, tmps, txtlen);
 
+				DCMem->SetTextColor(RGB(0, 0, 0));
 				txtlen = sprintf_s(tmps, 300, "X=%g  Y=%g  Z=%g", tmp.X, tmp.Y, tmp.Z);
 				TextOutA(hDC, 60, posY, tmps, txtlen);
 			}
@@ -225,9 +233,10 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 				SPos tmp = m_pData->curCalc.Group->m_Array[i]->GetCurData()->Speed;
 				posY += 20;
 				DCMem->SetTextColor(mRGB[(i) % 16]);
-				TextOutA(hDC, 1, posY, "Speed", 5);
-				DCMem->SetTextColor(RGB(0, 0, 0));
+				txtlen = sprintf_s(tmps, 300, "%d Speed", i);
+				TextOutA(hDC, 1, posY, tmps, txtlen);
 
+				DCMem->SetTextColor(RGB(0, 0, 0));
 				txtlen = sprintf_s(tmps, 300, "%g --  X=%g  Y=%g  Z=%g", tmp.LEN(), tmp.X, tmp.Y, tmp.Z);
 				TextOutA(hDC, 60, posY, tmps, txtlen);
 			}
@@ -248,8 +257,7 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 
 void CFindDlg::OnBnClicked_Refresh()
 {
-	Invalidate();
-	RedrawWindow();
+	::RedrawWindow(m_hWnd, NULL, NULL, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
 }
 
 
@@ -258,8 +266,18 @@ void CFindDlg::OnTimer(UINT_PTR nIDEvent)
 	switch (nIDEvent)
 	{
 	case 1:
-		Invalidate();
-		RedrawWindow();
+		if (m_pData)
+		{
+			KillTimer(nIDEvent);
+			m_LiveCntr+=100;
+			if (m_pData->m_FIND_REFRESH < 3000)	m_pData->m_FIND_REFRESH = 3000;
+			if (m_LiveCntr > m_pData->m_FIND_REFRESH * 2) m_LiveCntr = m_pData->m_FIND_REFRESH - 100;
+			if (m_LiveCntr < m_pData->m_FIND_REFRESH)
+			{
+				::RedrawWindow(m_hWnd, NULL, NULL, RDW_NOERASE| RDW_UPDATENOW| RDW_INVALIDATE);
+			}
+			SetTimer(nIDEvent, 100, NULL);
+		}
 		break;
 	default:
 		break;
@@ -273,10 +291,9 @@ void CFindDlg::OnTimer(UINT_PTR nIDEvent)
 void CFindDlg::OnBnClickedCancel()
 {
 	// TODO: Add your control notification handler code here
-	if (m_pData)
+	if (m_pData && m_pData->curCalc.Group)
 	{
-		m_pData->FindState = 0;
-		m_pData->curCalc.State = 0;
+		m_pData->curCalc.Group->SetCalcState(0);
 	}
 
 	CDialogEx::OnCancel();
@@ -285,14 +302,15 @@ void CFindDlg::OnBnClickedCancel()
 
 void CFindDlg::OnBnClicked_Next()
 {
-	m_pData->FindState |= M_STATE_DO_NEXT;
+	if (m_pData && m_pData->curCalc.Group)
+		m_pData->curCalc.Group->SetCalcState(M_STATE_DO_NEXT);
 }
 
 void CFindDlg::OnBnClicked_NextAndReport()
 {
-	m_pData->FindState |= M_STATE_DO_NEXT| M_STATE_DO_REPORT;
+	if (m_pData && m_pData->curCalc.Group)
+		m_pData->curCalc.Group->SetCalcState(M_STATE_DO_NEXT | M_STATE_DO_REPORT);
 }
-
 
 
 ///void SaveBitmapTest(char* in_FileName, HDC in_hdc, HBITMAP in_hBMP, HWND hWnd);
@@ -323,4 +341,9 @@ void CFindDlg::OnBnClicked_Save()
 		}
 		LeaveCriticalSection(&m_pData->curCalc.Group->m_cs);
 	}
+}
+
+void CFindDlg::OnBnClickedButtonRefreshlive()
+{
+	m_LiveCntr = 0;
 }

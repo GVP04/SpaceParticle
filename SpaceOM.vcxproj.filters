@@ -51,6 +51,9 @@
     <ClInclude Include="SPos.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="CommonFunc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SpaceOM.cpp">
@@ -80,6 +83,9 @@
     <ClCompile Include="FindSub.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="CommonFunc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SpaceOM.rc">
@@ -95,5 +101,8 @@
     <Image Include="res\SpaceOM.ico">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="settings_base.txt" />
   </ItemGroup>
 </Project>

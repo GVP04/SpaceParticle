@@ -27,6 +27,7 @@ private:
 	HBITMAP m_hDCBitmap;
 	SPos m_BMP_Size;  //размер картинки
 	void PaintToCDC(CDC* DCMem);
+	int m_LiveCntr;
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
@@ -44,4 +45,5 @@ public:
 	afx_msg void OnBnClicked_Save();
 	afx_msg void OnBnClicked_Next();
 	afx_msg void OnBnClicked_NextAndReport();
+	afx_msg void OnBnClickedButtonRefreshlive();
 };

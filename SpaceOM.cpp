@@ -6,6 +6,7 @@
 #include "framework.h"
 #include "SpaceOM.h"
 #include "SpaceOMDlg.h"
+#include <direct.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -28,6 +29,8 @@ CSpaceOMApp::CSpaceOMApp()
 
 	// TODO: add construction code here,
 	// Place all significant initialization in InitInstance
+
+	_chdir("C:\\SParticle");
 
 
 	//SPos pointVel; pointVel.SET(1.0, 1.0, 0.0);

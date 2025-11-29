@@ -19,14 +19,17 @@
 #define IDC_SLIDERVIEWPRC               1010
 #define IDC_SLIDERVIEWSPREAD            1011
 #define IDC_BUTTON_REFRESH              1012
+#define IDC_BUTTON_REFRESHLIVE          1013
 #define IDC_BUTTON_UPLEFT               1014
 #define IDC_BUTTON_CENTER               1015
 #define IDC_BUTTON_REFRESHTRACE         1015
 #define IDC_BUTTON_NEXT                 1016
-#define IDC_BUTTON_CENTER2              1016
 #define IDC_BUTTON_XYZ                  1016
 #define IDC_BUTTON_SAVE                 1017
 #define IDC_BUTTON_STARTFIND            1018
+#define IDC_BUTTON_GROUP                1018
+#define IDC_EDITCMD                     1019
+#define IDC_BUTTONCMD                   1020
 
 // Next default values for new objects
 // 
@@ -34,7 +37,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        133
 #define _APS_NEXT_COMMAND_VALUE         32771
-#define _APS_NEXT_CONTROL_VALUE         1019
+#define _APS_NEXT_CONTROL_VALUE         1022
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

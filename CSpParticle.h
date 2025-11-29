@@ -132,6 +132,39 @@ struct SPRelation
 
 	double LastViewPointTime;
 
+	SPRelation()
+	{
+		CLEAR();
+	};
+
+	void CLEAR()
+	{
+		ViewPointData.CLEAR();
+		State = 0;
+
+		DensityAtBasePoint = 0.0;
+
+		Distance_3D = { 0 };
+		DistancePwr1 = 0.0;
+		DistancePwr2 = 0.0;
+		DistancePwr3 = 0.0;
+
+		RelativeSpeed_3D = { 0 };
+		RelativeSpeedValue = 0.0;
+		RelativeSpeedValueAbs = 0.0;
+
+		Acceleration_3D = { 0 };
+		AccelerationValue = 0.0;
+
+		AccelerationDeriv_3D = { 0 };
+		AccelerationDerivValue = 0.0;
+
+		Wind_3D = { 0 };
+		WindValue = 0.0;
+
+		LastViewPointTime = 0.0;
+	};
+
 	void SET_AS_FARAWAY()
 	{
 		ViewPointData = { 0 };
@@ -166,7 +199,7 @@ struct SSingleRelation
 
 	void CLEAR()
 	{
-		relation = { 0 };
+		relation.CLEAR();
 		relation.LastViewPointTime = -1000000.0;
 		idxParticle1 = 0;
 		idxParticle2 = 0;
@@ -197,10 +230,12 @@ struct SMinMaxRelation
 	}
 };
 
-
+#define SP_DRFLG_GROUP_SPEED	0x00000001 
+#define SP_DRFLG_GROUP_ACC		0x00000002 
 
 #define SP_DRAW_TEXT		0x00000100 
 #define SP_DRAW_CLEARBKG	0x00000200 
+#define SP_DRAW_GROUPINFO	0x00000400 
 
 #define SP_DRAW_XYZ			0x00000003 
 #define SP_DRAW_XY			0x00000000 
@@ -241,14 +276,19 @@ struct SDrawSettings
 {
 	SPos m_00_Pos; //позиция нулевой координаты на картинке
 	double ViewMltpl;   //множитель (увеличение)
+	double ViewMltpl_Ext;   //множитель (увеличение)
 	SPos BMP_Size;  //размер картинки
 	SPos PosMin; //Окно просмотра в позициях траектории
 	SPos PosMax; //Окно просмотра в позициях траектории
+	SPos WindowPos; //сдвиг окна просмотра от вершины картинки
 
 	ViewPointData ViewPoint;
 
 	int ShowItems;
 	int ShowLinksFrom;
+	int ShowSpeedFor;
+	int ShowAccFor;
+	int ShowGroupArrows;
 	int ShowLinksTo;
 	int nLinks;
 	int iShowFlags;
@@ -257,17 +297,22 @@ struct SDrawSettings
 	{
 		m_00_Pos = {0};
 		ViewMltpl = 1.0;
-		BMP_Size.X = 2000;  //размер картинки
-		BMP_Size.Y = 2000;  //размер картинки
-		BMP_Size.Z = 2000;  //размер картинки
-		PosMin = { 0 }; //Окно просмотра в позициях траектории
-		PosMax = { 0 }; //Окно просмотра в позициях траектории
+		ViewMltpl_Ext = 0.1;
+		BMP_Size.X = 1400;
+		BMP_Size.Y = 1400;
+		BMP_Size.Z = 1400;
+		PosMin = { 0 }; 
+		PosMax = { 0 }; 
+		WindowPos = { 0 };
 
-		ShowItems = 0;
-		ShowLinksFrom = 0;
+		ShowSpeedFor = 0x0;
+		ShowAccFor = 0x0;
+		ShowItems = 0xFFFFFFFF;
+		ShowGroupArrows = 0xFFFFFFFF;
+		ShowLinksFrom = 0x1;
 		ShowLinksTo = 0;
-		nLinks = 0;
-		iShowFlags = 0;
+		nLinks = 10;
+		iShowFlags = SP_DRAW_TEXT | SP_DRAW_CLEARBKG | SP_DRAW_GROUPINFO;
 	}
 
 };
@@ -332,14 +377,67 @@ struct SP_CalcStat
 #define COLISSION_ACCEL_SET3	0x00003000
 #define COLISSION_ACCEL_SET4	0x00004000
 
+struct SP_StopParam
+{
+	double Time;
+	double minRelDist;
+	double minMaxRelSpeed;
+	double TimeStep;
+	int Iteration;
+
+	SP_StopParam()
+	{
+		CLEAR();
+	};
+
+	void CLEAR()
+	{
+		Time = 1.0e7;
+		minRelDist = 1000.0;
+		minMaxRelSpeed = 0.001;
+		TimeStep = 1000.0;
+		Iteration = 0x7FFF0000;
+	};
+};
+
+struct SP_CalcFindSet
+{
+	SPos minPos;
+	SPos maxPos;
+	SPos minSpeed;
+	SPos maxSpeed;
+
+	SP_StopParam StopIF;
+
+	double ExcludeDistance;
+
+	SP_CalcFindSet()
+	{
+		CLEAR();
+	};
+
+	void CLEAR()
+	{
+		minPos = { 0 };
+		maxPos = { 0 };
+		minSpeed = { 0 };
+		maxSpeed = { 0 };
+
+		StopIF.CLEAR();
+
+		ExcludeDistance = 500.0;
+	};
+};
+
+
 struct SP_Calc
 {
 
 	//Runtime
-	int State;
 	int CurStep;
 	SP_CalcStat Stat;
 	SPTime Time;
+	int nIterations;
 
 	CSP_Group* Group;
 	CDrawDlg* DlgTrace;
@@ -355,6 +453,7 @@ struct SP_Calc
 	double maxAbsSpeedPwr2;
 	double ParentSpaceThickness;
 	double CriticalDistance;
+	int InitialParticleCount;
 	int AccCalcType; //0 нет влияния плотности на время/скорость. 1 есть влияние умножене. 2 есть влияние умножене. 
 	int DensityCalcType; //
 	//0  -  dens = 1 - 1 / S^2
@@ -366,16 +465,19 @@ struct SP_Calc
 	int DensityDerivLevel;
 	int WindType;
 	int CollisionType;
+	int sRandSeed_Calc;
 
 	int OutPutFlags;
+
+	SP_CalcFindSet CalcFindSet;
 
 
 	SP_Calc()
 	{
-		State = SP_STATE_ОК;
 		CurStep = 0;
 		Stat.CLEAR();
 		Time = { 0 };
+		nIterations = 1000000;
 
 		Group = NULL;;
 		DlgTrace = NULL;;
@@ -389,8 +491,10 @@ struct SP_Calc
 		maxAbsSpeedPwr2 = 1.0;
 		ParentSpaceThickness = 0.0;
 		CriticalDistance = 1.0;
+		InitialParticleCount = 2;
 		AccCalcType = 0; 
 		DensityCalcType = 0;
+		sRandSeed_Calc = -1;
 
 		AdditiveType = 0;
 		ClassicType = 0;
@@ -400,11 +504,7 @@ struct SP_Calc
 	
 		OutPutFlags = 0;
 	}
-
-
-
 };
-
 
 struct SP_CalcFindStat
 {
@@ -413,60 +513,28 @@ struct SP_CalcFindStat
 };
 
 
-
-struct SP_CalcFindSet
-{
-	SPos minPos;
-	SPos maxPos;
-	SPos minSpeed;
-	SPos maxSpeed;
-
-	double Stop_Time;
-	double Stop_minRelDist;
-	double Stop_minMaxRelSpeed;
-	double Stop_CurStep;
-
-	double ExcludeDistance;
-
-	SP_CalcFindSet()
-	{
-		minPos = { 0 };
-		maxPos = { 0 };
-		minSpeed = { 0 };
-		maxSpeed = { 0 };
-
-		Stop_Time = 0.0;
-		Stop_minRelDist = 0.0;
-		Stop_minMaxRelSpeed = 0.0;
-		Stop_CurStep = 0.0;
-
-		ExcludeDistance = 0.0;
-	};
-};
-
-
-
-
 struct SP_CalcFind
 {
 	SP_Calc curCalc;
 	SP_CalcFindSet Settings;
-	int FindState;
 	CFindDlg* DlgFind;
 	SP_CalcFindStat stat;
 	int m_FIND_REFRESH;
 	char* FindParams;
+	int sRandSeed;
 
 	SP_CalcFind()
 	{
-		FindState = 0;
 		DlgFind = NULL;
 		stat = {0};
 		m_FIND_REFRESH = 5;
 		FindParams = NULL;
+		sRandSeed = 0;
+		stat = { 0 };
 	};
 };
 
+class CSDataArray;
 
 class CSpParticle
 {
@@ -476,6 +544,7 @@ class CSpParticle
 
 public:
 	SData *GetCurData();
+	SData* GetDataById(int in_Id);
 
 	static double GetDistance(CSpParticle* Ptr1, CSpParticle* Ptr2) { return SData::GetDistance(*Ptr1->GetCurData(), *Ptr2->GetCurData()); }
 	static double GetDistancePwr2(CSpParticle* Ptr1, CSpParticle* Ptr2) { return SData::GetDistancePwr2(*Ptr1->GetCurData(), *Ptr2->GetCurData()); }
@@ -516,8 +585,11 @@ public:
 	char* GetStateDescription(char* out_Str, int in_nPoints = 1);
 	double GetAbsSpeedPwr2();
 	void GetMinMaxTracePos(SPos& min_Pos, SPos& max_Pos, int idxStart, int idx_End);
+	int GetLowIdxByTime(double in_ViewTime);
+	int GetMaxIdx();
 
 	static char* GetFlagsDescription(char* out_Str, int in_Flags);
+	int GetDataById(int in_Idx, SData *inout_Reseult);
 
 private:
 	SData* GetDataAtLowPoint(double in_ViewTime);

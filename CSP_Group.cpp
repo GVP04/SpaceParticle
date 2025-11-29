@@ -1,18 +1,16 @@
 #include "pch.h"
-
-
-int mRGB[16]= {
-	RGB(200, 0, 0),RGB(0, 200, 0),RGB(0, 0, 200),RGB(200, 200, 0),RGB(200, 0, 200),RGB(0, 200, 200),
-	RGB(200, 100, 0),RGB(200, 0, 100),RGB(200, 100, 100),RGB(100, 200, 0),RGB(0, 200, 100),RGB(100, 0, 200),
-	RGB(0, 100, 200),RGB(0, 100, 100),RGB(100, 0, 100),RGB(100, 100, 0),
-};
-
-
+#include "CDrawDlg.h"
 #include "CSP_Group.h"
+#include "CommonFunc.h"
 
 
 CSP_Group::CSP_Group()
 {
+	m_innerState = M_INNER_STATE_STARTING;
+	AfxBeginThread(DoCommandThread, (LPVOID)this);
+
+	m_DelayMS = 0;
+	m_CalcState = M_STATE_OFF;
 	m_name = new char[20000];
 	sprintf_s(m_name, 1000, "GROUP_0");
 	m_tmpString = m_name + 1000;
@@ -20,7 +18,13 @@ CSP_Group::CSP_Group()
 	m_maxCount = 10;
 	m_maxCountLimit = 0;
 	m_pCalc = NULL;
+	m_pCalcFind = NULL;
+
+	m_CmdArr = new char* [M_CMD_MAXCOUNT];
+	ZeroMemory(m_CmdArr, sizeof(char*) * M_CMD_MAXCOUNT);
+
 	InitializeCriticalSection(&m_cs);
+	InitializeCriticalSection(&m_cs_Command);
 
 
 	m_Array = new CSpParticle * [m_maxCount];
@@ -29,7 +33,7 @@ CSP_Group::CSP_Group()
 	int nRelations = m_maxCount * m_maxCount;
 
 	m_Relations = new SPRelation [nRelations * 4];
-	ZeroMemory(m_Relations,  sizeof(SPRelation) * nRelations * 4);
+	
 	m_CurentRelations = m_Relations;
 	m_NextRelations = m_CurentRelations + nRelations;
 	m_PrevRelations = m_NextRelations + nRelations;
@@ -37,9 +41,36 @@ CSP_Group::CSP_Group()
 	m_Count = 0;
 	CalcCountDevider();
 	m_CurTime = 0.0;
+	m_CalcState = M_STATE_READY;
+
+	m_innerState = M_INNER_STATE_READY;
+
 }
 CSP_Group::~CSP_Group()
 {
+	m_CalcState |= M_STATE_BREAK;
+
+	switch ((m_innerState & M_INNER_STATE_MASK))
+	{
+	case M_INNER_STATE_NULL:
+	case M_INNER_STATE_STOPPED:
+	case M_INNER_STATE_END_IS:
+		break;
+	case M_INNER_STATE_BREAK_ON:
+	case M_INNER_STATE_STARTING:
+	case M_INNER_STATE_READY:
+	case M_INNER_STATE_RUNING:
+		m_innerState = M_INNER_STATE_BREAK_ON;
+		for(int cntr = 0; m_innerState != M_INNER_STATE_STOPPED && m_innerState != M_INNER_STATE_END_IS && cntr < 1000; cntr++)
+			Sleep(10);
+	}
+
+	for (int cntr = 0; (m_CalcState & M_STATE_CALC) && cntr < 1000; cntr++)
+		Sleep(10);
+
+
+	EnterCriticalSection(&m_cs_Command);
+
 	if (m_Relations)
 	{
 		delete [] m_Relations;
@@ -60,11 +91,28 @@ CSP_Group::~CSP_Group()
 	delete[] m_name;
 	m_Array = NULL;
 
+
+	if (m_CmdArr)
+	{
+		for (int i = 0; i < M_CMD_MAXCOUNT && m_CmdArr[i]; i++)
+		{
+			delete m_CmdArr[i];
+			m_CmdArr[i] = NULL;
+		}
+	}
+
+	if (m_CmdArr) delete[] m_CmdArr;
+	m_CmdArr = NULL;
+
+	LeaveCriticalSection(&m_cs_Command);
+	DeleteCriticalSection(&m_cs_Command);
 	DeleteCriticalSection(&m_cs);
 }
 
 void CSP_Group::Reset()
 {
+	EnterCriticalSection(&m_cs_Command);
+
 	if (m_Array)
 	{
 		for (int i = 0; i < m_Count; i++)
@@ -80,17 +128,32 @@ void CSP_Group::Reset()
 		m_Relations = NULL;
 	}
 
+	if (m_CmdArr)
+		for (int i = 0; i < M_CMD_MAXCOUNT && m_CmdArr[i]; i++)
+		{
+			delete m_CmdArr[i];
+			m_CmdArr[i] = NULL;
+		}
+
+	sprintf_s(m_name, 1000, "GROUP_0");
+
+	m_maxCount = 10;
 	int nRelations = m_maxCount * m_maxCount;
 
 	m_Relations = new SPRelation[nRelations * 4];
-	ZeroMemory(m_Relations, sizeof(SPRelation) * nRelations * 4);
+
 	m_CurentRelations = m_Relations;
 	m_NextRelations = m_CurentRelations + nRelations;
 	m_PrevRelations = m_NextRelations + nRelations;
 
+	m_DelayMS = 0;
 	m_Count = 0;
 	CalcCountDevider();
 	m_CurTime = 0.0;
+	m_maxCountLimit = 0;
+	m_CalcState = M_STATE_READY;
+
+	LeaveCriticalSection(&m_cs_Command);
 }
 
 void CSP_Group::Clear()
@@ -111,7 +174,7 @@ void CSP_Group::Clear()
 	int nRelations = m_maxCount * m_maxCount;
 
 	m_Relations = new SPRelation[nRelations * 4];
-	ZeroMemory(m_Relations, sizeof(SPRelation) * nRelations * 4);
+
 	m_CurentRelations = m_Relations;
 	m_PrevRelations = m_CurentRelations + nRelations;
 	m_NextRelations = m_PrevRelations + nRelations;
@@ -153,6 +216,22 @@ int CSP_Group::AddSpParticle(int in_flags, SData *in_Ptr, int in_Count, SP_Calc*
 	}
 	return m_Count - ret;
 }
+
+int CSP_Group::GetMaxTraceId()
+{
+	int ret = 0;
+	if (m_Array && m_Count)
+	{
+		for(int i = 0; i < m_Count; i++)
+			if (m_Array[i])
+			{
+				int tmp = m_Array[i]->GetMaxIdx();
+				if (tmp > ret) ret = tmp;
+			}
+	}
+	return ret;
+}
+
 
 int CSP_Group::RemoveSpParticle(int in_Idx)
 {
@@ -437,7 +516,7 @@ void CSP_Group::SetViewPoint(double in_Percents, double in_Spread)
 		if (in_Percents < 0.0) in_Percents = 100.0;
 		if (in_Spread < 0.000001) in_Spread = 0.000001;
 
-		if ((in_Percents < 0.0 && in_Spread >= 100.0 ) || !m_Array || !m_Array[0] || !m_Array[0]->m_Data || !m_Array[1])
+		if ((in_Percents < 0.0 && in_Spread >= 100.0 ) || !(m_pCalc->Group->GetCalcState()& M_STATE_READY) || !m_Array || !m_Array[0] || !m_Array[0]->m_Data || (m_Array[0]->m_Data->CurPos < 0) || !m_Array[1])
 		{
 			m_pCalc->DrawSet.ViewPoint.TimeInPc = -1.0;
 			m_pCalc->DrawSet.ViewPoint.Spread = 100.0;
@@ -497,7 +576,8 @@ int CSP_Group::GetIdByMaxDistance(double in_RelDist)
 		for (int i = 0; i < m_Count && ret < 0; i++)
 		{
 			int j;
-			for (j = 0; j < m_Count && (i == j || m_CurentRelations[i + m_maxCount * j].DistancePwr1 > in_RelDist); j++);
+			for (j = 0; j < m_Count && (i == j || m_CurentRelations[i + m_maxCount * j].DistancePwr1 > in_RelDist); j++)
+				;
 
 			if (j >= m_Count) 
 				ret = i; 
@@ -505,6 +585,65 @@ int CSP_Group::GetIdByMaxDistance(double in_RelDist)
 	}
 	return ret;
 }
+
+
+int CSP_Group::GetGroupSummaryInfo(GroupSummaryInfo* out_Info, int in_IdPos)
+{
+	int ret = -1;
+	if (out_Info)
+	{
+		out_Info->CLEAR();
+		if (m_Array && *m_Array)
+		{
+			if (in_IdPos < 0) in_IdPos = m_Array[0]->GetMaxIdx();
+
+			if (in_IdPos >= 0)
+			{
+				SData tmpData;
+				tmpData.CLEAR();
+
+				for (int i = 0; i < m_Count; i++)
+					if (m_Array[i])
+					{
+						if (m_Array[i]->GetDataById(in_IdPos, &tmpData) >= 0)
+							out_Info->ADD(tmpData, in_IdPos);
+					}
+				if (out_Info->Count < 1)
+					out_Info->CLEAR();
+				else
+					out_Info->CALC();
+			}
+		}
+
+	}
+
+	return ret;
+}
+
+int CSP_Group::GetGroupSummaryInfo(GroupSummaryInfo* out_Info, double in_TimePoint)
+{
+	int ret = -1;
+	if (out_Info)
+	{
+		if (m_Array && *m_Array)
+		{
+			ret = m_Array[0]->GetLowIdxByTime(in_TimePoint);
+			if (ret >= 0)
+				ret = GetGroupSummaryInfo(out_Info, ret);
+		}
+		else out_Info->CLEAR();
+	}
+
+	return ret;
+}
+
+int CSP_Group::GetGroupSummaryInfo(GroupSummaryInfo* out_Info)
+{
+	return GetGroupSummaryInfo(out_Info, -1);
+}
+
+
+
 
 int CSP_Group::NextStep(double in_DeltaTime)
 {
@@ -668,7 +807,7 @@ int CSP_Group::NextStep(double in_DeltaTime)
 				doByKeyPoint = SP_STATE_ОК;
 		}
 
-		EnterCriticalSection(&m_pCalc->Group->m_cs);
+		EnterCriticalSection(&m_cs);
 
 		if ( m_Array[0]->m_NextData.TimePoint != m_Array[1]->m_NextData.TimePoint)
 			ret = SP_STATE_ОК;
@@ -694,7 +833,7 @@ int CSP_Group::NextStep(double in_DeltaTime)
 		CalcDataByCurRelations();
 		//CalcDataByRelations(m_CurentRelations);
 
-		LeaveCriticalSection(&m_pCalc->Group->m_cs);
+		LeaveCriticalSection(&m_cs);
 
 	}
 	return ret;
@@ -712,7 +851,7 @@ int CSP_Group::CalcSingleRelation(SData* in_PtrData, CSpParticle* in_PtrView, do
 		{
 			double in_StartTime = -99999.0, in_EndTime = in_ViewTime;
 
-			*in_NewRelations = { 0 };
+			in_NewRelations->CLEAR();
 			
 			if (in_PrevRelations)
 			{
@@ -995,3 +1134,347 @@ int CSP_Group::CalcSingleDataByRelation(SData* pCalcData, SPRelation* in_CalcRel
 
 	return ret;
 }
+
+
+int CSP_Group::Cmd_Add(const char* in_Command)
+{
+	int ret = 0;
+	if (m_CmdArr)
+	{
+		EnterCriticalSection(&m_cs_Command);
+
+		if (m_CmdArr && in_Command && *in_Command)
+		{
+			for (ret = 0; ret < M_CMD_MAXCOUNT && m_CmdArr[ret]; ret++);
+
+			if (ret < M_CMD_MAXCOUNT)
+			{
+				int iLen = (int)strlen(in_Command);
+				m_CmdArr[ret] = new char[iLen + 2];
+				strcpy_s(m_CmdArr[ret], iLen + 1, in_Command);
+				m_CmdArr[ret][iLen] = 0;
+			}
+		}
+
+		LeaveCriticalSection(&m_cs_Command);
+	}
+	return ret;
+}
+
+
+int CSP_Group::Cmd_Execute(char* in_Command)
+{
+	int ret = 0;
+	EnterCriticalSection(&m_cs_Command);
+	if (in_Command && *in_Command)
+	{
+		TrimChar(in_Command, ' ');
+		StrUpr_my(in_Command);
+
+		if (*in_Command)
+		{
+			if (strstr(in_Command, "PAUSE") == in_Command && in_Command[5] <= ' ')
+			{
+				if ((m_CalcState & M_STATE_PAUSE)) ClearCalcState(M_STATE_PAUSE);
+				else SetCalcState(M_STATE_PAUSE);
+			}
+			else if (strstr(in_Command, "CONTINUE") == in_Command && in_Command[8] <= ' ')
+			{
+				if ((m_CalcState & M_STATE_PAUSE)) ClearCalcState(M_STATE_PAUSE);
+				else SetCalcState(M_STATE_PAUSE);
+			}
+			else if (strstr(in_Command, "DELAY") == in_Command && in_Command[5] <= ' ')
+			{
+				in_Command += 6;
+				while (*in_Command == ' ' || *in_Command == '\t' || *in_Command == '=') in_Command++;
+				sscanf_s(in_Command, "%i", &m_DelayMS);
+				if (m_DelayMS < 0 || m_DelayMS > 10000) m_DelayMS = 0;
+			}
+			else if (strstr(in_Command, "ADD") == in_Command && in_Command[3] <= ' ')
+			{
+				in_Command += 3;
+				while (*in_Command == ' ' || *in_Command == '\t' || *in_Command == '=') in_Command++;
+
+				SData initData = { 0 };
+
+				ReadCalcParam(in_Command, "POS", initData.position, 0.0);
+				ReadCalcParam(in_Command, "SPEED", initData.Speed, 0.0);
+
+				AddSpParticle(SP_DATA_ALL, &initData, 1, m_pCalc);
+			}
+			else if ((strstr(in_Command, "DEL") == in_Command && in_Command[3] <= ' ') || (strstr(in_Command, "DELETE") == in_Command && in_Command[6] <= ' '))
+			{
+				in_Command += 3; 
+				if (*in_Command >= ' ') in_Command += 3;
+				while (*in_Command == ' ' || *in_Command == '\t' || *in_Command == '=') in_Command++;
+				
+				int idParticle = atoi(in_Command);
+				RemoveSpParticle(idParticle);
+			}
+			else if (strstr(in_Command, "STOP") == in_Command && in_Command[4] <= ' ')
+			{
+				ClearCalcState(M_STATE_CALC);
+			}
+			else if (strstr(in_Command, "NEXT") == in_Command && in_Command[4] <= ' ')
+			{
+				SetCalcState(M_STATE_DO_NEXT);
+			}
+			else if (strstr(in_Command, "SAVE") == in_Command && in_Command[4] <= ' ')
+			{
+				in_Command += 4;
+				ReplaceChar(in_Command, '\t', ' ');
+				TrimChar(in_Command, ' ');
+
+				CMD_Param_File tmpfile;
+
+				if (m_Array && *m_Array && m_Count && tmpfile.ReadParams(in_Command) && *tmpfile.FileName)
+				{
+					if (!tmpfile.OPEN())
+					{
+						CMD_Param_DataType tmpWhat;
+						if (!tmpWhat.ReadParams(in_Command)) tmpWhat.SET_ALL_ON();
+
+						char* StrOut = new char[10000];
+						tmpWhat.CHECK(GetMaxTraceId());
+
+						for (int Id = tmpWhat.StartId; Id < tmpWhat.EndId; Id += tmpWhat.StepId)
+						{
+							fprintf(tmpfile.pPile, "\nTraceID\t%d\t", Id);
+
+							if (tmpWhat.GroupData)
+							{
+								GroupSummaryInfo GrInfo;
+								GetGroupSummaryInfo(&GrInfo, Id);
+
+								GrInfo.PRINT(StrOut, 10000);
+								fprintf(tmpfile.pPile, "%s\n", StrOut);
+							}
+
+							if (tmpWhat.Trace)
+							{
+								for(int ParticleID = 0; ParticleID < m_Count; ParticleID++)
+									if (m_Array[ParticleID] && m_Array[ParticleID]->m_Data)
+									{
+										fprintf(tmpfile.pPile, "ParticleID\t%d\t", ParticleID);
+										SData *dt = m_Array[ParticleID]->GetDataById(Id);
+										if (dt)	dt->PRINT(StrOut, 10000, SDATA_ALL);
+										else	SData::PRINT_AS_NULL(StrOut, 10000, SDATA_ALL);
+
+										fprintf(tmpfile.pPile, "%s\n", StrOut);
+									}
+							}
+						}
+
+						delete[] StrOut;
+						tmpfile.CLOSE();
+					}
+				}
+			}
+			else if (strstr(in_Command, "REPORT") == in_Command && in_Command[6] <= ' ')
+			{
+				SetCalcState(M_STATE_DO_REPORT);
+			}
+			else if (strstr(in_Command, "REDRAW") == in_Command && in_Command[6] <= ' ')
+			{
+				if (m_pCalc->DlgTrace)
+				{
+					m_pCalc->DlgTrace->ShowWindow(SW_SHOW);
+					m_pCalc->DlgTrace->RedrawMe();
+				}
+			}
+			else if (strstr(in_Command, "SET") == in_Command && in_Command[3] <= ' ')
+			{
+				ReadSettingsGroup(in_Command, SGROUP_ALL, READPARAMS_NOT_USE_DEFS);
+			}
+			else if (strstr(in_Command, "?") == in_Command && in_Command[1] <= ' ')
+			{
+				MessageBox(m_pCalc->DlgTrace ? m_pCalc->DlgTrace->m_hWnd : GetDesktopWindow(), L"PAUSE \nCONTINUE \nDELAY msec\nADD POS.X POS.Y POS.Z SPEED.X SPEED.Y SPEED.Z\nDEL ParticleID\nSTOP \nNEXT \nREPORT", L"Commands list", MB_OK | MB_APPLMODAL);
+			}
+
+
+		}
+	}
+	LeaveCriticalSection(&m_cs_Command);
+	return ret;
+}
+int CSP_Group::Cmd_Do(int in_Count)
+{
+	int ret = 0;
+	if (m_CmdArr)
+	{
+		EnterCriticalSection(&m_cs_Command);
+
+		while (*m_CmdArr && (in_Count--) != 0)
+		{
+			Cmd_Execute(*m_CmdArr);
+			delete[] * m_CmdArr;
+			CopyMemory(m_CmdArr, m_CmdArr + 1, sizeof(char*) * (M_CMD_MAXCOUNT - 1));
+			m_CmdArr[M_CMD_MAXCOUNT - 1] = NULL;
+		}
+
+		LeaveCriticalSection(&m_cs_Command);
+	}
+	return ret;
+}
+
+int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in_UseDefs)
+{
+	int ret = 0; 
+	
+	if (m_pCalc && in_Settings && *in_Settings)
+	{
+		if ((in_SettingsGroup & SGROUP_TRACE))
+		{
+			ret += ReadCalcParam(in_Settings, "TRACE_SPEED_ARR", m_pCalc->DrawSet.ShowSpeedFor, 0xFFFFF, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_ACC_ARR", m_pCalc->DrawSet.ShowAccFor, 0xFFFFF, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_GROUP_ARR", m_pCalc->DrawSet.ShowGroupArrows, 0xFFFFF, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_SHOWITEMS", m_pCalc->DrawSet.ShowItems, 0xFFFFF, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_SHOWLINKSFROM", m_pCalc->DrawSet.ShowLinksFrom, 0x0001, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_SHOWLINKSTO", m_pCalc->DrawSet.ShowLinksTo, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_LINKS", m_pCalc->DrawSet.nLinks, 10, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_REFRESH", m_pCalc->refresh.Delta, 5, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_00_POS", m_pCalc->DrawSet.m_00_Pos, 0, in_UseDefs);
+
+			if (ReadCalcParam(in_Settings, "TRACE_MAGN", m_pCalc->DrawSet.ViewMltpl_Ext, 0, READPARAMS_NOT_USE_DEFS) != 0 && m_pCalc->DlgTrace)
+			{
+					ret++;
+					m_pCalc->DlgTrace->SetMltplSliderPos();//!!!!!!!!!!!!!!!!!!уйти от mfc из-зи проблемы с разделением потоков
+			}
+
+			if (ReadCalcParam(in_Settings, "TRACE_WPOS", m_pCalc->DrawSet.WindowPos, 0, READPARAMS_NOT_USE_DEFS) != 0 && m_pCalc->DlgTrace)
+			{
+					ret++;
+					m_pCalc->DlgTrace->SetWindowPos(m_pCalc->DrawSet.WindowPos);//!!!!!!!!!!!!!!!!!!уйти от mfc из-зи проблемы с разделением потоков
+			}
+		}
+		if ((in_SettingsGroup & SGROUP_STEP))
+		{
+			ret += ReadCalcParam(in_Settings, "NSTEPS", m_pCalc->nIterations, 2000000, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "MAXNSTEPS", m_maxCountLimit, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "MAXSTEP_VAL", m_pCalc->Time.MaxStep, 1000.0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "MINSTEP_VAL", m_pCalc->Time.MinStep, SP_PREC_TIME_MINSTEP, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TIMESTEP", m_pCalc->Time.BaseStep, 0.001, in_UseDefs);
+
+
+
+		}
+		if ((in_SettingsGroup & SGROUP_MISC))
+		{
+			ret += ReadCalcParam(in_Settings, "OUTPUTFLAGS", m_pCalc->OutPutFlags, 0, in_UseDefs);
+
+			if (ReadCalcParam(in_Settings, "FIND_REFRESH", m_pCalcFind->m_FIND_REFRESH, 5, in_UseDefs) > 0)
+			{
+				ret++;
+				if (m_pCalcFind->m_FIND_REFRESH < 2000) m_pCalcFind->m_FIND_REFRESH *= 1000;
+				if (m_pCalcFind->m_FIND_REFRESH > 300000) m_pCalcFind->m_FIND_REFRESH = 10000;
+			}
+
+			ret += ReadCalcParam(in_Settings, "CALC_SRANDSEED", m_pCalc->sRandSeed_Calc, -1, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "FIND_SRANDSEED", m_pCalcFind->sRandSeed, 0, in_UseDefs);
+
+
+			int tmpret = 0;
+
+			tmpret = ReadCalcParam(in_Settings, "CALC_MINPOS", m_pCalc->CalcFindSet.minPos, -100.0, in_UseDefs);
+			tmpret += ReadCalcParam(in_Settings, "CALC_MAXPOS", m_pCalc->CalcFindSet.maxPos, 100.0, in_UseDefs);
+			tmpret += ReadCalcParam(in_Settings, "CALC_MINSPEED", m_pCalc->CalcFindSet.minSpeed, -1.0, in_UseDefs);
+			tmpret += ReadCalcParam(in_Settings, "CALC_MAXSPEED", m_pCalc->CalcFindSet.maxSpeed, 1.0, in_UseDefs);
+			if (tmpret)
+			{
+				ret += tmpret;
+				m_pCalc->CalcFindSet.maxSpeed.CUT(-1.0, 1.0);
+				m_pCalc->CalcFindSet.minSpeed.CUT(-1.0, 1.0);
+
+				m_pCalc->CalcFindSet.minSpeed.CUT(NULL, &m_pCalc->CalcFindSet.maxSpeed);
+				m_pCalc->CalcFindSet.maxSpeed.CUT(&m_pCalc->CalcFindSet.minSpeed, NULL);
+			}
+
+			ret += ReadCalcParam(in_Settings, "CALC_STOP_TIME", m_pCalc->CalcFindSet.StopIF.Time, 1.0e7, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "CALC_STOP_MINRELDIST", m_pCalc->CalcFindSet.StopIF.minRelDist, 2000.0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "CALC_STOP_MINMAXRELSPEED", m_pCalc->CalcFindSet.StopIF.minMaxRelSpeed, 0.001, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "CALC_STOP_CURSTEP", m_pCalc->CalcFindSet.StopIF.TimeStep, 1000.0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "CALC_STOP_ITERATION", m_pCalc->CalcFindSet.StopIF.Iteration, 0x7FFF0000, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "CALC_EXCLUDEDISTANCE", m_pCalc->CalcFindSet.ExcludeDistance, 1000.0, in_UseDefs);
+
+
+			tmpret = ReadCalcParam(in_Settings, "FIND_MINPOS", m_pCalcFind->Settings.minPos, -100.0, in_UseDefs);
+			tmpret += ReadCalcParam(in_Settings, "FIND_MAXPOS", m_pCalcFind->Settings.maxPos, 100.0, in_UseDefs);
+			tmpret += ReadCalcParam(in_Settings, "FIND_MINSPEED", m_pCalcFind->Settings.minSpeed, -1.0, in_UseDefs);
+			tmpret += ReadCalcParam(in_Settings, "FIND_MAXSPEED", m_pCalcFind->Settings.maxSpeed, 1.0, in_UseDefs);
+			if (tmpret)
+			{
+				ret += tmpret;
+				m_pCalcFind->Settings.maxSpeed.CUT(-1.0, 1.0);
+				m_pCalcFind->Settings.minSpeed.CUT(-1.0, 1.0);
+
+				m_pCalcFind->Settings.minSpeed.CUT(NULL, &m_pCalcFind->Settings.maxSpeed);
+				m_pCalcFind->Settings.maxSpeed.CUT(&m_pCalcFind->Settings.minSpeed, NULL);
+			}
+
+			ret += ReadCalcParam(in_Settings, "FIND_STOP_TIME", m_pCalcFind->Settings.StopIF.Time, 1.0e7, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "FIND_STOP_MINRELDIST", m_pCalcFind->Settings.StopIF.minRelDist, 2000.0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "FIND_STOP_MINMAXRELSPEED", m_pCalcFind->Settings.StopIF.minMaxRelSpeed, 0.001, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "FIND_STOP_CURSTEP", m_pCalcFind->Settings.StopIF.TimeStep, 1000.0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "FIND_STOP_ITERATION", m_pCalcFind->Settings.StopIF.Iteration, 0x7FFF0000, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "FIND_EXCLUDEDISTANCE", m_pCalcFind->Settings.ExcludeDistance, 1000.0, in_UseDefs);
+		}
+
+		if ((in_SettingsGroup & SGROUP_CALC_PARAM))
+		{
+			if (ReadCalcParam(in_Settings, "PARTICLE_COUNT", m_pCalc->InitialParticleCount, 2, in_UseDefs) > 0)
+			{
+				ret++;
+				if (m_pCalc->InitialParticleCount < 2 || m_pCalc->InitialParticleCount > 500)
+					m_pCalc->InitialParticleCount = 2;
+			}
+
+			ret += ReadCalcParam(in_Settings, "WINDTYPE", m_pCalc->WindType, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "COLLISIONTYPE", m_pCalc->CollisionType, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "DENCITYDERIVLEVEL", m_pCalc->DensityDerivLevel, 3, in_UseDefs);
+				if (m_pCalc->DensityDerivLevel > 3 || m_pCalc->DensityDerivLevel < 1) m_pCalc->DensityDerivLevel = 3;
+			ret += ReadCalcParam(in_Settings, "ACCCALCTYPE", m_pCalc->AccCalcType, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "CLASSICTYPE", m_pCalc->ClassicType, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "ADDITIVETYPE", m_pCalc->AdditiveType, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "DENSITYCALCTYPE", m_pCalc->DensityCalcType, 0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "MAXABSSPEED", m_pCalc->maxAbsSpeed,  1.0, in_UseDefs);
+				if (ReadCalcParam(in_Settings, "MAXRELATIVESPEED", m_pCalc->maxRelativeSpeed, 2.0, in_UseDefs) > 0)
+				{
+					ret++;
+					m_pCalc->maxAbsSpeedPwr2 = m_pCalc->maxAbsSpeed * m_pCalc->maxAbsSpeed;
+				}
+			ret += ReadCalcParam(in_Settings, "PARENTSPACETHICKNESS", m_pCalc->ParentSpaceThickness, 0.0, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "CRITICALDISTANCE", m_pCalc->CriticalDistance, 1.0, in_UseDefs);
+		}
+	}
+
+	return ret;
+}
+
+
+
+
+UINT DoCommandThread(LPVOID pParam)
+{
+	if (pParam)
+	{
+		CSP_Group* pGroup = (CSP_Group*)pParam;
+
+		while (pGroup->m_innerState == M_INNER_STATE_STARTING)
+			Sleep(1);
+
+		if (pGroup->m_innerState == M_INNER_STATE_READY)
+			pGroup->m_innerState = M_INNER_STATE_RUNING;
+
+		while (pGroup->m_innerState == M_INNER_STATE_RUNING)
+		{
+			pGroup->Cmd_Do(-1);
+
+			Sleep(100);
+		}
+
+
+		pGroup->m_innerState = M_INNER_STATE_STOPPED;
+	}
+	return 0;
+}
+

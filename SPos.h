@@ -1,7 +1,4 @@
 
-class CSDataArray;
-class CSpParticle;
-struct SData;
 
 struct SPos
 {
@@ -77,15 +74,41 @@ struct SPos
 		Z = -Z;
 	}
 
+	void CUT(double in_MinLimit, double in_MaxLimit)
+	{
+		if (X < in_MinLimit) X = in_MinLimit;
+		if (Y < in_MinLimit) Y = in_MinLimit;
+		if (Z < in_MinLimit) Z = in_MinLimit;
+		if (X > in_MaxLimit) X = in_MaxLimit;
+		if (Y > in_MaxLimit) Y = in_MaxLimit;
+		if (Z > in_MaxLimit) Z = in_MaxLimit;
+	}
+
+	void CUT(const SPos *in_MinLimit, const SPos* in_MaxLimit)
+	{
+		if (in_MinLimit)
+		{
+			if (X < in_MinLimit->X) X = in_MinLimit->X;
+			if (Y < in_MinLimit->Y) Y = in_MinLimit->Y;
+			if (Z < in_MinLimit->Z) Z = in_MinLimit->Z;
+		}
+		if (in_MaxLimit)
+		{
+			if (X > in_MaxLimit->X) X = in_MaxLimit->X;
+			if (Y > in_MaxLimit->Y) Y = in_MaxLimit->Y;
+			if (Z > in_MaxLimit->Z) Z = in_MaxLimit->Z;
+		}
+	}
+
+
 	// —кал€рное произведение
-	double DOT(const SPos& in_DOT) { return X * in_DOT.X + Y * in_DOT.Y + Z * in_DOT.Z;	}
+	inline double DOT(const SPos& in_DOT) { return X * in_DOT.X + Y * in_DOT.Y + Z * in_DOT.Z;	}
 
 	//длина от 0,0,0
-	double LEN() { return sqrt(X * X + Y * Y + Z * Z); }
-	double LENPWR2() { return X * X + Y * Y + Z * Z; }
-	bool IsZero() { return X == 0.0 && Y == 0.0 && Z == 0.0; }
-	static double LENPWR2(const SPos& Ptr1) { return Ptr1.X * Ptr1.X + Ptr1.Y * Ptr1.Y + Ptr1.Z * Ptr1.Z; }
-	double LENPWR3() { double tmp = LEN();	return tmp * tmp * tmp; }
+	inline double LEN() { return sqrt(X * X + Y * Y + Z * Z); }
+	inline double LENPWR2() { return X * X + Y * Y + Z * Z; }
+	inline bool IsZero() { return X == 0.0 && Y == 0.0 && Z == 0.0; }
+	inline double LENPWR3() { double tmp = LEN();	return tmp * tmp * tmp; }
 
 	static double GetDistance(const SPos& Ptr1, const SPos& Ptr2) { return sqrt(GetDistancePwr2(Ptr1, Ptr2)); }
 
@@ -102,8 +125,8 @@ struct SPos
 		return ret;
 	}
 
-	double GetDistance(const SPos& Ptr1) { return sqrt(GetDistancePwr2(Ptr1)); }
-	double GetDistancePwr2(const SPos& Ptr1)
+	inline double GetDistance(const SPos& Ptr1) { return sqrt(GetDistancePwr2(Ptr1)); }
+	inline double GetDistancePwr2(const SPos& Ptr1)
 	{
 		double ret, tmp;
 		tmp = Ptr1.X - X;
@@ -251,6 +274,39 @@ struct SPos
 		INVERT();
 	}
 
+	static int PRINT_AS_NULL(char* io_Str, int in_StrLen, int in_ValueDelim = '\t')
+	{
+		int ret = 0;
+		if (io_Str)
+		{
+			for (int i = 0; i < 3 && in_StrLen - ret > 0; i++)
+				if (in_StrLen - (ret += sprintf_s(io_Str + ret, in_StrLen - ret, "NULL")) > 0 && i < 2)
+					io_Str[ret++] = in_ValueDelim;
+
+			io_Str[ret] = 0;
+		}
+		return ret;
+	}
+
+
+	int PRINT(char* io_Str, int in_StrLen, int in_ValueDelim = '\t', const char* in_Format = "%g")
+	{
+		int ret = 0;
+		if (io_Str)
+		{
+			if (in_Format && *in_Format)
+			{
+				double* pData = &X;
+
+				for (int i = 0; i < 3 && in_StrLen - ret > 0; i++, pData++)
+					if (in_StrLen - (ret += sprintf_s(io_Str + ret, in_StrLen - ret, in_Format, *pData)) > 0 && i < 2)
+						io_Str[ret++] = in_ValueDelim;
+			}
+			io_Str[ret] = 0;
+		}
+		return ret;
+	}
+
 };
 
 struct SPosI64
@@ -277,6 +333,21 @@ struct SData_SD
 };
 
 
+
+#define SDATA_ALL			0x070F
+
+#define SDATA_ALL_VECTORS	0x000F
+#define SDATA_POSITION		0x0001
+#define SDATA_SPEED			0x0002
+#define SDATA_ACCEL3D		0x0004
+#define SDATA_ACCELDERIV3D	0x0008
+
+#define SDATA_ALL_SCALARS	0x0700
+#define SDATA_ABSSPEED		0x0100
+#define SDATA_DENSITY		0x0200
+#define SDATA_TIMEPOINT		0x0400
+
+
 struct SData
 {
 	SPos position;
@@ -292,6 +363,177 @@ struct SData
 
 	static double GetDistance(const SData& Ptr1, const SData& Ptr2) { return SPos::GetDistance(Ptr1.position, Ptr2.position); }
 	static double GetDistancePwr2(const SData& Ptr1, const SData& Ptr2) { return SPos::GetDistancePwr2(Ptr1.position, Ptr2.position); }
+
+	void CLEAR()
+	{
+		position = { 0 };
+		Speed = { 0 };
+		Accel3D = { 0 };
+		AccelDeriv3D = { 0 };
+		AbsSpeed = 0.0;
+		Density = 0.0;
+		TimePoint = -9.0e99; // типа, это врем€
+	};
+
+	static int PRINT_AS_NULL(char* io_Str, int in_StrLen, int in_Flags, int in_ValueDelim = '\t', int in_SubValueDelim = '\t')
+	{
+		int ret = 0;
+		if (io_Str)
+		{
+			const char* txtNULL = "NULL";
+			int nOutput;
+			if (in_StrLen - ret > 0 && (in_Flags & SDATA_POSITION))
+			{
+				in_Flags ^= SDATA_POSITION;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "position");
+				if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+				nOutput = SPos::PRINT_AS_NULL(io_Str + ret, in_StrLen - ret, in_SubValueDelim);
+				if (in_StrLen - (ret += nOutput) > 0 && in_Flags)
+						io_Str[ret++] = in_ValueDelim;
+			}
+
+			if (in_StrLen - ret > 0 && (in_Flags & SDATA_SPEED))
+			{
+				in_Flags ^= SDATA_SPEED;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "Speed");
+				if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+				nOutput = SPos::PRINT_AS_NULL(io_Str + ret, in_StrLen - ret, in_SubValueDelim);
+				if (in_StrLen - (ret += nOutput) > 0 && in_Flags)
+					io_Str[ret++] = in_ValueDelim;
+			}
+
+			if (in_StrLen - ret > 0 && (in_Flags & SDATA_ACCEL3D))
+			{
+				in_Flags ^= SDATA_ACCEL3D;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "Accel3D");
+				if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+				nOutput = SPos::PRINT_AS_NULL(io_Str + ret, in_StrLen - ret, in_SubValueDelim);
+				if (in_StrLen - (ret += nOutput) > 0 && in_Flags)
+					io_Str[ret++] = in_ValueDelim;
+			}
+
+			if (in_StrLen - ret > 0 && (in_Flags & SDATA_ACCELDERIV3D))
+			{
+				in_Flags ^= SDATA_ACCELDERIV3D;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "AccelDeriv3D");
+				if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+				nOutput = SPos::PRINT_AS_NULL(io_Str + ret, in_StrLen - ret, in_SubValueDelim);
+				if (in_StrLen - (ret += nOutput) > 0  && in_Flags)
+					io_Str[ret++] = in_ValueDelim;
+			}
+
+			if (in_StrLen - ret > 0 && (in_Flags & SDATA_ABSSPEED))
+			{
+				in_Flags ^= SDATA_ABSSPEED;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "AbsSpeed");
+				if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, txtNULL);
+				if (in_StrLen - (ret += nOutput) > 0  && in_Flags)
+					io_Str[ret++] = in_ValueDelim;
+			}
+
+			if (in_StrLen - ret > 0 && (in_Flags & SDATA_DENSITY))
+			{
+				in_Flags ^= SDATA_DENSITY;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "Density");
+				if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, txtNULL);
+				if (in_StrLen - (ret += nOutput) > 0  && in_Flags)
+					io_Str[ret++] = in_ValueDelim;
+			}
+
+			if (in_StrLen - ret > 0 && (in_Flags & SDATA_TIMEPOINT))
+			{
+				in_Flags ^= SDATA_TIMEPOINT;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "TimePoint");
+				if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+				nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, txtNULL);
+				if (in_StrLen - (ret += nOutput) > 0  && in_Flags)
+					io_Str[ret++] = in_ValueDelim;
+			}
+			*io_Str = 0;
+		}
+
+		return ret;
+	}
+
+	int PRINT(char* io_Str, int in_StrLen, int in_Flags, int in_ValueDelim = '\t', int in_SubValueDelim = '\t', const char* in_Format = "%g")
+	{
+		int ret = 0;
+		if (io_Str)
+		{
+			if (in_Format && *in_Format)
+			{
+				int nOutput;
+				if (in_StrLen - ret > 0 && (in_Flags & SDATA_POSITION))
+				{
+					in_Flags ^= SDATA_POSITION;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "position");
+					if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+
+					nOutput = position.PRINT(io_Str + ret, in_StrLen - ret, in_SubValueDelim, in_Format);
+					if (in_StrLen - (ret += nOutput) > 0  && in_Flags)	io_Str[ret++] = in_ValueDelim;
+				}
+
+				if (in_StrLen - ret > 0 && (in_Flags & SDATA_SPEED))
+				{
+					in_Flags ^= SDATA_SPEED;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "Speed");
+					if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+					nOutput = Speed.PRINT(io_Str + ret, in_StrLen - ret, in_SubValueDelim, in_Format);
+					if (in_StrLen - (ret += nOutput) > 0  && in_Flags)	io_Str[ret++] = in_ValueDelim;
+				}
+
+				if (in_StrLen - ret > 0 && (in_Flags & SDATA_ACCEL3D))
+				{
+					in_Flags ^= SDATA_ACCEL3D;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "Accel3D");
+					if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+					nOutput = Accel3D.PRINT(io_Str + ret, in_StrLen - ret, in_SubValueDelim, in_Format);
+					if (in_StrLen - (ret += nOutput) > 0  && in_Flags)	io_Str[ret++] = in_ValueDelim;
+				}
+
+				if (in_StrLen - ret > 0 && (in_Flags & SDATA_ACCELDERIV3D))
+				{
+					in_Flags ^= SDATA_ACCELDERIV3D;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "AccelDeriv3D");
+					if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+					nOutput = AccelDeriv3D.PRINT(io_Str + ret, in_StrLen - ret, in_SubValueDelim, in_Format);
+					if (in_StrLen - (ret += nOutput) > 0  && in_Flags)		io_Str[ret++] = in_ValueDelim;
+				}
+
+				if (in_StrLen - ret > 0 && (in_Flags & SDATA_ABSSPEED))
+				{
+					in_Flags ^= SDATA_ABSSPEED;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "AbsSpeed");
+					if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, in_Format, AbsSpeed);
+					if (in_StrLen - (ret += nOutput) > 0  && in_Flags)		io_Str[ret++] = in_ValueDelim;
+				}
+
+				if (in_StrLen - ret > 0 && (in_Flags & SDATA_DENSITY))
+				{
+					in_Flags ^= SDATA_DENSITY;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "Density");
+					if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, in_Format, Density);
+					if (in_StrLen - (ret += nOutput) > 0  && in_Flags)		io_Str[ret++] = in_ValueDelim;
+				}
+
+				if (in_StrLen - ret > 0 && (in_Flags & SDATA_TIMEPOINT))
+				{
+					in_Flags ^= SDATA_TIMEPOINT;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "TimePoint");
+					if (in_StrLen - (ret += nOutput) > 0) io_Str[ret++] = in_ValueDelim;
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, in_Format, TimePoint);
+					if (in_StrLen - (ret += nOutput) > 0  && in_Flags)		io_Str[ret++] = in_ValueDelim;
+				}
+			}
+			io_Str[ret] = 0;
+		}
+
+		return ret;
+	};
 
 	static double GetRelativeSpeed(const SData& Ptr1, const SData& Ptr2, SPos* RSpeed3D)
 	{

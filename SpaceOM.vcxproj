@@ -185,6 +185,7 @@
   <ItemGroup>
     <ClInclude Include="CDrawDlg.h" />
     <ClInclude Include="CFindDlg.h" />
+    <ClInclude Include="CommonFunc.h" />
     <ClInclude Include="CSDataArray.h" />
     <ClInclude Include="CSP_Group.h" />
     <ClInclude Include="framework.h" />
@@ -199,6 +200,7 @@
   <ItemGroup>
     <ClCompile Include="CDrawDlg.cpp" />
     <ClCompile Include="CFindDlg.cpp" />
+    <ClCompile Include="CommonFunc.cpp" />
     <ClCompile Include="CSDataArray.cpp" />
     <ClCompile Include="CSP_Group.cpp" />
     <ClCompile Include="FindSub.cpp" />
@@ -220,6 +222,9 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\SpaceOM.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="settings_base.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

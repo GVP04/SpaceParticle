@@ -38,6 +38,8 @@ protected:
 	DECLARE_MESSAGE_MAP()
 public:
 	SP_Calc m_Calc_1;
+	SP_CalcFind m_CalcFind_1;
+
 	SP_CalcFind m_Calc_FIND[M_NCALCFIND];
 
 	virtual BOOL DestroyWindow();

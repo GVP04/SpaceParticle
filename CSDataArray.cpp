@@ -43,7 +43,7 @@ int CSDataArray::AddData(int in_maxCountLimit, SData *in_Data)
 	if (m_Array && in_Data)
 	{
 		CurPos++;
-		if (in_maxCountLimit >5000 && CurPos >= in_maxCountLimit)
+		if ((in_maxCountLimit >5000 && CurPos >= in_maxCountLimit) || CurPos > DA_MAX_ITEMS)
 		{
 			int deltaMove = CurPos >> 4;
 			CurPos -= deltaMove;

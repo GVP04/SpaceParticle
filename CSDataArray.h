@@ -4,6 +4,7 @@
 
 #define DA_SHRINK_FLAG_NONE		0x0000
 #define DA_SHRINK_FLAG_FREE		0x0001
+#define DA_MAX_ITEMS			0x1000000
 
 class CSDataArray
 {

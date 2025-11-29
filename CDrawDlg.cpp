@@ -2,6 +2,7 @@
 //
 
 #include "pch.h"
+#include "CommonFunc.h"
 #include "SpaceOM.h"
 #include "afxdialogex.h"
 #include "CDrawDlg.h"
@@ -19,11 +20,10 @@ CDrawDlg::CDrawDlg(SP_Calc* in_pData, CWnd* pParent /*=nullptr*/)
 {
     m_pData = in_pData;
 	m_hDCBitmap = NULL;
-	m_ViewMltpl = 0.1;
 	m_ViewPrc = 100.0;
 	m_ViewSpread = 100.0;
 
-	m_WindowPos = { 0 };
+	m_pData->DrawSet.WindowPos = { 0 };
 
 	m_uRedrawFlag = 1;
 
@@ -51,13 +51,13 @@ BEGIN_MESSAGE_MAP(CDrawDlg, CDialogEx)
 	ON_WM_SIZE()
 	ON_WM_VSCROLL()
 	ON_WM_HSCROLL()
-	ON_NOTIFY(NM_RELEASEDCAPTURE, IDC_SLIDERMGNF, &CDrawDlg::OnReleasedcaptureSlidermgnf)
-	ON_NOTIFY(TRBN_THUMBPOSCHANGING, IDC_SLIDERMGNF, &CDrawDlg::OnThumbposchangingSlidermgnf)
 	ON_BN_CLICKED(IDC_BUTTON_REFRESH, &CDrawDlg::OnBnClicked_Refresh)
 	ON_BN_CLICKED(IDC_BUTTON_SAVE, &CDrawDlg::OnBnClicked_Save)
 	ON_BN_CLICKED(IDC_BUTTON_UPLEFT, &CDrawDlg::OnBnClicked_UpLeft)
 	ON_BN_CLICKED(IDC_BUTTON_CENTER, &CDrawDlg::OnBnClicked_Center)
 	ON_BN_CLICKED(IDC_BUTTON_XYZ, &CDrawDlg::OnBnClickedButtonXyz)
+	ON_BN_CLICKED(IDC_BUTTONCMD, &CDrawDlg::OnBnClickedButtoncmd)
+	ON_BN_CLICKED(IDC_BUTTON_GROUP, &CDrawDlg::OnBnClickedButtonGroup)
 END_MESSAGE_MAP()
 
 
@@ -131,20 +131,20 @@ void CDrawDlg::OnPaint()
 			else
 				delta00.Y = m_pData->DrawSet.BMP_Size.Y - m_pData->DrawSet.BMP_Size.X;
 
+			m_pData->DrawSet.ViewMltpl *= m_pData->DrawSet.ViewMltpl_Ext;
 
-			m_pData->DrawSet.m_00_Pos.X = (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl * m_ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl * m_ViewMltpl;
-			m_pData->DrawSet.m_00_Pos.Y = (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl * m_ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl * m_ViewMltpl;
+			m_pData->DrawSet.m_00_Pos.X = (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl;
+			m_pData->DrawSet.m_00_Pos.Y = (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl;
 
-			m_pData->DrawSet.ViewMltpl *= m_ViewMltpl;
 			
-			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT, delta00);
+			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT | SP_DRAW_GROUPINFO, delta00);
 
 			m_pData->DrawSet = oldDrawSet;
 
 			m_uRedrawFlag = 0;
 		}
 
-		::BitBlt(dc.m_hDC, re.left, re.top, re.Width(), re.Height(), DCMem.m_hDC, re.left + (int)m_WindowPos.X, re.top + (int)m_WindowPos.Y, SRCCOPY);
+		::BitBlt(dc.m_hDC, re.left, re.top, re.Width(), re.Height(), DCMem.m_hDC, re.left + (int)m_pData->DrawSet.WindowPos.X, re.top + (int)m_pData->DrawSet.WindowPos.Y, SRCCOPY);
 
 		// Select the old bitmap back into the device context.
 		DCMem.SelectObject(hOldBitmap);
@@ -220,19 +220,16 @@ void GetPrcPos(int* out_Pos, double* out_Mgnf, double in_Data, int in_FullRange)
 }
 
 
-double CDrawDlg::SetMltpl(double in_Mltpl)
+void CDrawDlg::SetMltplSliderPos()
 {
-	double ret = m_ViewMltpl;
+	//if (m_pData)   !!!!!!!!!!!!!!
+	{
+		m_SliderMgnf.SetRange(0, 140);
 
-	m_ViewMltpl = in_Mltpl;
-
-	m_SliderMgnf.SetRange(0, 140);
-
-	int posMgn;
-	GetMgnPos(&posMgn, NULL, m_ViewMltpl, 140);
-	m_SliderMgnf.SetPos(posMgn);
-
-	return ret;
+		int posMgn;
+		GetMgnPos(&posMgn, NULL, m_pData->DrawSet.ViewMltpl_Ext, 140);
+		m_SliderMgnf.SetPos(posMgn);
+	}
 }
 
 
@@ -277,24 +274,28 @@ void CDrawDlg::Set00Point(SPos &in_00, bool bRedraw)
 
 void CDrawDlg::SetWindowPos(SPos & in_WPos, bool bRedraw)
 {
+	//if (m_pData)   !!!!!!!!!!!!!!!!!!!!test
+	{
+		m_pData->DrawSet.WindowPos = in_WPos;
 
-	SCROLLINFO si = { 0 };
-	si.cbSize = sizeof(SCROLLINFO);
-	si.fMask = SIF_POS;
+		SCROLLINFO si = { 0 };
+		si.cbSize = sizeof(SCROLLINFO);
+		si.fMask = SIF_POS;
 
-	m_WindowPos.Y = in_WPos.Y;
-	if (m_WindowPos.Y < 0)	m_WindowPos.Y = 0;
-	if (m_WindowPos.Y > m_pData->DrawSet.BMP_Size.Y)	m_WindowPos.Y = m_pData->DrawSet.BMP_Size.Y - 200;
+		m_pData->DrawSet.WindowPos.Y = in_WPos.Y;
+		if (m_pData->DrawSet.WindowPos.Y < 0)	m_pData->DrawSet.WindowPos.Y = 0;
+		if (m_pData->DrawSet.WindowPos.Y > m_pData->DrawSet.BMP_Size.Y)	m_pData->DrawSet.WindowPos.Y = m_pData->DrawSet.BMP_Size.Y - 200;
 
-	si.nPos = (int)m_WindowPos.Y;
-	SetScrollInfo(SB_VERT, &si, TRUE);
+		si.nPos = (int)m_pData->DrawSet.WindowPos.Y;
+		SetScrollInfo(SB_VERT, &si, TRUE);
 
-	m_WindowPos.X = in_WPos.X;
-	if (m_WindowPos.X < 0)	m_WindowPos.X = 0;
-	if (m_WindowPos.X > m_pData->DrawSet.BMP_Size.X)	m_WindowPos.X = m_pData->DrawSet.BMP_Size.X - 200;
+		m_pData->DrawSet.WindowPos.X = in_WPos.X;
+		if (m_pData->DrawSet.WindowPos.X < 0)	m_pData->DrawSet.WindowPos.X = 0;
+		if (m_pData->DrawSet.WindowPos.X > m_pData->DrawSet.BMP_Size.X)	m_pData->DrawSet.WindowPos.X = m_pData->DrawSet.BMP_Size.X - 200;
 
-	si.nPos = (int)m_WindowPos.X;
-	SetScrollInfo(SB_HORZ, &si, TRUE);
+		si.nPos = (int)m_pData->DrawSet.WindowPos.X;
+		SetScrollInfo(SB_HORZ, &si, TRUE);
+	}
 
 	if (bRedraw) Invalidate();
 }
@@ -317,7 +318,7 @@ BOOL CDrawDlg::OnInitDialog()
 
 	OnBnClicked_Center();
 
-	SetMltpl(1.0);
+	SetMltplSliderPos();
 	SetViewPrc(m_pData->DrawSet.ViewPoint.TimeInPc);
 	SetViewSpread(m_pData->DrawSet.ViewPoint.Spread);
 
@@ -343,7 +344,7 @@ void CDrawDlg::OnSize(UINT nType, int cx, int cy)
 	si.nMin = 0;
 	si.nMax = (int)m_pData->DrawSet.BMP_Size.X;
 	si.nPage = cx;
-	si.nPos = (int)m_WindowPos.X;
+	si.nPos = (int)m_pData->DrawSet.WindowPos.X;
 
 	SetScrollInfo(SB_HORZ, &si, TRUE);
 
@@ -369,25 +370,25 @@ void CDrawDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		if (pScrollBar) si.nPos = 0;
 		switch (nSBCode)
 		{
-		case SB_PAGEUP:			m_WindowPos.Y -= 400; break;
-		case SB_PAGEDOWN:		m_WindowPos.Y += 400; break;
-		case SB_LINEUP:			m_WindowPos.Y -= 20; break;
-		case SB_LINEDOWN:		m_WindowPos.Y += 20; break;
-		case SB_THUMBPOSITION:	m_WindowPos.Y = nPos; break;
+		case SB_PAGEUP:			m_pData->DrawSet.WindowPos.Y -= 400; break;
+		case SB_PAGEDOWN:		m_pData->DrawSet.WindowPos.Y += 400; break;
+		case SB_LINEUP:			m_pData->DrawSet.WindowPos.Y -= 20; break;
+		case SB_LINEDOWN:		m_pData->DrawSet.WindowPos.Y += 20; break;
+		case SB_THUMBPOSITION:	m_pData->DrawSet.WindowPos.Y = nPos; break;
 		case SB_ENDSCROLL:		break;
-		case SB_TOP:			m_WindowPos.Y = 0; break;
-		case SB_BOTTOM:			m_WindowPos.Y = nPos - 200; break;
-		case SB_THUMBTRACK:		m_WindowPos.Y = nPos; break;
+		case SB_TOP:			m_pData->DrawSet.WindowPos.Y = 0; break;
+		case SB_BOTTOM:			m_pData->DrawSet.WindowPos.Y = nPos - 200; break;
+		case SB_THUMBTRACK:		m_pData->DrawSet.WindowPos.Y = nPos; break;
 		default:
 			nPos = nPos;
 			break;
 		}
-		if (m_WindowPos.Y < 0)
-			m_WindowPos.Y = 0;
-		if (m_WindowPos.Y > m_pData->DrawSet.BMP_Size.Y)
-			m_WindowPos.Y = m_pData->DrawSet.BMP_Size.Y - 200;
+		if (m_pData->DrawSet.WindowPos.Y < 0)
+			m_pData->DrawSet.WindowPos.Y = 0;
+		if (m_pData->DrawSet.WindowPos.Y > m_pData->DrawSet.BMP_Size.Y)
+			m_pData->DrawSet.WindowPos.Y = m_pData->DrawSet.BMP_Size.Y - 200;
 
-		si.nPos = (int)m_WindowPos.Y;
+		si.nPos = (int)m_pData->DrawSet.WindowPos.Y;
 
 		SetScrollInfo(SB_VERT, &si, TRUE);
 		Invalidate();
@@ -398,7 +399,7 @@ void CDrawDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		nPos = m_SliderMgnf.GetPos();
 
 		int PosValue = m_SliderMgnf.GetPos();
-		GetMgnPos(&PosValue, NULL, m_ViewMltpl, 140);
+		GetMgnPos(&PosValue, NULL, m_pData->DrawSet.ViewMltpl_Ext, 140);
 		if (nPos != PosValue)
 			bRedraw = true;
 		switch (nSBCode)
@@ -416,7 +417,7 @@ void CDrawDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		}
 		if (bRedraw)
 		{
-			GetMgnPos(NULL, &m_ViewMltpl, nPos, 140);
+			GetMgnPos(NULL, &m_pData->DrawSet.ViewMltpl_Ext, nPos, 140);
 			RedrawMe();
 		}
 	}
@@ -438,25 +439,25 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 
 		switch (nSBCode)
 		{
-		case SB_PAGEUP:			m_WindowPos.X -= 400; break;
-		case SB_PAGEDOWN:		m_WindowPos.X += 400; break;
-		case SB_LINEUP:			m_WindowPos.X -= 20; break;
-		case SB_LINEDOWN:		m_WindowPos.X += 20; break;
-		case SB_THUMBPOSITION:	m_WindowPos.X = nPos; break;
+		case SB_PAGEUP:			m_pData->DrawSet.WindowPos.X -= 400; break;
+		case SB_PAGEDOWN:		m_pData->DrawSet.WindowPos.X += 400; break;
+		case SB_LINEUP:			m_pData->DrawSet.WindowPos.X -= 20; break;
+		case SB_LINEDOWN:		m_pData->DrawSet.WindowPos.X += 20; break;
+		case SB_THUMBPOSITION:	m_pData->DrawSet.WindowPos.X = nPos; break;
 		case SB_ENDSCROLL:		break;
-		case SB_TOP:			m_WindowPos.X = 0; break;
-		case SB_BOTTOM:			m_WindowPos.X = nPos - 200; break;
-		case SB_THUMBTRACK:		m_WindowPos.X = nPos; break;
+		case SB_TOP:			m_pData->DrawSet.WindowPos.X = 0; break;
+		case SB_BOTTOM:			m_pData->DrawSet.WindowPos.X = nPos - 200; break;
+		case SB_THUMBTRACK:		m_pData->DrawSet.WindowPos.X = nPos; break;
 		default:
 			nPos = nPos;
 			break;
 		}
-		if (m_WindowPos.X < 0)
-			m_WindowPos.X = 0;
-		if (m_WindowPos.X > m_pData->DrawSet.BMP_Size.X)
-			m_WindowPos.X = m_pData->DrawSet.BMP_Size.X - 200;
+		if (m_pData->DrawSet.WindowPos.X < 0)
+			m_pData->DrawSet.WindowPos.X = 0;
+		if (m_pData->DrawSet.WindowPos.X > m_pData->DrawSet.BMP_Size.X)
+			m_pData->DrawSet.WindowPos.X = m_pData->DrawSet.BMP_Size.X - 200;
 
-		si.nPos = (int)m_WindowPos.X;
+		si.nPos = (int)m_pData->DrawSet.WindowPos.X;
 
 		SetScrollInfo(SB_HORZ, &si, TRUE);
 		Invalidate();
@@ -493,12 +494,15 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	else if (WndId == IDC_SLIDERVIEWSPREAD)
 	{
 		bool bRedraw = false;
+
+
 		nPos = m_SliderSpread.GetPos();
 
 		int PosValue = m_SliderSpread.GetPos();
 		GetPrcPos(&PosValue, NULL, m_ViewSpread, 140);
 		if (nPos != PosValue)
 			bRedraw = true;
+
 		switch (nSBCode)
 		{
 		case SB_PAGEUP:				break;
@@ -509,9 +513,11 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		case SB_ENDSCROLL:			break;
 		case SB_TOP:				break;
 		case SB_BOTTOM:				break;
-		case SB_THUMBTRACK:			bRedraw = false;	break;
+		case SB_THUMBTRACK:	
+			bRedraw = false;	break;
 		default:		break;
 		}
+
 		if (bRedraw)
 		{
 			GetPrcPos(NULL, &m_ViewSpread, nPos, 140);
@@ -523,183 +529,10 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 	//CDialogEx::OnHScroll(nSBCode, nPos, pScrollBar);
 }
 
-
-BOOL CDrawDlg::OnNotify(WPARAM wParam, LPARAM lParam, LRESULT* pResult)
-{
-	// TODO: Add your specialized code here and/or call the base class
-
-	return CDialogEx::OnNotify(wParam, lParam, pResult);
-}
-
-
-void CDrawDlg::OnReleasedcaptureSlidermgnf(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	// TODO: Add your control notification handler code here
-	*pResult = 0;
-}
-
-
-void CDrawDlg::OnThumbposchangingSlidermgnf(NMHDR* pNMHDR, LRESULT* pResult)
-{
-	// This feature requires Windows Vista or greater.
-	// The symbol _WIN32_WINNT must be >= 0x0600.
-	NMTRBTHUMBPOSCHANGING* pNMTPC = reinterpret_cast<NMTRBTHUMBPOSCHANGING*>(pNMHDR);
-	// TODO: Add your control notification handler code here
-	*pResult = 0;
-}
-
-
 void CDrawDlg::OnBnClicked_Refresh()
 {
 	RedrawMe();
 }
-
-
-
-
-
-/*
-
-	HDC hdcScreen;
-	HDC hdcWindow;
-	HDC hdcMemDC = NULL;
-	HBITMAP hbmScreen = NULL;
-	BITMAP bmpScreen;
-	DWORD dwBytesWritten = 0;
-	DWORD dwSizeofDIB = 0;
-	HANDLE hFile = NULL;
-	char* lpbitmap = NULL;
-	HANDLE hDIB = NULL;
-	DWORD dwBmpSize = 0;
-
-	// Retrieve the handle to a display device context for the client
-	// area of the window.
-	hdcScreen = GetDC(NULL);
-	hdcWindow = GetDC(hWnd);
-
-	// Create a compatible DC, which is used in a BitBlt from the window DC.
-	hdcMemDC = CreateCompatibleDC(hdcWindow);
-
-	if (!hdcMemDC)
-	{
-		MessageBox(hWnd, L"CreateCompatibleDC has failed", L"Failed", MB_OK);
-		goto done;
-	}
-
-	// Get the client area for size calculation.
-	RECT rcClient;
-	GetClientRect(hWnd, &rcClient);
-
-	// This is the best stretch mode.
-	SetStretchBltMode(hdcWindow, HALFTONE);
-
-	// The source DC is the entire screen, and the destination DC is the current window (HWND).
-
-
-
-if (!StretchBlt(hdcWindow,
-		0, 0,
-		rcClient.right, rcClient.bottom,
-		hdcScreen,
-		0, 0,
-		GetSystemMetrics(SM_CXSCREEN),
-		GetSystemMetrics(SM_CYSCREEN),
-		SRCCOPY))
-	{
-		MessageBox(hWnd, L"StretchBlt has failed", L"Failed", MB_OK);
-		goto done;
-	}
-
-	// Create a compatible bitmap from the Window DC.
-	hbmScreen = CreateCompatibleBitmap(hdcWindow, rcClient.right - rcClient.left, rcClient.bottom - rcClient.top);
-
-	if (!hbmScreen)
-	{
-		MessageBox(hWnd, L"CreateCompatibleBitmap Failed", L"Failed", MB_OK);
-		goto done;
-	}
-
-	// Select the compatible bitmap into the compatible memory DC.
-	SelectObject(hdcMemDC, hbmScreen);
-
-	// Bit block transfer into our compatible memory DC.
-	if (!BitBlt(hdcMemDC,
-		0, 0,
-		rcClient.right - rcClient.left, rcClient.bottom - rcClient.top,
-		hdcWindow,
-		0, 0,
-		SRCCOPY))
-	{
-		MessageBox(hWnd, L"BitBlt has failed", L"Failed", MB_OK);
-		goto done;
-	}
-
-	// Get the BITMAP from the HBITMAP.
-	GetObject(hbmScreen, sizeof(BITMAP), &bmpScreen);
-
-	BITMAPFILEHEADER   bmfHeader;
-	BITMAPINFOHEADER   bi;
-
-	bi.biSize = sizeof(BITMAPINFOHEADER);
-	bi.biWidth = bmpScreen.bmWidth;
-	bi.biHeight = bmpScreen.bmHeight;
-	bi.biPlanes = 1;
-	bi.biBitCount = 32;
-	bi.biCompression = BI_RGB;
-	bi.biSizeImage = 0;
-	bi.biXPelsPerMeter = 0;
-	bi.biYPelsPerMeter = 0;
-	bi.biClrUsed = 0;
-	bi.biClrImportant = 0;
-
-	dwBmpSize = ((bmpScreen.bmWidth * bi.biBitCount + 31) / 32) * 4 * bmpScreen.bmHeight;
-
-	// Starting with 32-bit Windows, GlobalAlloc and LocalAlloc are implemented as wrapper functions that
-	// call HeapAlloc using a handle to the process's default heap. Therefore, GlobalAlloc and LocalAlloc
-	// have greater overhead than HeapAlloc.
-	hDIB = GlobalAlloc(GHND, dwBmpSize);
-	lpbitmap = (char*)GlobalLock(hDIB);
-
-	// Gets the "bits" from the bitmap, and copies them into a buffer
-	// that's pointed to by lpbitmap.
-	GetDIBits(hdcWindow, hbmScreen, 0,
-		(UINT)bmpScreen.bmHeight,
-		lpbitmap,
-		(BITMAPINFO*)&bi, DIB_RGB_COLORS);
-
-	// A file is created, this is where we will save the screen capture.
-	hFile = CreateFile(L"captureqwsx.bmp",
-		GENERIC_WRITE,
-		0,
-		NULL,
-		CREATE_ALWAYS,
-		FILE_ATTRIBUTE_NORMAL, NULL);
-
-	// Add the size of the headers to the size of the bitmap to get the total file size.
-	dwSizeofDIB = dwBmpSize + sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER);
-
-	// Offset to where the actual bitmap bits start.
-	bmfHeader.bfOffBits = (DWORD)sizeof(BITMAPFILEHEADER) + (DWORD)sizeof(BITMAPINFOHEADER);
-
-	// Size of the file.
-	bmfHeader.bfSize = dwSizeofDIB;
-
-	// bfType must always be BM for Bitmaps.
-	bmfHeader.bfType = 0x4D42; // BM.
-
-	WriteFile(hFile, (LPSTR)&bmfHeader, sizeof(BITMAPFILEHEADER), &dwBytesWritten, NULL);
-	WriteFile(hFile, (LPSTR)&bi, sizeof(BITMAPINFOHEADER), &dwBytesWritten, NULL);
-	WriteFile(hFile, (LPSTR)lpbitmap, dwBmpSize, &dwBytesWritten, NULL);
-
-	// Unlock and Free the DIB from the heap.
-	GlobalUnlock(hDIB);
-	GlobalFree(hDIB);
-
-	// Close the handle for the file that was created.
-	CloseHandle(hFile);
-
-*/
-
 
 void CDrawDlg::OnBnClicked_Save()
 {
@@ -708,7 +541,7 @@ void CDrawDlg::OnBnClicked_Save()
 		SDrawSettings oldDrawSet = m_pData->DrawSet;
 
 		SPos TraceSize = { 0 };
-		int BMP_Size = 1000;
+		int BMP_Size = 2000;
 
 		m_pData->DrawSet.BMP_Size.X = BMP_Size;
 		m_pData->DrawSet.BMP_Size.Y = BMP_Size;
@@ -725,9 +558,10 @@ void CDrawDlg::OnBnClicked_Save()
 		else m_pData->DrawSet.ViewMltpl = BMP_Size / TraceSize.Y;
 
 		m_pData->DrawSet.ViewMltpl *= 0.98;
+		m_pData->DrawSet.ViewMltpl *= m_pData->DrawSet.ViewMltpl_Ext;
 
-		m_pData->DrawSet.m_00_Pos.X = (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl * m_ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl * m_ViewMltpl;
-		m_pData->DrawSet.m_00_Pos.Y = (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl * m_ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl * m_ViewMltpl;
+		m_pData->DrawSet.m_00_Pos.X = (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl;
+		m_pData->DrawSet.m_00_Pos.Y = (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl;
 
 
 		CPaintDC dc(this);
@@ -746,9 +580,8 @@ void CDrawDlg::OnBnClicked_Save()
 
 			SPos tmp = { 0 };
 
-			m_pData->DrawSet.ViewMltpl *= m_ViewMltpl;
 
-			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT, tmp);
+			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT | SP_DRAW_GROUPINFO, tmp);
 
 			char fileMane[500];
 			sprintf_s(fileMane, "C:\\SParticle\\BMP\\CALC_NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_PT%g_%d.bmp",
@@ -780,11 +613,11 @@ void CDrawDlg::OnBnClicked_UpLeft()
 	si.fMask = SIF_POS;
 
 
-	m_WindowPos.X = 0.0; 
+	m_pData->DrawSet.WindowPos.X = 0.0; 
 	si.nPos = 0;
 	SetScrollInfo(SB_HORZ, &si, TRUE);
 
-	m_WindowPos.Y = 0.0;
+	m_pData->DrawSet.WindowPos.Y = 0.0;
 	si.nPos = 0;
 	SetScrollInfo(SB_VERT, &si, TRUE);
 
@@ -801,13 +634,13 @@ void CDrawDlg::OnBnClicked_Center()
 	si.cbSize = sizeof(SCROLLINFO);
 	si.fMask = SIF_POS;
 
-	m_WindowPos.X =  (((int)m_pData->DrawSet.BMP_Size.X) >> 1) - re.right / 2;
-	si.nPos = (int)m_WindowPos.X;
+	m_pData->DrawSet.WindowPos.X =  (((int)m_pData->DrawSet.BMP_Size.X) >> 1) - re.right / 2;
+	si.nPos = (int)m_pData->DrawSet.WindowPos.X;
 
 	SetScrollInfo(SB_HORZ, &si, TRUE);
 
-	m_WindowPos.Y = (((int)m_pData->DrawSet.BMP_Size.Y) >> 1) - re.bottom / 2;
-	si.nPos = (int)m_WindowPos.Y;
+	m_pData->DrawSet.WindowPos.Y = (((int)m_pData->DrawSet.BMP_Size.Y) >> 1) - re.bottom / 2;
+	si.nPos = (int)m_pData->DrawSet.WindowPos.Y;
 	SetScrollInfo(SB_VERT, &si, TRUE);
 
 	Invalidate();
@@ -822,4 +655,32 @@ void CDrawDlg::OnBnClickedButtonXyz()
 
 	RedrawMe();
 	OnBnClicked_Center();
+}
+
+void CDrawDlg::OnBnClickedButtoncmd()
+{
+	if (m_pData && m_pData->Group)
+	{
+		char* tmps = new char[SD_PARAMSLEN];
+
+		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDITCMD), tmps, SD_PARAMSLEN);
+		m_pData->Group->Cmd_Add(tmps);
+		delete [] tmps;
+	}
+}
+
+void CDrawDlg::OnBnClickedButtonGroup()
+{
+
+	if (m_pData && m_pData->Group)
+	{
+		char* tmps = new char[SD_PARAMSLEN];
+
+		m_pData->DrawSet.ShowGroupArrows  = (m_pData->DrawSet.ShowGroupArrows & 0xFFFFFFFC) | ((m_pData->DrawSet.ShowGroupArrows & 0x3) + 1 );
+
+		sprintf_s(tmps, SD_PARAMSLEN, "SET TRACE_GROUP_ARR = %d", m_pData->DrawSet.ShowGroupArrows);
+		m_pData->Group->Cmd_Add(tmps);
+
+		delete[] tmps;
+	}
 }
