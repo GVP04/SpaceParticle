@@ -1,4 +1,4 @@
-
+﻿
 // SpaceOM.h : main header file for the PROJECT_NAME application
 //
 
@@ -15,11 +15,13 @@
 // See SpaceOM.cpp for the implementation of this class
 //
 
+class CSpaceOMDlg;
+
 class CSpaceOMApp : public CWinApp
 {
 public:
 	CSpaceOMApp();
-
+	CSpaceOMDlg* dlg;
 // Overrides
 public:
 	virtual BOOL InitInstance();

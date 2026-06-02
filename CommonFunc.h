@@ -1,3 +1,86 @@
+﻿#pragma once
+#define M_COUTER_SET_MAX    0x7FFFFFF0
+
+struct LoopCounter
+{
+private:
+    int StepsInLoop;
+    int LoopsCount;
+    int CurStep;
+    int CurLoop;
+    int Base;
+    int AlighmentRes1;
+
+public:
+
+    LoopCounter(int in_Base)
+    {
+        if (in_Base >= 0 && in_Base < M_COUTER_SET_MAX - 1)
+            Base = in_Base;
+        else
+            Base = 0;
+        CLEAR();
+    };
+
+    LoopCounter()
+    {
+        Base = 0;
+        CLEAR();
+    };
+
+    void CLEAR()
+    {
+        StepsInLoop = 1 + Base;
+        LoopsCount = 1 + Base;
+        InitLoop();
+    }
+
+    int GetCurStep() { return CurStep; }
+    int GetCurLoop() { return CurLoop; }
+
+    void SetData(int in_StepsInLoop, int in_LoopsCount)
+    {
+        StepsInLoop = in_StepsInLoop;
+        LoopsCount = in_LoopsCount;
+        if (StepsInLoop + +Base > M_COUTER_SET_MAX) StepsInLoop = M_COUTER_SET_MAX - Base;
+        if (LoopsCount + Base > M_COUTER_SET_MAX) LoopsCount = M_COUTER_SET_MAX - Base;
+
+        if (StepsInLoop < 1 + Base) StepsInLoop = M_COUTER_SET_MAX;
+        if (LoopsCount < 1 + Base) LoopsCount = M_COUTER_SET_MAX;
+    }
+
+    void InitLoop()
+    {
+        CurStep = Base;
+        CurLoop = Base;
+    }
+
+    bool NextAndCheck()
+    {
+        if (++CurStep >= StepsInLoop + Base)
+        {
+            if (++CurLoop >= LoopsCount + Base)
+                CurStep = CurLoop = M_COUTER_SET_MAX ;
+            else 
+                CurStep = Base;
+        }
+        return CurStep < StepsInLoop + Base;
+    };
+
+    bool IsOn()
+    {
+        return CurStep < StepsInLoop + Base;
+    };
+};
+
+
+BYTE* convHexToByteArr(const char* iDataSrc, BYTE* ArrDataDst);
+BOOL GPCopyDir(const wchar_t* sDir, const wchar_t* dDir);
+BOOL GPDeleteDir(const wchar_t* iDir);
+
+
+void SaveBitmap(char* in_FileName, HDC in_hdc, HBITMAP in_hBMP);
+
 char * GetDblStr(char *oStr, char *oStr2, BYTE *Arr, UINT Len);
 char * GetDecStr(char *oStr, BYTE *Arr,   UINT Len);
 char * GetOctStr(char *oStr, BYTE *Arr,   UINT Len);
@@ -12,7 +95,6 @@ const char *GetFileName(const char *fname);
 //UINT SetObjStlCheck(CCheckListBox *m_ListUnitStl, UINT stl, int nn,const char **lpstl,const UINT *uistl,const UINT *uimask,UINT add = 0);
 UINT GPRecalcWndRect(CRect *QurentRect, CRect *EtalonRect,CRect *InitialRect, CRect *CompareRect,char *SizingStyle);
 UINT ShadowColor(UINT & incolor);
-void OptimColor(CDC *dc, UINT & iFRG, UINT & iBKG);
 void qsCharLine(const char **Item, int left, int right);
 void qsCharILine(const char **Item, int left, int right);
 void qsCharLineAndDWORD(const char **Item, DWORD *dwItem, int left, int right);
@@ -102,12 +184,7 @@ int wStrCompare( const char *srcStr1, const wchar_t *srcStr2 );
 int wStrCompare( const wchar_t *srcStr1, const char *srcStr2 );
 int wStrCompare( const char *srcStr1, const char *srcStr2 );
 
-
-int ReadCalcParam(char* in_Src, char* in_Mask, SPos& data, double defValu, int inFlags = READPARAMS_USE_DEFS);
-int ReadCalcParam(char* in_Src, char* in_Mask, int& data, int defValue, int inFlags = READPARAMS_USE_DEFS);
-int ReadCalcParam(char* in_Src, char* in_Mask, double& data, double defValue, int inFlags = READPARAMS_USE_DEFS);
 void DrawArrow(HDC hDC, int posSX, int posSY, int posEX, int posEY, int in_ArrLen);
-
 
 struct CMD_Param_File
 {
@@ -123,7 +200,7 @@ struct CMD_Param_File
     void CLEAR() {
         *FileName = 0;
         *Mode = 0;
-        pPile = NULL;
+        pPile = nullptr;
     };
 
     void CHECK()
@@ -152,6 +229,77 @@ struct CMD_Param_File
         return ret;
     }
 
+    void OUTPUT(const char *in_S)
+    {
+        if (pPile && in_S)
+        {
+            fputs(in_S, pPile);
+            fflush(pPile);
+        }
+    }
+
+    void OUTPUT(int in_Int)
+    {
+        if (pPile)
+        {
+            fprintf(pPile, "%d\n", in_Int);
+            fflush(pPile);
+        }
+    }
+
+
+    void OUTPUT(const char* in_S, INT64 in_Int)
+    {
+        if (pPile && in_S)
+        {
+            fprintf(pPile, "%s %I64d\n", in_S, in_Int);
+            fflush(pPile);
+        }
+    }
+
+    void OUTPUT(const char* in_S, INT64 in_Int1, INT64 in_Int2)
+    {
+        if (pPile && in_S)
+        {
+            fprintf(pPile, "%s\t%I64d\t%I64d\n", in_S, in_Int1, in_Int2);
+            fflush(pPile);
+        }
+    }
+    void OUTPUT(const char* in_S, INT64 in_Int1, int in_Int2)
+    {
+        if (pPile && in_S)
+        {
+            fprintf(pPile, "%s\t%I64d\t%d\n", in_S, in_Int1, in_Int2);
+            fflush(pPile);
+        }
+    }
+    void OUTPUT(const char* in_S, int in_Int1, INT64 in_Int2)
+    {
+        if (pPile && in_S)
+        {
+            fprintf(pPile, "%s\t%d\t%I64d\n", in_S, in_Int1, in_Int2);
+            fflush(pPile);
+        }
+    }
+
+    void OUTPUT(const char* in_S, int in_Int)
+    {
+        if (pPile && in_S)
+        {
+            fprintf(pPile, "%s %d\n", in_S, in_Int);
+            fflush(pPile);
+        }
+    }
+
+    void OUTPUT(const char* in_S, int in_Int1, int in_Int2)
+    {
+        if (pPile && in_S)
+        {
+            fprintf(pPile, "%s\t%d\t%d\n", in_S, in_Int1, in_Int2);
+            fflush(pPile);
+        }
+    }
+
     int ReadParams(char* in_String)
     {
         int ret = 0;
@@ -178,7 +326,6 @@ struct CMD_Param_File
         return ret;
     }
 };
-
 
 
 struct CMD_Param_DataType
@@ -229,7 +376,7 @@ struct CMD_Param_DataType
         if (EndId < StartId) EndId = StartId;
 
         if (StepId < 1 || StepId >(EndId - StartId)) StepId = EndId - StartId;
-        if (StepId < 1 ) StepId = 1;
+        if (StepId < 1) StepId = 1;
     };
 
     int ReadParams(char* in_String)
@@ -239,7 +386,7 @@ struct CMD_Param_DataType
         if (in_String)
         {
             const char* pos;
-            
+
             if (*FindField(in_String, 2, "TRACE")) { ret++; Trace = 1; }
             if (*FindField(in_String, 2, "GROUPDATA")) { ret++; GroupData = 1; }
             if (*FindField(in_String, 2, "RELATION")) { ret++; Relation = 1; }
@@ -268,3 +415,48 @@ struct CMD_Param_DataType
         return ret;
     }
 };
+
+
+union DoubleBitsUnion {
+    double Dbl;
+    unsigned long long Bits;
+
+};
+
+struct ComplexDouble
+{
+    DoubleBitsUnion realPart;
+    DoubleBitsUnion imaginaryPart;
+};
+
+struct TwoDoubleRoots
+{
+    DoubleBitsUnion root1;
+    DoubleBitsUnion root2;
+    static double GetNaN() { return (double)0x7FF8000000000000ULL; }
+};
+
+struct TwoComplexRoots
+{
+    ComplexDouble root1;
+    ComplexDouble root2;
+};
+
+union QuadraticRoots {
+    TwoDoubleRoots RealRoots;
+    TwoComplexRoots ComplexRoot;
+};
+
+struct SPos;
+struct SData;
+
+double GetProjectionPointOnLine(SPos& retPoint, const SPos& PointOnLine, const SPos LineDirection, const SPos& PointToProjection);
+double GetLinearViewTime(const SData& BaseParticle, const SData& ViewParticle);
+TwoDoubleRoots QuadraticEequationSolution(double A, double B, double C);
+double QuadraticEequationSolutionNOpt(double A, double B, double C);
+SPos GetProjection(const SPos& PointOnLine, const SPos LineDirection, const SPos& PointToProjection);
+void LimitedItgrl_rk4(SPos& result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double dt, double* Theta);
+void LimitedItgrl_rk4(SPos& result, SPos& resultOfFirst, SPos& resultOfSecond, SPos& FirstDerivative, SPos& SecondDerivative, SPos& ThirdDerivative, double LimitValue, double dt, double* Theta);
+
+
+

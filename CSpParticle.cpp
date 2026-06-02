@@ -1,53 +1,69 @@
-#include "pch.h"
+Ôªø#include "pch.h"
 #include "CSpParticle.h"
 #include "CSDataArray.h"
 #include "CSP_Group.h"
 
 
-CSpParticle::CSpParticle(SP_Calc* in_pCalc)
+CSpParticle::CSpParticle(SP_Calc& in_pCalc, int in_TypeFlags)
 {
-	m_pCalc = in_pCalc;
+	m_TypeFlags = in_TypeFlags;
+	m_StateNext = m_StateCurr = m_StatePrev = 0;
+	m_pCalc = &in_pCalc;
+
 	m_NewPointState = SP_NEWPOINT_STATE_ON;
 	NewPoint_Clear();
 	m_NextData = { 0 };
-	m_Data = new CSDataArray;
+	m_Data = new SPTraceArrayDynEx<SData, double>(m_pCalc->nIterations < 5 ? SDA_DEF_AMOUNT : m_pCalc->nIterations, &m_pCalc->Time);
+	m_CountBeStuck = 0;
 }
 
-CSpParticle::CSpParticle(int in_MaxItems)
+CSpParticle::CSpParticle(int in_MaxItems, int in_TypeFlags)
 {
+	m_TypeFlags = in_TypeFlags;
+	m_StateNext = m_StateCurr = m_StatePrev = 0;
 	m_NewPointState = SP_NEWPOINT_STATE_ON;
 	NewPoint_Clear();
-	m_NextData = { 0 };
-	m_Data = new CSDataArray(in_MaxItems);
+	m_NextData.CLEAR();
+	m_Data = new SPTraceArrayDynEx<SData, double>(in_MaxItems < 5 ? 1000 : in_MaxItems + 100, &m_pCalc->Time);
 }
 
 CSpParticle::~CSpParticle()
 {
 	if (m_Data) delete m_Data;
+	m_Data = nullptr;
 }
 
-void CSpParticle::Clear()
+void CSpParticle::Clear(int in_Flags)
 {
-	if (!m_Data) m_Data = new CSDataArray;
-	m_Data->Init();
-}
+	m_StateNext = m_StateCurr = m_StatePrev = 0;
+	m_CountBeStuck = 0;
 
-SData* CSpParticle::GetCurData()
-{
-	return m_Data == NULL || m_Data->CurPos < 0 ? &CSDataArray::EmptyData : m_Data->GetCurData();
-}
+	if (m_Data) m_Data->Clear(in_Flags);
+	else
+	if (m_pCalc)
+		m_Data = new SPTraceArrayDynEx<SData, double>(m_pCalc->nIterations < 5 ? SDA_DEF_AMOUNT + 100: m_pCalc->nIterations + 100, &m_pCalc->Time);
 
+	NewPoint_Clear();
+	m_NextData.CLEAR();
+}
 
 SData* CSpParticle::GetDataById(int in_Id)
 {
-	return m_Data == NULL || m_Data->m_Array == NULL || m_Data->CurPos < 0 || in_Id  < 0 || in_Id > m_Data->CurPos ? NULL : m_Data->m_Array +in_Id;
+	return m_Data == nullptr ? nullptr : m_Data->GetDataById(in_Id);
 }
+
+void CSpParticle::GetLastDeltaAcc(SPos& in_DeltaAcc)
+{
+	in_DeltaAcc.SET_AS_DELTA(m_Data->GetCurData()->Accel_2_3D, m_Data->GetPrevData()->Accel_2_3D);
+}
+
 
 int CSpParticle::NewPoint_Begin(double in_NewTimePoint)
 {
 	int ret = 0;
 	NewPoint_Clear();
-	if (m_Data && m_Data->GetCurData() && m_Data->GetCurData()->TimePoint < in_NewTimePoint)
+	ASSERT(m_Data->GetCurTime() < in_NewTimePoint || in_NewTimePoint == 0.0);
+	if (m_Data)
 	{
 		ret = 1;
 		m_NewPointState = SP_NEWPOINT_STATE_ON;
@@ -58,46 +74,42 @@ int CSpParticle::NewPoint_Begin(double in_NewTimePoint)
 
 double CSpParticle::GetCurTime() 
 {
-	return m_Data && m_Data->CurPos >=0 ? m_Data->GetCurData()->TimePoint : 0.0;
+	return m_Data->GetCurTime();
 }
 
 double CSpParticle::GetPrevTime(int n_StepsBefore)
 {
 	double ret = -1.0;
-
-	if (m_Data && m_Data->CurPos >= 0)
+	int CurPos;
+	if (m_Data && (CurPos = m_Data->GetCurPos()) >= 0)
 	{
-		int PointsIdx = m_Data->CurPos - n_StepsBefore;
+		int PointsIdx = CurPos - n_StepsBefore;
 
-		if (PointsIdx <= m_Data->CurPos && PointsIdx >= 0)  ret = m_Data->m_Array[ PointsIdx].TimePoint;
+		SData* sd = m_Data->GetDataById(PointsIdx);
+		if (sd)
+			ret = sd->TimePoint;
 	}
 
 	return ret;
 }
 
-
-int CSpParticle::DeletePoints(double TimeFromGE, double TimeToLE)
-{
-	int ret = 0;
-	if (m_Data) ret = m_Data->DeletePoints(TimeFromGE, TimeToLE);
-
-	return ret;
-}
-
-int CSpParticle::MoveToNewPoint(int in_maxCountLimit, bool in_ClearData)
+int CSpParticle::MoveToNewPoint(int AddType)
 {
 	int ret = 0;
 	if (m_Data && (m_NewPointState & SP_NEWPOINT_STATE_ON))
 	{
-		if (m_NextData.position == m_Data->m_Array[m_Data->CurPos].position)
-			ret = 1;
+		m_Data->AddData(m_NextData, AddType);
+		m_StatePrev = m_StateCurr;
+		m_StateCurr = m_StateNext;
 
-		m_Data->AddData( in_maxCountLimit, &m_NextData);
 		NewPoint_Clear();
 		ret = 1;
 	}
 	else
-		ret = 0;
+	{
+		ASSERT(0);
+		ret = 0;//!!!!!!check
+	}
 
 	return ret;
 }
@@ -105,281 +117,385 @@ int CSpParticle::MoveToNewPoint(int in_maxCountLimit, bool in_ClearData)
 void CSpParticle::NewPoint_Clear()
 {
 	m_NewPointState = SP_NEWPOINT_STATE_OFF;
-	m_NextData = { 0 };
+	m_StateNext = 0;
+
+	//m_NextData = { 0 };
 }
 
 
-char* CSpParticle::GetStateDescription(char* out_Str, int in_nPoints)
+char* CSpParticle::GetStateDescription(char* out_Str, int in_StrLen, int in_nPoints)
 {
 	if (out_Str)
 	{
 		*out_Str = 0;
+		char* initialPos = out_Str;
 		if (m_Data)
 		{
-			if (m_Data->CurPos >= 0)
+			if (m_Data->GetCurPos() >= 0)
 			{
-				int PointsIdx = m_Data->CurPos - in_nPoints + 1;
+				int tmpCurPos = m_Data->GetCurPos();
+				int PointsIdx = tmpCurPos - in_nPoints + 1;
 
-				if (PointsIdx > m_Data->CurPos || PointsIdx < 0 || in_nPoints < 0)  PointsIdx = 0;
+				if (PointsIdx > tmpCurPos || PointsIdx < 0 || in_nPoints < 0)  PointsIdx = 0;
 
-				while (PointsIdx <= m_Data->CurPos)
+				while (PointsIdx <= tmpCurPos)
 				{
-					SData *tmpData = m_Data->m_Array + PointsIdx;
+					SData *tmpData = GetDataById(PointsIdx);
 					out_Str = GetFlagsDescription(out_Str, 0);
-					out_Str += sprintf_s(out_Str, 1000, "\tTime=\t%g\tTraceCount=%d", tmpData->TimePoint, m_Data->CurPos);
-					out_Str += sprintf_s(out_Str, 1000, "\tPosition=\t%g\t%g\t%g", tmpData->position.X, tmpData->position.Y, tmpData->position.Z);
-					out_Str += sprintf_s(out_Str, 1000, "\tSpeed=\t%g\t%g\t%g", tmpData->Speed.X, tmpData->Speed.Y, tmpData->Speed.Z);
-					out_Str += sprintf_s(out_Str, 1000, "\tDensity3D=\t%g\t%g\t%g", tmpData->Accel3D.X, tmpData->Accel3D.Y, tmpData->Accel3D.Z);
-					out_Str += sprintf_s(out_Str, 1000, "\tDensityDeriv3D=\t%g\t%g\t%g", tmpData->AccelDeriv3D.X, tmpData->AccelDeriv3D.Y, tmpData->AccelDeriv3D.Z);
+					out_Str += sprintf_s(out_Str, in_StrLen - ((int)(out_Str - initialPos)), "\tTime=\t%g\tTraceCount=%d\t", tmpData ? tmpData->TimePoint : 0.0, tmpCurPos);
+					if (tmpData)
+						out_Str += tmpData->PRINT(out_Str, in_StrLen - ((int)(out_Str - initialPos)), SDATA_ALL);
+					else
+						out_Str += tmpData->PRINT_AS_NULL(out_Str, in_StrLen - ((int)(out_Str - initialPos)), SDATA_ALL);
 
-					if (PointsIdx++ < m_Data->CurPos)
-						out_Str += sprintf_s(out_Str, 1000, "\n");
+
+					if (PointsIdx++ < tmpCurPos)
+						out_Str += sprintf_s(out_Str, in_StrLen - ((int)(out_Str - initialPos)), "\n");
 				}
 			}
-			else sprintf_s(out_Str, 1000, "CurPos<0");
+			else sprintf_s(out_Str, in_StrLen - ((int)(out_Str - initialPos)), "CurPos<0");
 		}
-		else sprintf_s(out_Str, 1000, "m_Data==NULL");
+		else sprintf_s(out_Str, in_StrLen - ((int)(out_Str - initialPos)), "m_Data==nullptr");
 	}
 
 	return out_Str;
 }
 
 
-char* CSpParticle::GetStateDescription(char* out_Str, double in_ReportTime)
+char* CSpParticle::GetStateDescription(char* out_Str, int in_StrLen, double in_ReportTime)
 {
 	if (out_Str)
 	{
 		*out_Str = 0;
 		if (m_Data)
 		{
-			if (m_Data->CurPos >= 0)
+			int tmpCurPos = m_Data->GetCurPos();
+			if (tmpCurPos >= 0)
 			{
 				SData tmpData = { 0 };
 				double tmpTime = 0.0;
-				int ret = GetPrevDataByTime(&tmpData, in_ReportTime, &tmpTime);
+				int ret = GetPrevDataByTime(tmpData, in_ReportTime, &tmpTime);
 				out_Str = GetFlagsDescription(out_Str, ret);
 				if ((ret & SP_STATE_ERROR_MINOR) != SP_STATE_ERROR_MAIN)
 				{
-					out_Str += sprintf_s(out_Str, 1000, "\tTime=\t%.10g\tTraceCount=%d", tmpData.TimePoint, m_Data->CurPos);
-					out_Str += sprintf_s(out_Str, 1000, "\tPosition=\t%.10g\t%.10g\t%.10g", tmpData.position.X, tmpData.position.Y, tmpData.position.Z);
-					out_Str += sprintf_s(out_Str, 1000, "\tSpeed=\t%.10g\t%.10g\t%.10g", tmpData.Speed.X, tmpData.Speed.Y, tmpData.Speed.Z);
-					out_Str += sprintf_s(out_Str, 1000, "\tDensity3D=\t%.10g\t%.10g\t%.10g", tmpData.Accel3D.X, tmpData.Accel3D.Y, tmpData.Accel3D.Z);
-					out_Str += sprintf_s(out_Str, 1000, "\tDensityDeriv3D=\t%.10g\t%.10g\t%.10g", tmpData.AccelDeriv3D.X, tmpData.AccelDeriv3D.Y, tmpData.AccelDeriv3D.Z);
+					out_Str += sprintf_s(out_Str, 1000, "\tTime=\t%.10g\tTraceCount=%d", tmpData.TimePoint, tmpCurPos);
+					out_Str += sprintf_s(out_Str, 1000, "\tPosition=\t%.10g\t%.10g\t%.10g", tmpData.Position.X, tmpData.Position.Y, tmpData.Position.Z);
+					out_Str += sprintf_s(out_Str, 1000, "\tSpeed=\t%.10g\t%.10g\t%.10g", tmpData.Velocity.X, tmpData.Velocity.Y, tmpData.Velocity.Z);
+					out_Str += sprintf_s(out_Str, 1000, "\tDensity3D=\t%.10g\t%.10g\t%.10g", tmpData.Accel_2_3D.X, tmpData.Accel_2_3D.Y, tmpData.Accel_2_3D.Z);
+					out_Str += sprintf_s(out_Str, 1000, "\tDensityDeriv3D=\t%.10g\t%.10g\t%.10g", tmpData.Jerk_3_3D.X, tmpData.Jerk_3_3D.Y, tmpData.Jerk_3_3D.Z);
 				}
 			}
 			else sprintf_s(out_Str, 1000, "CurPos<0");
 		}
-		else sprintf_s(out_Str, 1000, "m_Data==NULL");
+		else sprintf_s(out_Str, 1000, "m_Data==nullptr");
 	}
 
 	return out_Str;
 }
 
-int CSpParticle::FindViewPointEx(SData* out_Data, SData* in_Pos, double in_ViewTime)
+//–Ω–∞–ø–æ–º–∏–Ω–∞–Ω–∏–µ -- –≤—Ä–µ–º—è –∏–∑–º–µ–Ω–µ–Ω–∏—è –ø–ª–æ—Ç–Ω–æ—Å—Ç–∏ == —Ä–∞—Å—Å—Ç–æ—è–Ω–∏—é
+int CSpParticle::FindViewPointByTime(SData& out_Data, const SData& in_Pos, double in_ViewTime, double in_StartTime, double in_EndTime, int* const out_LowIdx)
 {
-	int idMax = 0;
-	//if (in_LastRelation) // && in_LastRelation->State != SP_STATE_FAR_AWAY)
-	//{
-	//idMin = m_Data->GetLowIdxByTime(in_StartTime);
-	//idMax = m_Data->GetLowIdxByTime(in_EndTime) + 1;
-	//if (idMax > m_Data->CurPos) idMax = m_Data->CurPos;
-	//}
-	//else
-	//{
-	//	idMax = m_Data->GetLowIdxByTime(in_ViewTime) + 1;  
-	//	if (idMax > m_Data->CurPos) idMax = m_Data->CurPos;
-	//	idMin = -1;
+	ASSERT(in_StartTime < in_EndTime);
 
-	//	if (idMax > 0)
-	//	{
-	//		double tmpDistance = in_Pos->position.GetDistance(m_Data->m_Array[idMax].position);
-	//		if ((idMax = m_Data->GetLowIdxByTime(m_Data->m_Array[idMax].TimePoint - 0.5 * tmpDistance)) > 0)
-	//		{
-	//			idMin = m_Data->GetLowIdxByTime(m_Data->m_Array[idMax].TimePoint - 2.5 * tmpDistance);
-	//			if (idMin < 0) idMin = 0;
-	//		}
-	//	}
-	//}
-	return 0;
-}
+	int ret = SP_STATE_–û–ö;
+	SData* VPDataID0 = GetDataById(0);
 
-//Ì‡ÔÓÏËÌ‡ÌËÂ -- ‚ÂÏˇ ËÁÏÂÌÂÌËˇ ÔÎÓÚÌÓÒÚË == ‡ÒÒÚÓˇÌË˛
-int CSpParticle::FindViewPoint(SData* out_Data, SData* in_Pos, double in_ViewTime, double in_StartTime, double in_EndTime)
-{
-	int ret = SP_STATE_Œ ;
-	if (!m_Data || !m_Data->m_Array || m_Data->CurPos < 0 || !in_Pos || !out_Data)
-		ret = SP_STATE_ERROR_MAIN;
-	else
-	if (m_pCalc->ClassicType)
+	if (VPDataID0)
 	{
-		if (m_Data->m_Array[m_Data->CurPos].TimePoint <= in_ViewTime)
+		if (m_pCalc->ClassicType)
 		{
-			if (m_pCalc->ClassicType == 2 && (m_NewPointState & SP_NEWPOINT_STATE_ON))
-				*out_Data = m_NextData;
+			const SData* VPDataCur = GetCurData_C();
+			if (VPDataCur->TimePoint <= in_ViewTime)
+			{
+				if (m_pCalc->ClassicType == 2 && (m_NewPointState & SP_NEWPOINT_STATE_ON))
+					out_Data = m_NextData;
+				else
+					out_Data = *VPDataCur;
+				if (out_LowIdx) *out_LowIdx = GetCurPos();
+			}
 			else
-				*out_Data = m_Data->m_Array[m_Data->CurPos];
+			{	///–¥–æ–±–∞–≤–∏—Ç—å –≤—ã—á–∏—Å–ª–µ–Ω–∏–µ –¥–∞–Ω–Ω—ã—Ö –µ—Å–ª–∏  m_Data->m_Array[iii].TimePoint < in_ViewTime
+				SData* tmpData;
+				int iii = m_Data->GetLowIdxByTime(in_ViewTime);
+				if (out_LowIdx) *out_LowIdx = iii;
+
+				if (iii >= 0 && (tmpData = GetDataById(iii)))
+					out_Data = *tmpData;
+			}
 		}
 		else
 		{
-			///‰Ó·‡‚ËÚ¸ ‚˚˜ËÒÎÂÌËÂ ‰‡ÌÌ˚ı ÂÒÎË  m_Data->m_Array[iii].TimePoint < in_ViewTime
-			int iii = m_Data->GetLowIdxByTime(in_ViewTime);
-			if (iii >= 0)
-				*out_Data = m_Data->m_Array[iii];
+			int FlagFind = 1;
+			if (in_StartTime <= VPDataID0->TimePoint)
+			{
+				double distanceTMP = VPDataID0->Position.GetDistance(in_Pos.Position);
+				double periodTMP = in_ViewTime - VPDataID0->TimePoint;// -m_pCalc->CriticalDistance;
+				if (distanceTMP >= periodTMP)
+				{//VP –¥–æ —Å–æ—Ö—Ä–∞–Ω–µ–Ω–Ω–æ–π —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏
+					ret |= FindViewPointByTimeLinear(out_Data, in_Pos, in_ViewTime, in_StartTime);
+					if (out_Data.TimePoint >= VPDataID0->TimePoint)
+						FlagFind = 1;
+					else
+						FlagFind = 0;
+				}
+			}
+
+			if (FlagFind)
+			{
+				int idMin = FindViewPointMinIdByTime(in_Pos.Position, in_ViewTime, in_StartTime, in_EndTime);
+				if (out_LowIdx)
+					*out_LowIdx = idMin;
+
+				int CurPos = GetCurPos();
+
+				if (idMin < CurPos)
+				{
+					if (idMin >= 0)
+					{// –µ—Å—Ç—å –ø–µ—Ä–µ—Å–µ—á–µ–Ω–∏–µ –≤ –¥–∏–∞–ø–∞–∑–æ–Ω–µ [idMin]...[idMin+1] /// –ø—Ä–æ—Å—Ç–æ–π –ª–∏–Ω–π–Ω—ã–π —Ä–∞—Å—á–µ—Ç –±–µ–∑ —É—á–µ—Ç–∞ —É—Å–∫–æ—Ä–µ–Ω–∏—è
+						//–ø—Ä–∞–≤–∏–ª—å–Ω–æ —Å —É—á–µ—Ç–æ–º —É—Å–∫–æ—Ä–µ–Ω–∏—è. —É—Å–∫–æ—Ä–µ–Ω–∏–µ —É—Å–∫–æ—Ä–µ–Ω–∏—è –ø—Ä–æ–ø–æ—Ä—Ü–∏–æ–Ω–∞–ª—å–Ω–æ –∫–≤–∞–¥—Ä–∞—Ç—É —Å–∫–æ—Ä–æ—Å—Ç–∏.
+						//–ø–æ–∫–∞ —Ä–∞—Å—á–µ—Ç –ø–æ–∑–∏—Ü–∏–∏ –ø–æ —Å–ø—Ä—è–º–ª–µ–Ω–Ω–æ–π 
+						SData LowBorder = *GetDataById(idMin);
+						SData UpBorder = *GetDataById(idMin + 1);
+						double UpDelta, LowDelta;
+
+						LowDelta = in_ViewTime - LowBorder.TimePoint - LowBorder.Position.GetDistance(in_Pos.Position);
+						UpDelta = in_ViewTime - UpBorder.TimePoint - UpBorder.Position.GetDistance(in_Pos.Position);
+						
+						ASSERT(UpDelta <= 0.0 || UpBorder.AbsSpeed > 0.9999);		//—Ä–∞—Å—Å—Ç–æ—è–Ω–∏–µ –±–æ–ª—å—à–µ –≤—Ä–µ–º–µ–Ω–∏. 
+						ASSERT(LowDelta >= 0.0);		//—Ä–∞—Å—Å—Ç–æ—è–Ω–∏–µ –º–µ–Ω—å—à–µ –≤—Ä–µ–º–µ–Ω–∏. 
+
+						while (UpDelta < - m_pCalc->Time.GetMinStep() && LowDelta > m_pCalc->Time.GetMinStep())
+						{
+							SPos DeltaPos = UpBorder.Position; 
+							DeltaPos -= LowBorder.Position;
+							double RelMltpl = LowDelta / (LowDelta - UpDelta);
+							DeltaPos *= RelMltpl;
+							DeltaPos += LowBorder.Position;
+							double MidTime = UpBorder.TimePoint - LowBorder.TimePoint;
+							MidTime *= RelMltpl;
+							MidTime += LowBorder.TimePoint;
+
+							double MidDelta = in_ViewTime - MidTime - DeltaPos.GetDistance(in_Pos.Position);
+							if (MidDelta < 0.0)
+							{
+								UpDelta = MidDelta;
+								UpBorder.Position = DeltaPos;
+								UpBorder.TimePoint = MidTime;
+							}
+							else
+							{
+								LowDelta = MidDelta;
+								LowBorder.Position = DeltaPos;
+								LowBorder.TimePoint = MidTime;
+							}
+						}
+
+						if (UpDelta >= -m_pCalc->Time.GetMinStep())
+						{
+							out_Data = UpBorder;
+						}
+						else
+						{
+							out_Data = LowBorder;
+						}
+						//–ß–µ—Ä–µ–∑ –∫–≤–∞–¥—Ä–∞—Ç–Ω–æ–µ —É—Ä–∞–≤–Ω–µ–Ω–∏–µ
+						//SData Up, Dn, Mid;
+						//Dn = LowBorder;
+						//Up = UpBorder;
+						//Dn.Accel_2_3D = {0}; Up.Accel_2_3D = { 0 };
+						//Dn.Velocity.SET_AS_DELTA(UpBorder.Position, LowBorder.Position);
+						//Dn.Velocity.DIV((UpBorder.TimePoint - LowBorder.TimePoint));
+						//Up.Velocity = Dn.Velocity;
+						//Mid = Dn;
+						//double tSwap, maxDelta = m_pCalc->Time.GetMinStep();
+						//ret = SP_STATE_INPROC;
+						//double DeltaT13 = in_ViewTime - Mid.TimePoint;
+						//while (ret == SP_STATE_INPROC)
+						//{
+						//	double newTime2;
+						//	SPos DP = Mid.Position; 
+						//	DP.MINUS(in_Pos.Position);
+						//	double C = DP.LENPWR2() - DeltaT13 * DeltaT13;
+						//	double B =  DeltaT13 + DP.DOT(Mid.Velocity);
+						//	B += B;
+						//	double A = Mid.Velocity.LENPWR2() - 1.0;
+						//	TwoDoubleRoots result = QuadraticEequationSolution( A, B, C);
+						//	newTime2 = Mid.TimePoint + result.root1.Dbl;
+						//	switch (CalcMidData(Mid, Dn, Up, newTime2))
+						//	{
+						//	case SP_STATE_UP:
+						//	case SP_STATE_DOWN:
+						//		ret = SP_STATE_–û–ö;
+						//		break;
+						//	case SP_STATE_MID:
+						//		DeltaT13 = in_ViewTime - Mid.TimePoint;
+						//		tSwap = DeltaT13 - in_Pos.Position.GetDistance(Mid.Position);
+						//		if (tSwap < 0.0)
+						//			Up = Mid;	
+						//		else
+						//			Dn = Mid;
+						//		if (Up.TimePoint - Dn.TimePoint < maxDelta || fabs(tSwap) < maxDelta)
+						//			ret = SP_STATE_–û–ö;
+						//		break;
+						//	default: //error
+						//		ret = SP_STATE_ERROR_MAIN;
+						//		break;
+						//	}
+						//}
+						//if (!(ret & SP_STATE_ERROR_MAIN))
+						//{
+						//	out_Data = Mid;
+						//	if (out_LowIdx && UpBorder.TimePoint == Mid.TimePoint)
+						//		*out_LowIdx = idMin + 1;
+						//}
+					}
+				}
+				else
+				{//–≤—Ä–µ–º—è –±–æ–ª—å—à–µ –≤—Ä–µ–º–µ–Ω–∏ –≤ –ø–æ—Å–ª–µ–¥–Ω–µ–π –ø–æ–∑–∏—Ü–∏–∏ –º–∞—Å–∏–∏–≤–∞ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏
+					ret = SP_STATE_HIGH_VIEW | SP_STATE_ERROR_MINOR;
+					double KeyPoint = 0.0;
+					GetNextDataByTime(out_Data, in_ViewTime, &KeyPoint);
+				}
+
+				if (out_Data.TimePoint < in_StartTime && !(ret & SP_STATE_FAR_AWAY))
+				{
+					ret |= SP_STATE_FAR_AWAY;
+					//out_Data->SET_AS_FARAWAY();
+				}
+			}
+			ASSERT(!isnan(out_Data.TimePoint));
 		}
 	}
 	else
 	{
-		int idMin = m_Data->CurPos;
-		
-		if (m_Data->CurPos > 0)
+		ret = SP_STATE_ERROR_MAIN;
+	}
+
+
+	return ret;
+}
+
+
+
+int CSpParticle::FindViewPointByTimeLinear(SData & out_Data, const SData & in_Pos, double in_ViewTime, double in_StartTime)
+{
+	int ret = -1;
+	SData* VPDataID0 = GetDataById(0);
+	if (in_StartTime <= VPDataID0->TimePoint)
+	{
+		double LinearViewTime = GetLinearViewTime(in_Pos, *VPDataID0);
+		if (fabs(LinearViewTime) < SP_MAX_TIME_DISTANCE)
 		{
-			int idMax = 0;
-			idMin = m_Data->GetLowIdxByTime(in_StartTime);
-			int idMinTmp = idMin;
-			idMax = m_Data->GetLowIdxByTime(in_EndTime) + 1;
-			if (idMax > m_Data->CurPos) idMax = m_Data->CurPos;
-
-			if (idMin < 0 && idMax > 0) idMin = 0;
-
-			if (idMin < m_Data->CurPos && idMin >= 0)
-			{
-				double dltTpwr2 = 0.0;
-
-				for(int kk = 1; dltTpwr2 >= 0.0 && idMin + kk < idMax; kk*=2)
-				{
-						dltTpwr2 = (in_ViewTime - m_Data->m_Array[idMin + kk].TimePoint);
-						dltTpwr2 = dltTpwr2 * dltTpwr2 - in_Pos->position.GetDistancePwr2(m_Data->m_Array[idMin + kk].position);
-						if (dltTpwr2 <= 0.0) idMax = idMin + kk;
-						else idMin += kk;
-				}
-
-				while (idMax > idMin)
-				{
-					int idMid = ((idMax - idMin + 1) >> 1) + idMin;
-
-					dltTpwr2 = (in_ViewTime - m_Data->m_Array[idMid].TimePoint);
-					dltTpwr2 = dltTpwr2 * dltTpwr2 - in_Pos->position.GetDistancePwr2(m_Data->m_Array[idMid].position);
-					if (dltTpwr2 > 0.0)
-						idMin = idMid;
-					else
-						if (idMax != idMid) idMax = idMid;
-						else idMax--;
-				}
-
-				if (idMin < 0 && idMax > 0)
-				{
-					idMax = 0;
-					idMin = idMinTmp;
-				}
-			}
-		}
-		else idMin = -1;
-
-		if (idMin < m_Data->CurPos)
-		{
-			if (idMin >= 0 )
-			{// ÂÒÚ¸ ÔÂÂÒÂ˜ÂÌËÂ ‚ ‰Ë‡Ô‡ÁÓÌÂ [idMin]...[idMin+1]
-				SData Up, Dn, Mid;
-				Dn = m_Data->m_Array[idMin];
-				Up = m_Data->m_Array[idMin + 1];
-
-				double tSwap, maxDelta = (Up.TimePoint - Dn.TimePoint) / 1000.0;
-				ret = SP_STATE_INPROC;
-
-				//tSwap = (in_ViewTime - Dn.TimePoint);
-				//double dltDn = tSwap * tSwap - in_Pos->position.GetDistancePwr2(Dn.position);
-				//tSwap = (in_ViewTime - Up.TimePoint);
-				//double dltUp = tSwap * tSwap - in_Pos->position.GetDistancePwr2(Up.position);
-
-
-				while (ret == SP_STATE_INPROC)
-				{
-					double newTime = Dn.TimePoint + (Up.TimePoint - Dn.TimePoint) * 0.5; // ‚ÓÁÏÓÊÌÓ ÛÒÍÓËÚ¸ Á‡ Ò˜ÂÚ ÎËÌÂÈÌÓÈ ËÌÚÂÔÓÎˇˆËË
-					switch(CalcMidData(&Mid, Dn, Up, newTime))
-					{
-					case SP_STATE_UP:
-					case SP_STATE_DOWN:
-						ret = SP_STATE_Œ ;
-						break;
-					case SP_STATE_MID:
-						tSwap = (in_ViewTime - Mid.TimePoint);
-						tSwap = tSwap * tSwap - in_Pos->position.GetDistancePwr2(Mid.position);
-						if (tSwap < 0.0) Up = Mid;	else Dn = Mid;
-						if (Up.TimePoint - Dn.TimePoint < maxDelta) ret = SP_STATE_Œ ;
-						break;
-					default: //error
-						ret = SP_STATE_ERROR_MAIN;
-						break;
-					}
-				}
-				if (!(ret & SP_STATE_ERROR_MAIN)) *out_Data = Mid;
-			}
-			else
-			{ //‚˚ıÓ‰ Á‡ ÔÂ‰ÂÎ˚ ÔÂ‚ÓÈ ÚÓ˜ÍË Ú‡ÂÍÚÓËË. ›ÏÛÎˇˆËˇ ÔˇÏÓÎËÌÂÈÌÓ„Ó ‡‚ÌÓÏÂÌÓ„Ó ‰‚ËÊÂÌËˇ. ≈ÒÎË ÓÚÌÓÒËÚÂÎ¸Ì‡ˇ ÒÍÓÓÒÚ¸ ‚˚¯Â ‰ÓÔÛÒÚËÔÓÈ ÏÂÌˇÂÏ ret
-				ret = SP_STATE_LOW_VIEW|SP_STATE_ERROR_MINOR;
-				*out_Data = m_Data->m_Array[0];
-				SData Up;
-				Up = m_Data->m_Array[0];
-
-				if (Up.Speed.X == 0.0 && Up.Speed.Y == 0.0 && Up.Speed.Z == 0.0)
-				{
-					ret |= SP_STATE_ABS_0_SPEED;
-					out_Data->TimePoint = in_ViewTime - in_Pos->position.GetDistance(m_Data->m_Array[0].position);
-				}
-				else
-				{
-					double newTimeDlt;
-					newTimeDlt = Up.TimePoint - in_StartTime;
-
-					double tSwap, maxDelta = newTimeDlt * 0.00001;
-					if (maxDelta < m_pCalc->Time.MinStep) maxDelta = m_pCalc->Time.MinStep;
-					//ÓÔÚËÏËÁËÓ‚‡Ú¸ ÔÓ ‰ÂÎËÚÂÎ˛. œÓÍ‡ Á‰ÂÒ¸ ÔÓËÁ‚Ó‰ËÚÂÎ¸ÌÓÒÚ¸ ÌÂ ‚‡ÊÌ‡
-					double ntDelim = 0.5;
-					SData Mid = Up;
-
-					while (newTimeDlt > maxDelta)
-					{
-						newTimeDlt *= ntDelim;
-						Mid = Up;
-						Mid.position.X -= Mid.Speed.X * newTimeDlt;
-						Mid.position.Y -= Mid.Speed.Y * newTimeDlt;
-						Mid.position.Z -= Mid.Speed.Z * newTimeDlt;
-						Mid.TimePoint -= newTimeDlt;
-
-						tSwap = (in_ViewTime - Mid.TimePoint);
-						tSwap = tSwap * tSwap - in_Pos->position.GetDistancePwr2(Mid.position);
-						if (tSwap < 0.0)
-							Up = Mid;
-					}
-					*out_Data = Mid;
-				}
-			}
+			ret = 0;
+			out_Data = *VPDataID0;
+			out_Data.LinearMove(in_ViewTime + LinearViewTime - VPDataID0->TimePoint, LINEARMOVECLEARFLAG_ACCEL3D | LINEARMOVECLEARFLAG_ACCELDERIV3D);
 		}
 		else
-		{//‚ÂÏˇ ·ÓÎ¸¯Â ‚ÂÏÂÌË ‚ ÔÓÒÎÂ‰ÌÂÈ ÔÓÁËˆËË Ï‡ÒËË‚‡ Ú‡ÂÍÚÓËË
-			ret = SP_STATE_HIGH_VIEW | SP_STATE_ERROR_MINOR;
-			double KeyPoint = 0.0;
-			GetNextDataByTime(out_Data, in_ViewTime, &KeyPoint);
+		{
+			ret = SP_STATE_FAR_AWAY;
+			out_Data.SET_AS_FARAWAY();
 		}
+	}
+	return ret;
+}
 
-		if (ret > 0 && fabs(out_Data->GetRelativeSpeed(*in_Pos, NULL)) >= m_pCalc->maxRelativeSpeed)
-			ret = SP_STATE_REL_SPEED_AL | SP_STATE_ERROR_MINOR;
+int CSpParticle::FindViewPointMinIdByTime(const SPos& in_Pos, double in_ViewTime, double in_StartTime, double in_EndTime)
+{
+	int ret = -1;
+	int MinIDAtViewTime;
+	if (in_ViewTime >= GetCurTime())
+		MinIDAtViewTime = GetCurPos();
+	else
+		MinIDAtViewTime = m_Data->GetLowIdxByTime(in_ViewTime);
+
+	if (m_pCalc->ClassicType || MinIDAtViewTime < 0)
+		ret = MinIDAtViewTime;
+	else
+	{
+		SData* pDataAtViewTime  = GetDataById(MinIDAtViewTime);
+		double distAtViewTime = in_Pos.GetDistance(pDataAtViewTime->Position);
+		if (distAtViewTime < m_pCalc->CriticalDistance) distAtViewTime = m_pCalc->CriticalDistance;
+
+		double maxTime = in_ViewTime - distAtViewTime * 0.5;
+		if (maxTime > in_EndTime) maxTime = in_EndTime;
+
+		int MaxID = m_Data->GetLowIdxByTime(maxTime);
+
+		if (MaxID >= 0)
+		{
+			//double minTime = in_ViewTime - distAtViewTime - distAtViewTime;
+			//if (minTime < in_StartTime) minTime = in_StartTime;
+			//int MinID = m_Data->GetLowIdxByTime(minTime);
+
+			int MinID = m_Data->GetLowIdxByTime(in_StartTime);
+			if (MinID < 0)
+			{
+				SData* tmpData = GetDataById(0);
+				if (tmpData)
+				{
+					double dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
+
+					if (dDelta >= 0.0) //(dT > dDist)
+						MinID = 0;
+					else
+						MaxID = MinID;
+				}
+			}
+
+			int idMid = MinID + 3;
+			double dDelta = -1.0;
+
+			while (MinID < MaxID)
+			{
+				SData* tmpData = GetDataById(idMid);
+				ASSERT(tmpData);
+				//double dT = in_ViewTime - tmpData->TimePoint;
+				//double dDist = in_Pos.GetDistance(tmpData->Position);
+				//double dDelta = dT - dDist;
+				dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
+
+				if (dDelta >= 0.0) //(dT > dDist)
+					ret = MinID = idMid;
+				else // if (dT < dDist) —Ç–∞–∫ –∫–∞–∫ –≤–µ—Ä–æ—è—Ç–Ω–æ—Å—å—Ç –ø–æ–ø–∞–¥–∞–Ω–∏—è –≤ —Ä–∞–≤–µ–Ω—Å—Ç–≤–æ —Å—Ç—Ä–µ–º–∏—Ç—Å—è –∫ 0
+				{
+					if (MaxID != idMid)
+						MaxID = idMid;
+					else 
+						MaxID--;
+				}
+				//else MaxID = MinID = idMid;
+				idMid = ((MaxID - MinID + 1) >> 1) + MinID;
+			}
+			//!!!!–ü–æ–∫–∞ –Ω–µ–ø–æ–Ω—è—Ç–Ω–æ –ø–æ—á–µ–º—É —Ç–∞–∫ –±—ã–≤–∞–µ—Ç
+			if (ret < 0)
+			{
+				MinID++;
+				while (dDelta < 0.0 && --MinID >= 0)
+				{
+					SData* tmpData = GetDataById(MinID);
+					dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
+				}
+
+				if (dDelta >= 0.0)
+					ret = MinID;
+
+			}
+
+		}
 	}
 
 	return ret;
 }
 
-int CSpParticle::GetDataAtLowPoint(SData* out_Data, double in_ViewTime)
+int CSpParticle::GetDataAtLowPoint(SData& out_Data, double in_ViewTime)
 {
 	int ret = -1;
-	if (out_Data)
+	SData* tmp = GetDataAtLowPoint(in_ViewTime);
+	if (tmp)
 	{
-		SData* tmp = GetDataAtLowPoint(in_ViewTime);
-		if (tmp)
-		{
-			*out_Data = *tmp;
-			ret = 1;
-		}
+		out_Data = *tmp;
+		ret = 1;
 	}
 	return ret;
 }
@@ -388,203 +504,224 @@ int CSpParticle::GetDataAtLowPoint(SData* out_Data, double in_ViewTime)
 double CSpParticle::GetAbsSpeedPwr2()
 {
 	double ret = 0.0;
-	if (m_Data && m_Data->CurPos >= 0)
-	{
-		SData* tmp = GetCurData();
-		ret = tmp->Speed.X * tmp->Speed.X +  tmp->Speed.Y * tmp->Speed.Y + tmp->Speed.Z * tmp->Speed.Z;
-	}
+	const SData* tmp = GetCurData_C();
+	if (tmp)
+		ret = tmp->Velocity.X * tmp->Velocity.X +  tmp->Velocity.Y * tmp->Velocity.Y + tmp->Velocity.Z * tmp->Velocity.Z;
+
 	return ret;
 }
 
 SData* CSpParticle::GetDataAtLowPoint(double in_ViewTime)
 {
-	SData* ret = NULL;
-	if (m_Data && m_Data->CurPos >= 0)
-	{
-		int LoIdx = m_Data->GetLowIdxByTime(in_ViewTime);
-		if (LoIdx >= 0)
-			ret = m_Data->m_Array + LoIdx;
-	}
-	return ret;
+	return GetDataById(m_Data->GetLowIdxByTime(in_ViewTime));
 }
 
 int CSpParticle::GetLowIdxByTime(double in_ViewTime)
 {
-	int ret = -1;
-	if (m_Data && m_Data->CurPos >= 0)
-		ret = m_Data->GetLowIdxByTime(in_ViewTime);
-
-	return ret;
+	return m_Data ? m_Data->GetLowIdxByTime(in_ViewTime) : -1;
 }
 
+int CSpParticle::GetLowIdxByTime(double in_ViewTime, int in_IdxStart)
+{
+	return m_Data ? m_Data->GetLowIdxByTime(in_ViewTime, in_IdxStart) : -1;
+}
 int CSpParticle::GetDataById(int in_Idx, SData* inout_Reseult)
 {
-	int ret = -1;
-	if (inout_Reseult)
+	SData* tmp = nullptr;
+	if (inout_Reseult && m_Data)
 	{
-		if (m_Data && m_Data->m_Array && in_Idx >= 0 && in_Idx <= m_Data->CurPos)
-			*inout_Reseult = m_Data->m_Array[ret = in_Idx];
+		tmp = m_Data->GetDataById(in_Idx);
+		if (tmp)
+			*inout_Reseult = *tmp;
 		else
 			inout_Reseult->CLEAR();
 	}
 
-	return ret;
+	return tmp ? in_Idx : -1;
 }
 
-int CSpParticle::GetMaxIdx()
-{
-	int ret = -2;
-	if (m_Data)
-		ret = m_Data->CurPos;
-
-	return ret;
-}
-
-
-int CSpParticle::GetNextDataByTime(SData* out_Data, double in_ViewTime, double* out_KeyPoint)
+int CSpParticle::GetMovement(SData& out_Data, const SData& cur_Data, double in_NewTime, double* const out_KeyPoint)
 {
 	int ret = SP_STATE_ERROR_MAIN;
-	if (m_Data && out_Data && out_KeyPoint)
+	//double dTime = in_NewTime - cur_Data.TimePoint;
+	int  LowIdxStart = m_Data->GetLowIdxByTime(in_NewTime);
+
+	if (LowIdxStart >= 0) // && LowIdxStart < m_Data->GetCurPos())
 	{
-		int idDn;
-		idDn = m_Data->GetLowIdxByTime(in_ViewTime);
-		if (idDn >= m_Data->CurPos && m_Data->m_Array[idDn].TimePoint < in_ViewTime)
-		{//ÔÓÁËˆËˇ ÔÓÒÎÂ ÔÓÒÎÂ‰ÌÂÈ ‚ Ú‡ÂÍÚÓËË
-			ret = SP_STATE_Œ ;
-
-			ItgrlFull(out_Data, m_Data->m_Array[m_Data->CurPos], in_ViewTime, m_pCalc);
-
-			int SpeedPwr1 = (m_Data->m_Array + m_Data->CurPos)->AbsSpeed >= m_pCalc->maxAbsSpeed ? 1 : 0;
-			int SpeedPwr2 = out_Data->AbsSpeed >= m_pCalc->maxAbsSpeed ? 1 : 0;
-
-			if (SpeedPwr1 ^ SpeedPwr2)
-			{//·˚Î ÔÂÂıÓ‰ Ò/Ì‡ ÔÂ‰ÂÎ¸ÌÛ˛ ÒÍÓÓÒÚ¸
-				SData Lo = *(m_Data->m_Array + m_Data->CurPos);
-				SData Hi = *out_Data;
-				SData Mid = Hi;
-				double deltaT;
-
-				ret |= SP_STATE_ABS_CHANGE_LS;
-
-				while ((deltaT = (Hi.TimePoint - Lo.TimePoint) / 2.0) > m_pCalc->Time.MinStep)
-				{
-					ItgrlFull(&Mid, Lo, deltaT, m_pCalc);
-
-					Mid.TimePoint = Lo.TimePoint + deltaT;
-					if (SpeedPwr2)
-					{
-						if (Mid.AbsSpeed >= m_pCalc->maxAbsSpeed) Hi = Mid; else Lo = Mid;
-					}
-					else if (Mid.AbsSpeed >= m_pCalc->maxAbsSpeed) Lo = Mid; else Hi = Mid;
-				}
-				*out_KeyPoint = Hi.TimePoint;
-			}
-		}
-		else 
-			if (idDn >= 0)
-		{//œÓÁËˆËˇ ÏÂÊ‰Û ÔÂ‚ÓÈ Ë ÔÓÒÎÂ‰ÌÂÈ ÚÓ˜Í‡ÏË Ú‡ÂÍÚÓËË.
-			ret = SP_STATE_ERROR_MAIN;
-		}
+		SData* DataAtLowIdx = m_Data->GetDataById(LowIdxStart);
+		if (DataAtLowIdx->TimePoint > cur_Data.TimePoint)
+			ret = ItgrlFull(out_Data, *DataAtLowIdx, in_NewTime, *m_pCalc, out_KeyPoint);
 		else
-		{//œÓÁËˆËˇ ‰Ó ÔÂ‚ÓÈ ‚ Ú‡ÂÍÚÓËË
-			ret = SP_STATE_ERROR_MAIN;
-		}
+			ret = ItgrlFull(out_Data, cur_Data, in_NewTime, *m_pCalc, out_KeyPoint);
 	}
+	else
+		ret = GetPrevDataByTime(out_Data, in_NewTime, out_KeyPoint);
+
 	return ret;
 }
 
-int CSpParticle::GetPrevDataByTime(SData* out_Data, double in_ViewTime, double* out_KeyPoint)
+
+int CSpParticle::GetNextDataByTime(SData& out_Data, double in_ViewTime, double* const out_KeyPoint)
 {
 	int ret = SP_STATE_ERROR_MAIN;
-	if (m_Data && out_Data && out_KeyPoint)
+	const SData* CurData = GetCurData_C();
+	int CurPos = GetCurPos();
+	if (CurData && CurPos >=0)
 	{
 		int idDn;
 		idDn = m_Data->GetLowIdxByTime(in_ViewTime);
-		if (idDn == m_Data->CurPos)
+
+		if (idDn >= CurPos && in_ViewTime > GetCurTime())
+			ret = ItgrlFull(out_Data, *CurData, in_ViewTime, *m_pCalc, out_KeyPoint);
+	}
+
+	ASSERT(fabs(out_Data.Position.X) < 1000);
+
+	return ret;
+}
+
+int CSpParticle::GetPrevDataByTime(SData& out_Data, double in_ViewTime, double* const out_KeyPoint)
+{
+	int ret = SP_STATE_ERROR_MAIN;
+	const SData* CurData = GetCurData_C();
+	int CurPos = GetCurPos();
+	if (CurData)
+	{
+		int idDn;
+		idDn = m_Data->GetLowIdxByTime(in_ViewTime);
+
+		if (idDn == CurPos)
 		{
-			if (m_Data->m_Array[idDn].TimePoint == in_ViewTime)
+			if (CurData->TimePoint == in_ViewTime)
 			{
-				ret = SP_STATE_Œ ;
-				*out_Data = m_Data->m_Array[idDn];
+				ret = SP_STATE_–û–ö;
+				out_Data = *CurData;
 			}
 		}
 		else
-			if (idDn > m_Data->CurPos)
-				*out_Data = { 0 };
+			if (idDn > CurPos)
+			{
+				out_Data = { 0 };
+			}
 		else
 		if (idDn >= 0)
-		{//œÓÁËˆËˇ ÏÂÊ‰Û ÔÂ‚ÓÈ Ë ÔÓÒÎÂ‰ÌÂÈ ÚÓ˜Í‡ÏË Ú‡ÂÍÚÓËË.
-			ret = CalcMidData(out_Data, m_Data->m_Array[idDn], m_Data->m_Array[idDn + 1], in_ViewTime);
-			int SpeedPwr1 = m_Data->m_Array[idDn].AbsSpeed >= m_pCalc->maxAbsSpeed ? 1 : 0;
-			int SpeedPwr2 = out_Data->AbsSpeed >= m_pCalc->maxAbsSpeed ? 1 : 0;
-			if (SpeedPwr1 ^ SpeedPwr2)
-			{//·˚Î ÔÂÂıÓ‰ Ò/Ì‡ ÔÂ‰ÂÎ¸ÌÛ˛ ÒÍÓÓÒÚ¸
-				//!!! ÌÂ ‰ÓÎÊÌÓ Ò‡·‡Ú˚‚‡Ú¸ Ú‡Í Í‡Í ÚÓ˜ÍË Ú‡ÂÍÚÓËË Û˜ËÚ˚‚‡˛Ú ÔÂÂıÓ‰˚
-				ret |= SP_STATE_ABS_CHANGE_LS;
-				SData Lo = m_Data->m_Array[idDn];
-				SData Hi = m_Data->m_Array[idDn + 1];
-				SData Mid = Hi;
-				double deltaT;
-
-				while ((deltaT = (Hi.TimePoint - Lo.TimePoint) / 2.0) > m_pCalc->Time.MinStep)
-				{
-					CalcMidData(&Mid, Lo, Hi, Lo.TimePoint + deltaT);
-					if (SpeedPwr2)
-					{
-						if (Mid.AbsSpeed >= m_pCalc->maxAbsSpeed) Hi = Mid; else Lo = Mid;
-					}
-					else if (Mid.AbsSpeed >= m_pCalc->maxAbsSpeed) Lo = Mid; else Hi = Mid;
-				}
-				*out_KeyPoint = Hi.TimePoint;
+		{//–ü–æ–∑–∏—Ü–∏—è –º–µ–∂–¥—É –ø–µ—Ä–≤–æ–π –∏ –ø–æ—Å–ª–µ–¥–Ω–µ–π —Ç–æ—á–∫–∞–º–∏ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏.
+			SData* SdataIdn = GetDataById(idDn);
+			if (SdataIdn)
+			{
+				SData* SdataIdnP1 = GetDataById(idDn + 1);
+				if (SdataIdnP1)
+					ret = CalcMidData(out_Data, *SdataIdn, *SdataIdnP1, in_ViewTime);
 			}
 		}
 		else
-		{//œÓÁËˆËˇ ‰Ó ÔÂ‚ÓÈ ‚ Ú‡ÂÍÚÓËË
+		{//–ü–æ–∑–∏—Ü–∏—è –¥–æ –ø–µ—Ä–≤–æ–π –≤ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏
 			ret = CalcPrevData(out_Data, in_ViewTime);
-			int SpeedPwr1 = m_Data->m_Array[0].AbsSpeed >= m_pCalc->maxAbsSpeed ? 1 : 0;
-			int SpeedPwr2 = out_Data->AbsSpeed >= m_pCalc->maxAbsSpeed ? 1 : 0;
-			if (SpeedPwr1 ^ SpeedPwr2)
-			{//·˚Î ÔÂÂıÓ‰ Ò/Ì‡ ÔÂ‰ÂÎ¸ÌÛ˛ ÒÍÓÓÒÚ¸
-				ret |= SP_STATE_ABS_CHANGE_LS;
-				SData Lo = *out_Data;
-				SData Hi = m_Data->m_Array[0];
-				SData Mid = Hi;
-				double deltaT;
-
-				while ((deltaT = (Hi.TimePoint - Lo.TimePoint) / 2.0) > m_pCalc->Time.MinStep)
-				{
-					CalcPrevData(out_Data, Lo.TimePoint + deltaT);
-					if (SpeedPwr2)
-					{
-						if (Mid.AbsSpeed >= m_pCalc->maxAbsSpeed) Hi = Mid; else Lo = Mid;
-					}
-					else if (Mid.AbsSpeed >= m_pCalc->maxAbsSpeed) Lo = Mid; else Hi = Mid;
-				}
-				*out_KeyPoint = Lo.TimePoint;
-			}
 		}
 	}
 		
 	return ret;
 }
 
-int CSpParticle::CalcPrevData(SData* out_Data, double in_DataTime)
+int CSpParticle::GetPrevDataByTimeFast_(SData& out_Data, int& out_Idx, int StartIdx, double in_ViewTime, double* const out_KeyPoint)
+{
+	int ret = SP_STATE_ERROR_MAIN;
+	out_Idx = -1;
+	const SData* CurData = GetCurData_C();
+	int CurPos = GetCurPos();
+	if (CurData)
+	{
+		int idDn;
+		idDn = m_Data->GetLowIdxByTime(in_ViewTime, StartIdx);
+
+		if (idDn == CurPos)
+		{
+			if (CurData->TimePoint == in_ViewTime)
+			{
+				ret = SP_STATE_–û–ö;
+				out_Data = *CurData;
+			}
+		}
+		else
+			if (idDn > CurPos)
+			{
+				out_Data = { 0 };
+			}
+		else
+		if (idDn >= 0)
+		{//–ü–æ–∑–∏—Ü–∏—è –º–µ–∂–¥—É –ø–µ—Ä–≤–æ–π –∏ –ø–æ—Å–ª–µ–¥–Ω–µ–π —Ç–æ—á–∫–∞–º–∏ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏.
+			SData* SdataIdn = GetDataById(idDn);
+			out_Idx = idDn;
+			ItgrlFull(out_Data, *SdataIdn, in_ViewTime, *m_pCalc, out_KeyPoint);
+		}
+		else
+		{//–ü–æ–∑–∏—Ü–∏—è –¥–æ –ø–µ—Ä–≤–æ–π –≤ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏
+			ret = CalcPrevData(out_Data, in_ViewTime);
+		}
+	}
+		
+	return ret;
+}
+
+
+int CSpParticle::GetPrevDataByTimeLinear(SData& out_Data, int& out_Idx, int StartIdx, double in_ViewTime)
+{
+	int ret = SP_STATE_ERROR_MAIN;
+	out_Idx = -1;
+	const SData* CurData = GetCurData_C();
+	int CurPos = GetCurPos();
+	if (CurData)
+	{
+		int idDn;
+		idDn = m_Data->GetLowIdxByTime(in_ViewTime, StartIdx);
+
+		if (idDn >= CurPos)
+		{
+			if (CurData->TimePoint == in_ViewTime)
+			{
+				ret = SP_STATE_–û–ö;
+				out_Data = *CurData;
+			}
+			else
+				if (idDn > CurPos)
+				{
+					out_Data = { 0 };
+				}
+		}
+		else if (idDn >= 0)
+			{//–ü–æ–∑–∏—Ü–∏—è –º–µ–∂–¥—É –ø–µ—Ä–≤–æ–π –∏ –ø–æ—Å–ª–µ–¥–Ω–µ–π —Ç–æ—á–∫–∞–º–∏ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏.
+				out_Idx = idDn;
+				out_Data.SetLinearFrom(*GetDataById(idDn), *GetDataById(idDn + 1), in_ViewTime);
+			}
+			else
+			{//–ü–æ–∑–∏—Ü–∏—è –¥–æ –ø–µ—Ä–≤–æ–π –≤ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏
+				ret = CalcPrevData(out_Data, in_ViewTime);
+			}
+	}
+
+	return ret;
+}
+
+
+
+int CSpParticle::CalcPrevData(SData& out_Data, double in_DataTime)
 {
 	int ret = -1;
-	if (m_Data && out_Data && m_Data->m_Array && m_Data->CurPos >= 0)
+	int CurPos = GetCurPos();
+	if (CurPos >= 0)
 	{
 		double KeyPoint = 0.0;
-		if (in_DataTime >= m_Data->m_Array[0].TimePoint) ret = GetPrevDataByTime(out_Data, in_DataTime, &KeyPoint);
-		else
+		SData* Sdata0 = GetDataById(0);
+		if (Sdata0)
 		{
-			*out_Data = m_Data->m_Array[0];
-			//œ‡‚ËÎ¸ÌÓ ÔÓÒ˜ËÚ‡Ú¸ Ò Û˜ÂÚÓÏ ÛÒÍÓÂÌËˇ
-
-			out_Data->TimePoint = in_DataTime;
-			double dltTime = m_Data->m_Array[0].TimePoint - in_DataTime;
-			out_Data->position.X -= m_Data->m_Array[0].Speed.X * dltTime;
-			out_Data->position.Y -= m_Data->m_Array[0].Speed.Y * dltTime;
-			out_Data->position.Z -= m_Data->m_Array[0].Speed.Z * dltTime;
+			if (in_DataTime >= Sdata0->TimePoint)
+				ret = GetPrevDataByTime(out_Data, in_DataTime, &KeyPoint);
+			else
+			{
+				out_Data = *Sdata0;
+				//–ü—Ä–∞–≤–∏–ª—å–Ω–æ –ø–æ—Å—á–∏—Ç–∞—Ç—å —Å —É—á–µ—Ç–æ–º —É—Å–∫–æ—Ä–µ–Ω–∏—è
+				out_Data.LinearMove(in_DataTime - Sdata0->TimePoint);
+			}
 		}
 	}
 	return ret;
@@ -595,48 +732,77 @@ int CSpParticle::GetPointCount()
 	return m_Data ? m_Data->GetCurPos() + 1 : 0;
 }
 
-SPos CSpParticle::GetCurPosition()
+int CSpParticle::GetCurPos()
 {
-	SPos ret = { 0 };
-	if (m_Data && m_Data->CurPos >= 0) ret = m_Data->GetCurData()->position;
+	return m_Data ? m_Data->GetCurPos() : -2;
+}
+
+SData* CSpParticle::GetCurData()
+{
+	return m_Data ? m_Data->GetCurData() : nullptr;
+}
+
+const SData* CSpParticle::GetCurData_C() 
+{
+	return m_Data->GetCurData(); 
+}
+
+const SData* CSpParticle::GetPrevData_C()
+{
+	return m_Data->GetPrevData(); 
+}
+
+int CSpParticle::GetCurData(SData* out_Data)
+{
+	int ret = 0;
+	if (out_Data) *out_Data = *GetCurData_C();
+	else ret = -1;
 	return ret;
 }
 
-int CSpParticle::SetParticleData(int in_flags, SData *in_Ptr)
+int CSpParticle::SetParticleData(int in_flags, const SData& in_Ptr)
 {
 	int ret = 0;
 
-	if (m_Data && in_Ptr)
+	if (m_Data)
 	{
-		SData* curData = m_Data->GetCurData();
-		if (curData)
+		if (m_Data->GetCurPos() >= 0)
 		{
-			if ((in_flags & SP_DATA_DENCITY))
+			SData* curData = GetCurData();
+
+			if ((in_flags & SP_DATA_ALL) == SP_DATA_ALL)
 			{
-				curData->Accel3D = in_Ptr->Accel3D;
-				curData->AccelDeriv3D = in_Ptr->AccelDeriv3D;
-				ret |= SP_DATA_DENCITY; 
+				*curData = in_Ptr;
 			}
-			if ((in_flags & SP_DATA_SPEED)) 
+			else
 			{
-				curData->Speed = in_Ptr->Speed;
-				ret |= SP_DATA_SPEED;
-				curData->AbsSpeed = curData->Speed.LEN();
-			}
-			if ((in_flags & SP_DATA_POSITION))
-			{
-				curData->position = in_Ptr->position;
-				ret |= SP_DATA_POSITION;
-			}
-			if ((in_flags & SP_DATA_TIMEPOINT))
-			{ 
-				curData->TimePoint = in_Ptr->TimePoint;
-				ret |= SP_DATA_TIMEPOINT;
+				if ((in_flags & SP_DATA_DENSITY))
+				{
+					curData->Accel_2_3D = in_Ptr.Accel_2_3D;
+					curData->Jerk_3_3D = in_Ptr.Jerk_3_3D;
+					ret |= SP_DATA_DENSITY;
+				}
+				if ((in_flags & SP_DATA_SPEED))
+				{
+					curData->Velocity = in_Ptr.Velocity;
+					ret |= SP_DATA_SPEED;
+					curData->AbsSpeed = curData->Velocity.LEN();
+				}
+				if ((in_flags & SP_DATA_POSITION))
+				{
+					curData->Position = in_Ptr.Position;
+					ret |= SP_DATA_POSITION;
+				}
+				if ((in_flags & SP_DATA_TIMEPOINT))
+				{
+					curData->TimePoint = in_Ptr.TimePoint;
+					ret |= SP_DATA_TIMEPOINT;
+				}
 			}
 		}
 		else
 		{
-			m_Data->AddData(0, in_Ptr);
+			m_Data->AddData(in_Ptr, DA_ADD_FLAG_ADD_FORCE);
 		}
 	}
 
@@ -645,16 +811,12 @@ int CSpParticle::SetParticleData(int in_flags, SData *in_Ptr)
 
 /////////////////////// STATIC ///////////////////////
 
-int CSpParticle::Itgrl(SPos* D_Res, SPos* D1, int iMaxLev, double Tx, double DensMltpl)
+int CSpParticle::Itgrl(SPos* const D_Res, SPos* const D1, int iMaxLev, double Tx, double DensMltpl)
 {
-	int ret = 0;
-	if (D_Res && D1 && Tx >= 0.0)
-		ret = Itgrl(D_Res, D1, Tx, 0, iMaxLev, Tx, DensMltpl);
-
-	return ret;
+	return Itgrl(D_Res, D1, Tx, 0, iMaxLev, Tx, DensMltpl);
 }
 
-int CSpParticle::Itgrl(SPos* D_Res, SPos* D1, double in_Mltpl, int iLev, int iMaxLev, double Tx, double DensMltpl)
+int CSpParticle::Itgrl(SPos* const D_Res, SPos* const D1, double in_Mltpl, int iLev, int iMaxLev, double Tx, double DensMltpl)
 {
 	if (iLev <= 0)
 	{
@@ -706,16 +868,12 @@ int CSpParticle::Itgrl(SPos* D_Res, SPos* D1, double in_Mltpl, int iLev, int iMa
 }
 
 
-int CSpParticle::Itgrl_s(SPos* D_Res, SPos* D1, int iMaxLev, double Tx)
+int CSpParticle::Itgrl_s(SPos* const D_Res, SPos* const D1, int iMaxLev, double Tx)
 {
-	int ret = 0;
-	if (D_Res && D1 && Tx >= 0.0)
-		ret = CSpParticle::Itgrl_s(D_Res, D1, Tx, 0, iMaxLev, Tx);
-
-	return ret;
+	return CSpParticle::Itgrl_s(D_Res, D1, Tx, 0, iMaxLev, Tx);
 }
 
-int CSpParticle::Itgrl_s(SPos* D_Res, SPos* D1, double in_Mltpl, int iLev, int iMaxLev, double Tx)
+int CSpParticle::Itgrl_s(SPos* const D_Res, SPos* const D1, double in_Mltpl, int iLev, int iMaxLev, double Tx)
 {
 	if (iLev <= 0)
 	{
@@ -741,165 +899,217 @@ int CSpParticle::Itgrl_s(SPos* D_Res, SPos* D1, double in_Mltpl, int iLev, int i
 	return iLev;
 }
 
-int CSpParticle::ItgrlFull(SData* Result, const SData& DataSrc, double in_Time, SP_Calc* in_pCalcParams)
+
+int CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(SData& Result, const SData& DataSrc, double in_TimeDelta, const SP_Calc& in_pCalcParams, int in_CalcFlag)
+{
+	int ret = SP_STATE_–û–ö;
+	double deltaTimeD2 = in_TimeDelta * 0.5;
+	double deltaTimeD4 = deltaTimeD2 * 0.5;
+
+	if ((in_CalcFlag & ITGL_CALC_TIME))
+		Result.TimePoint = DataSrc.TimePoint + in_TimeDelta;
+
+	if ((in_CalcFlag & ITGL_CALC_ACCELERATION))
+	{
+		Result.Accel_2_3D.X = DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * in_TimeDelta;
+		Result.Accel_2_3D.Y = DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * in_TimeDelta;
+		Result.Accel_2_3D.Z = DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * in_TimeDelta;
+		ASSERT(fabs(Result.Accel_2_3D.X) < 1.0e80);
+	}
+
+	if ((in_CalcFlag & ITGL_CALC_SPEED))
+	{
+		Result.Velocity.X = DataSrc.Velocity.X + in_TimeDelta * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD2);
+		Result.Velocity.Y = DataSrc.Velocity.Y + in_TimeDelta * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD2);
+		Result.Velocity.Z = DataSrc.Velocity.Z + in_TimeDelta * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD2);
+	}
+
+	//ASSERT(DataSrc.Jerk_3_3D.Z == 0.0);
+
+	//–†–∞–∑–±–∏–µ–Ω–∏–µ –Ω–∞ –¥–≤–∞ –æ—Ç—Ä–µ–∑–∫–∞. –†–∞–∑–Ω–∏—Ü–∞ –¥—Ä–∏–Ω—ã –ø—Ä–æ–µ–∫—Ü–∏–∏ –ø–æ–ª–æ–≤–∏–Ω–Ω–æ–≥–æ —Ä–µ–∑—É–ª—å—Ç–∞—Ç–∞ –Ω–∞ –ø–æ–ª–æ–≤–∏–Ω—É –∏—Ç–æ–≥–æ–≤–æ–≥–æ –ø—Ä–∏–±–ª–∏–∑–∏—Ç–µ–ª—å–Ω–æ —è–≤–ª—è–µ—Ç—Å—è 1/4 –≤–µ–ª–∏—á–∏–Ω—ã –ø–µ—Ä–µ–ª–µ—Ç–∞ –ø–æ –ø—Ä—è–º–æ–π –≤–º–µ—Å—Ç–æ –¥—É–≥–∏
+	SPos SpeedDelta05 = DataSrc.Velocity;
+
+	SpeedDelta05.X += deltaTimeD2 * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD4);
+	SpeedDelta05.Y += deltaTimeD2 * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD4);
+	SpeedDelta05.Z += deltaTimeD2 * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD4);
+
+	SpeedDelta05.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+
+	SpeedDelta05 *= deltaTimeD2;
+	Result.Velocity.SET_AS_PROJECTION_OF(SpeedDelta05);
+
+	double NewLenTime = Result.Velocity.LEN() * 4.0 - in_TimeDelta;
+
+	Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+	//—Ç–∞–∫ –±—ã—Å—Ç—Ä–µ–µ
+	Result.Position.X += NewLenTime * Result.Velocity.X;
+	Result.Position.Y += NewLenTime * Result.Velocity.Y;
+	Result.Position.Z += NewLenTime * Result.Velocity.Z;
+
+	return ret;
+}
+
+int CSpParticle::ItgrlFull(SData& Result, const SData& DataSrc, double in_Time, const SP_Calc& in_pCalcParams, double* const out_KeyPoint)
 {
 	int ret = SP_STATE_ERROR_MAIN;
 
-	if (in_pCalcParams && Result && DataSrc.TimePoint <= in_Time)
+	ret = SP_STATE_–û–ö;
+	Result = DataSrc;
+	Result.TimePoint = in_Time;
+
+	double deltaTime = in_Time - DataSrc.TimePoint;
+	double deltaTimeD2 = deltaTime * 0.5;
+
+	Result.Accel_2_3D.X += DataSrc.Jerk_3_3D.X * deltaTime;
+	Result.Accel_2_3D.Y += DataSrc.Jerk_3_3D.Y * deltaTime;
+	Result.Accel_2_3D.Z += DataSrc.Jerk_3_3D.Z * deltaTime;
+
+	ASSERT(fabs(Result.Accel_2_3D.X) < SP_MAX_TIME_ACC);
+
+	Result.Velocity.X += deltaTime * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD2);
+	Result.Velocity.Y += deltaTime * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD2);
+	Result.Velocity.Z += deltaTime * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD2);
+
+	Result.AbsSpeed = Result.Velocity.LEN();
+
+	if (Result.AbsSpeed >= in_pCalcParams.maxAbsSpeed - in_pCalcParams.Time.GetPrecSpeed())
 	{
-		ret = SP_STATE_Œ ;
-		if (DataSrc.TimePoint < in_Time)
+		ret |= SP_STATE_ABS_SPEED_AL;
+		Result.AbsSpeed = in_pCalcParams.maxAbsSpeed;
+		Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+
+		if (deltaTime <= in_pCalcParams.Time.GetMinStep())
 		{
-			*Result = DataSrc;
-			Result->TimePoint = in_Time;
+			//—É–ø—Ä–æ—â–µ–Ω–∏–µ –¥–ª—è –º–∏–Ω–∏–º–∞–ª—å–Ω–æ–≥–æ —à–∞–≥–∞ –∏ —Ç–æ–ª—å–∫–æ –¥–ª—è —Ç–æ—á–∫–∏ –ø–µ—Ä–µ—Ö–æ–¥–∞.
+			SPos DeltaS; DeltaS.SET_AS_DELTA(DataSrc.Velocity, Result.Velocity);
 
-			double deltaTime = in_Time - DataSrc.TimePoint;
-			double deltaTimeD2 = deltaTime * 0.5;
-
-			Result->Accel3D = DataSrc.Accel3D;
-
-			if (in_pCalcParams->DensityDerivLevel >= 3)
-			{
-				ASSERT(0);
-				/// Õ‡‰Ó Â‡ÎËÁÓ‚‡Ú¸ ‰Îˇ ÛÒÍÓÂÌËˇ. œÓÍ‡ ÌÂÚ Â‡ÎËÁ‡ˆËË ‡Ò˜ÂÚ‡ Ì‡ ÔÂ‚˚¯ÂÌËÂ Ï‡ÍÒËÏ‡Î¸ÌÓÈ ÒÍÓÓÒÚË. Gthatrwbjybpv jnls[ftn gjrf/ 
-				Result->Accel3D.X += DataSrc.AccelDeriv3D.X * deltaTime;
-				Result->Accel3D.Y += DataSrc.AccelDeriv3D.Y * deltaTime;
-				Result->Accel3D.Z += DataSrc.AccelDeriv3D.Z * deltaTime;
-
-				Result->Speed.X += deltaTime * (DataSrc.Accel3D.X + DataSrc.AccelDeriv3D.X * deltaTimeD2);
-				Result->Speed.Y += deltaTime * (DataSrc.Accel3D.Y + DataSrc.AccelDeriv3D.Y * deltaTimeD2);
-				Result->Speed.Z += deltaTime * (DataSrc.Accel3D.Z + DataSrc.AccelDeriv3D.Z * deltaTimeD2);
-
-				Result->AbsSpeed = Result->Speed.LEN();
-
-				if (DataSrc.AbsSpeed < in_pCalcParams->maxAbsSpeed)
-					ret |= SP_STATE_ABS_CHANGE_LS;
-
-				double deltaTimeD3 = deltaTime * 0.33333333333333333;
-
-				if (Result->AbsSpeed >= in_pCalcParams->maxAbsSpeed)
-				{
-					ret |= SP_STATE_ABS_SPEED_AL;
-					if (Result->AbsSpeed > in_pCalcParams->maxAbsSpeed)
-					{
-						Result->Speed.SET_LENGHT(in_pCalcParams->maxAbsSpeed);
-					}
-
-					Result->position.X += deltaTime * (DataSrc.Speed.X + deltaTimeD2 * (DataSrc.Accel3D.X + DataSrc.AccelDeriv3D.X * deltaTimeD3));
-					Result->position.Y += deltaTime * (DataSrc.Speed.Y + deltaTimeD2 * (DataSrc.Accel3D.Y + DataSrc.AccelDeriv3D.Y * deltaTimeD3));
-					Result->position.Z += deltaTime * (DataSrc.Speed.Z + deltaTimeD2 * (DataSrc.Accel3D.Z + DataSrc.AccelDeriv3D.Z * deltaTimeD3));
-				}
-				else
-				{
-					Result->position.X += deltaTime * (DataSrc.Speed.X + deltaTimeD2 * (DataSrc.Accel3D.X + DataSrc.AccelDeriv3D.X * deltaTimeD3));
-					Result->position.Y += deltaTime * (DataSrc.Speed.Y + deltaTimeD2 * (DataSrc.Accel3D.Y + DataSrc.AccelDeriv3D.Y * deltaTimeD3));
-					Result->position.Z += deltaTime * (DataSrc.Speed.Z + deltaTimeD2 * (DataSrc.Accel3D.Z + DataSrc.AccelDeriv3D.Z * deltaTimeD3));
-				}
-			}
-			else //if (in_pCalcParams->DensityDerivLevel == 2)
-			{
-				//V = V0 + a * t
-				//S = S0 + V0 * t + (a * t^2)/2, >>>  S = S0 + t * (V0 + a * t /2),
-
-				Result->Speed.X += DataSrc.Accel3D.X * deltaTime;
-				Result->Speed.Y += DataSrc.Accel3D.Y * deltaTime;
-				Result->Speed.Z += DataSrc.Accel3D.Z * deltaTime;
-
-				Result->AbsSpeed = Result->Speed.LEN();
-
-				if (Result->AbsSpeed >= in_pCalcParams->maxAbsSpeed)
-				{
-					ret |= SP_STATE_ABS_SPEED_AL;
-					if (DataSrc.AbsSpeed >= in_pCalcParams->maxAbsSpeed)
-					{
-						Result->Speed.SET_LENGHT(in_pCalcParams->maxAbsSpeed);
-						//„Û·Ó‚‡ÚÓ
-						Result->position.X += deltaTimeD2 * (DataSrc.Speed.X + Result->Speed.X);
-						Result->position.Y += deltaTimeD2 * (DataSrc.Speed.Y + Result->Speed.Y);
-						Result->position.Z += deltaTimeD2 * (DataSrc.Speed.Z + Result->Speed.Z);
-					}
-					else
-					{
-						//„Û·Ó‚‡ÚÓ
-						double dlt = deltaTimeD2;
-						double dltStop = deltaTimeD2 * 0.001;
-						double MaxSpeedTime = deltaTimeD2 * 0.5;
-						SPos tmpPos;
-						do
-						{
-							tmpPos = DataSrc.Accel3D;
-							tmpPos.MULT(MaxSpeedTime);
-							tmpPos.ADD(DataSrc.Speed);
-							double lencmp = tmpPos.LENPWR2();
-							dlt *= 0.5;
-
-							if (lencmp > in_pCalcParams->maxAbsSpeedPwr2)			MaxSpeedTime -= dlt;
-							else if (lencmp > in_pCalcParams->maxAbsSpeedPwr2)		MaxSpeedTime += dlt;
-								else		dlt = 0.0;
-
-						} while (dlt > dltStop);
-
-						Result->position.X += MaxSpeedTime * (DataSrc.Speed.X + Result->Speed.X);
-						Result->position.Y += MaxSpeedTime * (DataSrc.Speed.Y + Result->Speed.Y);
-						Result->position.Z += MaxSpeedTime * (DataSrc.Speed.Z + Result->Speed.Z);
-
-						Result->Speed.SET_LENGHT(in_pCalcParams->maxAbsSpeed);
-
-						dlt = deltaTime - MaxSpeedTime - MaxSpeedTime;
-						Result->position.X += dlt * Result->Speed.X;
-						Result->position.Y += dlt * Result->Speed.Y;
-						Result->position.Z += dlt * Result->Speed.Z;
-					}
-					Result->AbsSpeed = in_pCalcParams->maxAbsSpeed;
-				}
-				else
-				{
-					if (DataSrc.AbsSpeed < in_pCalcParams->maxAbsSpeed)
-					{
-						Result->position.X += deltaTime * (DataSrc.Speed.X + DataSrc.Accel3D.X * deltaTimeD2);
-						Result->position.Y += deltaTime * (DataSrc.Speed.Y + DataSrc.Accel3D.Y * deltaTimeD2);
-						Result->position.Z += deltaTime * (DataSrc.Speed.Z + DataSrc.Accel3D.Z * deltaTimeD2);
-					}
-					else
-					{
-						ret |= SP_STATE_ABS_CHANGE_LS;
-						/// ???? Œ„Û·ÎÂÌËÂ ‚‚Âı
-						Result->position.X += deltaTime * (DataSrc.Speed.X + DataSrc.Accel3D.X * deltaTimeD2);
-						Result->position.Y += deltaTime * (DataSrc.Speed.Y + DataSrc.Accel3D.Y * deltaTimeD2);
-						Result->position.Z += deltaTime * (DataSrc.Speed.Z + DataSrc.Accel3D.Z * deltaTimeD2);
-					}
-				}
-			}
+			Result.Position.X += deltaTimeD2 * DeltaS.X;
+			Result.Position.Y += deltaTimeD2 * DeltaS.Y;
+			Result.Position.Z += deltaTimeD2 * DeltaS.Z;
 		}
-		else *Result = DataSrc;
+		else if (DataSrc.AbsSpeed >= in_pCalcParams.maxAbsSpeed) //–î–æ —ç—Ç–æ–≥–æ –±—ã–ª–∞ –ø—Ä–µ–¥–µ–ª—å–Ω–∞—è
+		{
+			CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(Result, DataSrc, deltaTime, in_pCalcParams, ITGL_CALC_NONE);
+
+			////–†–∞–∑–±–∏–µ–Ω–∏–µ –Ω–∞ –¥–≤–∞ –æ—Ç—Ä–µ–∑–∫–∞. –†–∞–∑–Ω–∏—Ü–∞ –¥—Ä–∏–Ω—ã –ø—Ä–æ–µ–∫—Ü–∏–∏ –ø–æ–ª–æ–≤–∏–Ω–Ω–æ–≥–æ —Ä–µ–∑—É–ª—å—Ç–∞—Ç–∞ –Ω–∞ –ø–æ–ª–æ–≤–∏–Ω—É –∏—Ç–æ–≥–æ–≤–æ–≥–æ –ø—Ä–∏–±–ª–∏–∑–∏—Ç–µ–ª—å–Ω–æ —è–≤–ª—è–µ—Ç—Å—è 1/4 –≤–µ–ª–∏—á–∏–Ω—ã –ø–µ—Ä–µ–ª–µ—Ç–∞ –ø–æ –ø—Ä—è–º–æ–π –≤–º–µ—Å—Ç–æ –¥—É–≥–∏
+			//double deltaTimeD4 = deltaTimeD2 * 0.5;
+			//SPos SpeedDelta05 = DataSrc.Velocity;
+
+			//SpeedDelta05.X += deltaTimeD2 * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD4);
+			//SpeedDelta05.Y += deltaTimeD2 * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD4);
+			//SpeedDelta05.Z += deltaTimeD2 * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD4);
+
+			//SpeedDelta05.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+
+			//SpeedDelta05 *= deltaTimeD2;
+			//Result.Velocity; Result.Velocity.SET_AS_PROJECTION_OF(SpeedDelta05);
+
+			//double NewLenTime = Result.Velocity.LEN() * 4.0 - deltaTime;
+
+			//Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+			////—Ç–∞–∫ –±—ã—Å—Ç—Ä–µ–µ
+			//Result.Position.X += NewLenTime * Result.Velocity.X;
+			//Result.Position.Y += NewLenTime * Result.Velocity.Y;
+			//Result.Position.Z += NewLenTime * Result.Velocity.Z;
+		}
+		else 
+		{
+			//// –∫–ª—é—á–µ–≤—ã–µ —Ç–æ—á–∫–∏ —Å –º–∏–Ω–∏–º–∞–ª—å–Ω—ã–º —à–∞–≥–æ–º –ø–æ–∑–≤–æ–ª—è—é—Ç –≤—ã–¥–µ–ª–∏—Ç—å —É—á–∞—Å—Ç–∫–∏ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏ —Å –ø–æ—Å—Ç–æ—è–Ω–Ω—ã–º–∏ —Å–≤–æ–π—Å—Ç–≤–∞–º–∏. –ø–µ—Ä–µ—Ö–æ–¥ –º–µ–∂–¥—É –±–ª–æ–∫–∞–º–∏
+			SPos tmpSpeed;
+			double StepDeltaTime = deltaTimeD2;
+			double MaxSpeedDeltaTime = deltaTimeD2;
+			double CurSpeedPwr2;
+
+			//–ø–æ–∏—Å–∫ —Ç–æ—á–∫–∏ –ø–µ—Ä–µ—Ö–æ–¥–∞
+			do
+			{
+				StepDeltaTime *= 0.5;
+				tmpSpeed.X = DataSrc.Velocity.X + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * StepDeltaTime);
+				tmpSpeed.Y = DataSrc.Velocity.Y + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * StepDeltaTime);
+				tmpSpeed.Z = DataSrc.Velocity.Z + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * StepDeltaTime);
+
+				if ((CurSpeedPwr2 = tmpSpeed.LENPWR2())> in_pCalcParams.maxAbsSpeedPwr2)
+					MaxSpeedDeltaTime -= StepDeltaTime;
+				else
+					MaxSpeedDeltaTime += StepDeltaTime;
+			}
+			while (StepDeltaTime > in_pCalcParams.Time.GetMinStep());
+
+			if (CurSpeedPwr2 > in_pCalcParams.maxAbsSpeedPwr2)
+				MaxSpeedDeltaTime -= StepDeltaTime;
+
+			if (out_KeyPoint)	*out_KeyPoint = DataSrc.TimePoint + in_pCalcParams.Time.CorrectDelta_ByMinStep(MaxSpeedDeltaTime);
+
+			double dtDiv2 = (1.0 / 2.0) * MaxSpeedDeltaTime;
+			double dtDiv3 = (1.0 / 3.0) * MaxSpeedDeltaTime;
+
+			//–ø–µ—Ä–µ–º–µ—â–µ–Ω–∏–µ –¥–æ —Ç–æ—á–∫–∏ –ø–µ—Ä–µ—Ö–æ–¥–∞
+			Result.Position.X += MaxSpeedDeltaTime * (DataSrc.Velocity.X + dtDiv2 * (DataSrc.Accel_2_3D.X + dtDiv3 * DataSrc.Jerk_3_3D.X));
+			Result.Position.Y += MaxSpeedDeltaTime * (DataSrc.Velocity.Y + dtDiv2 * (DataSrc.Accel_2_3D.Y + dtDiv3 * DataSrc.Jerk_3_3D.Y));
+			Result.Position.Z += MaxSpeedDeltaTime * (DataSrc.Velocity.Z + dtDiv2 * (DataSrc.Accel_2_3D.Z + dtDiv3 * DataSrc.Jerk_3_3D.Z));
+
+			//–ø–µ—Ä–µ–º–µ—â–µ–Ω–∏–µ –ø–æ—Å–ª–µ —Ç–æ—á–∫–∏ –ø–µ—Ä–µ—Ö–æ–¥–∞
+			CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(Result, DataSrc, deltaTime - MaxSpeedDeltaTime, in_pCalcParams, ITGL_CALC_NONE);
+		}
+		//else
+		//{ //////–ö–≤–∞–¥—Ä–∞—Ç–Ω–æ–µ —É—Ä–∞–≤–Ω–µ–Ω–∏–µ –Ω–µ —Ç–æ—á–Ω–æ –∏ –æ—Ç–∫–ª—é—á–µ–Ω–æ
+		//	//// –∫–ª—é—á–µ–≤—ã–µ —Ç–æ—á–∫–∏ —Å –º–∏–Ω–∏–º–∞–ª—å–Ω—ã–º —à–∞–≥–æ–º –ø–æ–∑–≤–æ–ª—è—é—Ç –≤—ã–¥–µ–ª–∏—Ç—å —É—á–∞—Å—Ç–∫–∏ —Ç—Ä–∞–µ–∫—Ç–æ—Ä–∏–∏ —Å –ø–æ—Å—Ç–æ—è–Ω–Ω—ã–º–∏ —Å–≤–æ–π—Å—Ç–≤–∞–º–∏. –ø–µ—Ä–µ—Ö–æ–¥ –º–µ–∂–¥—É –±–ª–æ–∫–∞–º–∏
+		//	double MaxSpeedDeltaTime = DataSrc.GetTimeToSpeed(in_pCalcParams.maxAbsSpeed);
+		//	ASSERT(!isnan(MaxSpeedDeltaTime));
+
+		//	MaxSpeedDeltaTime = in_pCalcParams.Time.CorrectDelta_ByMinStep(MaxSpeedDeltaTime);
+
+		//	if (out_KeyPoint)	*out_KeyPoint = DataSrc.TimePoint + MaxSpeedDeltaTime;
+
+		//	Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+
+		//	double MaxSpeedDeltaTime05 = MaxSpeedDeltaTime * 0.5; //–≤ –∏–Ω—Ç–µ–≥—Ä–∞–ª–µ /2
+
+		//	Result.Position.X += MaxSpeedDeltaTime05 * (DataSrc.Velocity.X + Result.Velocity.X);
+		//	Result.Position.Y += MaxSpeedDeltaTime05 * (DataSrc.Velocity.Y + Result.Velocity.Y);
+		//	Result.Position.Z += MaxSpeedDeltaTime05 * (DataSrc.Velocity.Z + Result.Velocity.Z);
+
+		//	double dlt = deltaTime - MaxSpeedDeltaTime;
+		//	Result.Position.X += dlt * Result.Velocity.X;
+		//	Result.Position.Y += dlt * Result.Velocity.Y;
+		//	Result.Position.Z += dlt * Result.Velocity.Z;
+		//}
+		Result.AbsSpeed = in_pCalcParams.maxAbsSpeed;
+	}
+	else
+	{
+		double dtDiv2 = (1.0 / 2.0) * deltaTime;
+		double dtDiv3 = (1.0 / 3.0) * deltaTime;
+
+		Result.Position.X += deltaTime * (DataSrc.Velocity.X + dtDiv2 * (DataSrc.Accel_2_3D.X + dtDiv3 * DataSrc.Jerk_3_3D.X));
+		Result.Position.Y += deltaTime * (DataSrc.Velocity.Y + dtDiv2 * (DataSrc.Accel_2_3D.Y + dtDiv3 * DataSrc.Jerk_3_3D.Y));
+		Result.Position.Z += deltaTime * (DataSrc.Velocity.Z + dtDiv2 * (DataSrc.Accel_2_3D.Z + dtDiv3 * DataSrc.Jerk_3_3D.Z));
+
+		if (DataSrc.AbsSpeed >= in_pCalcParams.maxAbsSpeed)
+			ret |= SP_STATE_ABS_CHANGE_LS;
 	}
 	return ret;
 }
 
-int CSpParticle::CalcMidData(SData* Result, const SData& Ptr1, const SData& Ptr2, double absMidPoint)
+int CSpParticle::CalcMidData(SData& Result, const SData& Ptr1, const SData& Ptr2, double absMidPoint)
 {
-	int ret = SP_STATE_Œ ;
+	int ret = SP_STATE_–û–ö;
 
-	if (Result)
+	Result = { 0 };
+	if (Ptr1.TimePoint >= absMidPoint)
 	{
-		*Result = { 0 };
-		if (Ptr1.TimePoint >= absMidPoint)
-		{
-			ret = SP_STATE_DOWN;
-			if (Ptr1.TimePoint == absMidPoint) *Result = Ptr1; else ret |= SP_STATE_ERROR_MAIN;
-		}
-		else if (Ptr2.TimePoint <= absMidPoint)
-		{
-			ret = SP_STATE_UP;
-			if (Ptr2.TimePoint == absMidPoint) *Result = Ptr2; else ret |= SP_STATE_ERROR_MAIN;
-		}
-		else
-		{
-			ret = SP_STATE_MID;
-			ItgrlFull(Result, Ptr1, absMidPoint, m_pCalc);
-
-			Result->TimePoint = absMidPoint;
-		}
+		ret = SP_STATE_DOWN;
+		if (Ptr1.TimePoint == absMidPoint) Result = Ptr1; else ret |= SP_STATE_ERROR_MAIN;
+	}
+	else if (Ptr2.TimePoint <= absMidPoint)
+	{
+		ret = SP_STATE_UP;
+		if (Ptr2.TimePoint == absMidPoint) Result = Ptr2; else ret |= SP_STATE_ERROR_MAIN;
+	}
+	else
+	{
+		ret = SP_STATE_MID;
+		ItgrlFull(Result, Ptr1, absMidPoint, *m_pCalc, nullptr);
 	}
 	return ret;
 }
@@ -925,8 +1135,6 @@ char* CSpParticle::GetFlagsDescription(char* out_Str, int in_Flags)
 			if ((in_Flags & SP_STATE_DOWN) == SP_STATE_DOWN) out_Str += sprintf_s(out_Str, 1000, "DOWN|");
 			if ((in_Flags & SP_STATE_UP) == SP_STATE_UP) out_Str += sprintf_s(out_Str, 1000, "UP|");
 			if ((in_Flags & SP_STATE_MID) == SP_STATE_MID) out_Str += sprintf_s(out_Str, 1000, "MID|");
-			if ((in_Flags & SP_STATE_REL_SPEED_AL) == SP_STATE_REL_SPEED_AL) out_Str += sprintf_s(out_Str, 1000, "REL_SPEED_AL|");
-			if ((in_Flags & SP_STATE_REL_CHANGE_LS) == SP_STATE_REL_CHANGE_LS) out_Str += sprintf_s(out_Str, 1000, "REL_CHANGE_LS|");
 			if ((in_Flags & SP_STATE_ABS_SPEED_AL) == SP_STATE_ABS_SPEED_AL) out_Str += sprintf_s(out_Str, 1000, "ABS_SPEED_AL|");
 			if ((in_Flags & SP_STATE_ABS_CHANGE_LS) == SP_STATE_ABS_CHANGE_LS) out_Str += sprintf_s(out_Str, 1000, "ABS_CHANGE_LS|");
 			if ((in_Flags & SP_STATE_LOW_VIEW) == SP_STATE_LOW_VIEW) out_Str += sprintf_s(out_Str, 1000, "LOW_VIEW|");
@@ -938,3 +1146,100 @@ char* CSpParticle::GetFlagsDescription(char* out_Str, int in_Flags)
 
 	return out_Str;
 }
+
+
+
+////////////////////////////////////////////////////////////////////////////////////
+
+
+double Calc_RelativeAcceleration(int in_RelPartType, int in_CalcType, double in_DensityAtBasePoint)
+{
+	double AccelerationValue;
+	//—Ä–∞—Å—á–µ—Ç —É—Å–∫–æ—Ä–µ–Ω–∏—è
+	switch ((in_RelPartType & SP_TYPE_FORM_MASK))
+	{
+	case SP_TYPE_NEGATIVE://–ø—Ä–æ—Å—Ç–∞—è –∞–Ω—Ç–∏—á–∞—Å—Ç–∏—Ü–∞ - –æ—Ç—Ç–∞–ª–∫–∏–≤–∞–µ—Ç
+		switch (in_CalcType)
+		{
+		case 0:
+		default: //AccelerationValue !!!-inf>>>!!! 0 >>> +inf
+			if (in_DensityAtBasePoint >= 1.0)
+				AccelerationValue = -1.0e50;
+			else
+				AccelerationValue = -1.0 / (1.0 - in_DensityAtBasePoint) + 1.0;
+			break;
+		case 1: //AccelerationValue   !!!-inf>>>!!! 0 >>> +inf
+			AccelerationValue = in_DensityAtBasePoint - 1.0;
+			break;
+		}
+		break;
+	case SP_TYPE_POSITIVE://–ø—Ä–æ—Å—Ç–∞—è —á–∞—Å—Ç–∏—Ü–∞ - –ø—Ä–∏—Ç—è–≥–∏–≤–∞–µ—Ç
+	default:
+		switch (in_CalcType)
+		{
+		case 0:
+		default: //AccelerationValue !!!-inf>>>!!! 0 >>> +inf
+			if (in_DensityAtBasePoint <= 0.0)
+				AccelerationValue = 1.0e50;
+			else
+				AccelerationValue = (1.0 / in_DensityAtBasePoint) - 1.0;
+			break;
+		case 1: //AccelerationValue   !!!-inf>>>!!! 0 >>> +inf
+			AccelerationValue = 1.0 - in_DensityAtBasePoint;
+			break;
+		}
+		break;
+	}
+	return AccelerationValue;
+}
+
+double Calc_RelativeDensity(int in_RelPartType, int in_CalcType, double in_DistancePwr1, double in_DistancePwr2)
+{
+	double DensityValue;
+	//—Ä–∞—Å—á–µ—Ç –ø–ª–æ—Ç–Ω–æ—Å—Ç–∏
+
+
+	switch (in_RelPartType)
+	{
+	case SP_TYPE_NEGATIVE://–ø—Ä–æ—Å—Ç–∞—è –∞–Ω—Ç–∏—á–∞—Å—Ç–∏—Ü–∞ - –æ—Ç—Ç–∞–ª–∫–∏–≤–∞–µ—Ç
+		switch (in_CalcType)
+		{
+		case 0:
+		default: //dens = 1 / S^2        DensityAtBasePoint [-inf] 0 >>>> 1
+			if (in_DistancePwr2 == 0.0)
+				DensityValue = 1.0e-50;
+			else
+				DensityValue = SP_DENSITY_MAX / in_DistancePwr2;
+			break;
+		case 1://dens = 1 - 1 / (1 + S^2)
+			DensityValue = SP_DENSITY_MAX / (SP_DENSITY_MAX + in_DistancePwr2);
+			break;
+		case 2://dens = 1 - 1 / (1 + S) ^ 2      0.0 < DensityAtBasePoint < 1
+			DensityValue = SP_DENSITY_MAX / ((SP_DENSITY_MAX + in_DistancePwr1) * (SP_DENSITY_MAX + in_DistancePwr1));
+			break;
+		}
+		break;
+	case SP_TYPE_POSITIVE://–ø—Ä–æ—Å—Ç–∞—è —á–∞—Å—Ç–∏—Ü–∞ - –ø—Ä–∏—Ç—è–≥–∏–≤–∞–µ—Ç
+	default:
+		switch (in_CalcType)
+		{
+		case 0:
+		default: //dens = 1 - 1 / S^2        DensityAtBasePoint [-inf] 0 >>>> 1
+			if (in_DistancePwr2 == 0.0)
+				DensityValue = 1.0e-50;
+			else
+				DensityValue = SP_DENSITY_MAX - SP_DENSITY_MAX / in_DistancePwr2;
+			break;
+		case 1://dens = 1 - 1 / (1 + S^2)
+			DensityValue = SP_DENSITY_MAX - SP_DENSITY_MAX / (SP_DENSITY_MAX + in_DistancePwr2);
+			break;
+		case 2://dens = 1 - 1 / (1 + S) ^ 2      0.0 < DensityAtBasePoint < 1
+			DensityValue = SP_DENSITY_MAX - SP_DENSITY_MAX / ((SP_DENSITY_MAX + in_DistancePwr1) * (SP_DENSITY_MAX + in_DistancePwr1));
+			break;
+		}
+		break;
+	}
+
+	return DensityValue;
+}
+

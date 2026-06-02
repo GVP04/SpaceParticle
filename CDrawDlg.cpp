@@ -1,4 +1,4 @@
-// CDrawDlg.cpp : implementation file
+﻿// CDrawDlg.cpp : implementation file
 //
 
 #include "pch.h"
@@ -19,7 +19,7 @@ CDrawDlg::CDrawDlg(SP_Calc* in_pData, CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_DIALOGDRAW, pParent)
 {
     m_pData = in_pData;
-	m_hDCBitmap = NULL;
+	m_hDCBitmap = nullptr;
 	m_ViewPrc = 100.0;
 	m_ViewSpread = 100.0;
 
@@ -33,7 +33,7 @@ CDrawDlg::CDrawDlg(SP_Calc* in_pData, CWnd* pParent /*=nullptr*/)
 CDrawDlg::~CDrawDlg()
 {
 	if (m_hDCBitmap) DeleteObject(m_hDCBitmap);
-	m_hDCBitmap = NULL;
+	m_hDCBitmap = nullptr;
 }
 
 void CDrawDlg::DoDataExchange(CDataExchange* pDX)
@@ -67,9 +67,10 @@ END_MESSAGE_MAP()
 void CDrawDlg::OnPaint()
 {
 	CPaintDC dc(this);
-
 	if (m_pData)
 	{
+		EnterCriticalSection(&m_pData->Group->m_cs);
+
 		HBITMAP hOldBitmap;       // Handle to the old bitmap
 
 		// Create a memory device context compatible with the device. 
@@ -77,7 +78,7 @@ void CDrawDlg::OnPaint()
 		dc.GetClipBox(&re);
 		CDC DCMem;
 		DCMem.CreateCompatibleDC(&dc);
-		if (m_hDCBitmap == NULL)
+		if (m_hDCBitmap == nullptr)
 		{
 			///////////CRect ClientRe;
 			///////////GetClientRect(&ClientRe);
@@ -94,9 +95,6 @@ void CDrawDlg::OnPaint()
 
 			//SPos tmp = { 0 };
 			//PaintTraceToCDC(&DCMem, m_pData, SP_DRAW_XY, tmp);
-
-			HDC hDC = DCMem.m_hDC;
-
 			SDrawSettings oldDrawSet = m_pData->DrawSet;
 
 			//m_pData->DrawSet.iShowFlags = SP_SHOWFLAG_TRACE;
@@ -108,6 +106,7 @@ void CDrawDlg::OnPaint()
 			m_pData->Group->GetMinMaxTracePos(m_pData->DrawSet.PosMin, m_pData->DrawSet.PosMax, m_pData->DrawSet.ViewPoint.StartIdx, m_pData->DrawSet.ViewPoint.EndIdx);
 
 			TraceSize.SET_AS_DELTA(m_pData->DrawSet.PosMax, m_pData->DrawSet.PosMin);
+			if (TraceSize.X == 0.0 && TraceSize.Y == 0.0 && TraceSize.Z == 0.0) TraceSize.X = TraceSize.Y = TraceSize.Z = 10.0;
 
 			if (TraceSize.X > TraceSize.Y && TraceSize.X > TraceSize.Z)
 				m_pData->DrawSet.ViewMltpl = BMP_Size / TraceSize.X;
@@ -148,6 +147,8 @@ void CDrawDlg::OnPaint()
 
 		// Select the old bitmap back into the device context.
 		DCMem.SelectObject(hOldBitmap);
+
+		LeaveCriticalSection(&m_pData->Group->m_cs);
 	}
 }
 
@@ -227,7 +228,7 @@ void CDrawDlg::SetMltplSliderPos()
 		m_SliderMgnf.SetRange(0, 140);
 
 		int posMgn;
-		GetMgnPos(&posMgn, NULL, m_pData->DrawSet.ViewMltpl_Ext, 140);
+		GetMgnPos(&posMgn, nullptr, m_pData->DrawSet.ViewMltpl_Ext, 140);
 		m_SliderMgnf.SetPos(posMgn);
 	}
 }
@@ -242,7 +243,7 @@ double CDrawDlg::SetViewPrc(double in_Prc)
 	m_SliderViewPrc.SetRange(0, 140);
 
 	int posMgn;
-	GetPrcPos(&posMgn, NULL, m_ViewPrc, 140);
+	GetPrcPos(&posMgn, nullptr, m_ViewPrc, 140);
 	m_SliderViewPrc.SetPos(posMgn);
 
 	return ret;
@@ -258,7 +259,7 @@ double CDrawDlg::SetViewSpread(double in_Mlin_Spreadtpl)
 	m_SliderSpread.SetRange(0, 140);
 
 	int posMgn;
-	GetPrcPos(&posMgn, NULL, m_ViewSpread, 140);
+	GetPrcPos(&posMgn, nullptr, m_ViewSpread, 140);
 	m_SliderSpread.SetPos(posMgn);
 
 	return ret;
@@ -297,7 +298,8 @@ void CDrawDlg::SetWindowPos(SPos & in_WPos, bool bRedraw)
 		SetScrollInfo(SB_HORZ, &si, TRUE);
 	}
 
-	if (bRedraw) Invalidate();
+	if (bRedraw) 	
+		::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
 }
 
 BOOL CDrawDlg::OnInitDialog()
@@ -330,8 +332,7 @@ BOOL CDrawDlg::OnInitDialog()
 void CDrawDlg::RedrawMe()
 {
 	m_uRedrawFlag = 1;
-	Invalidate();
-	UpdateWindow();
+	::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
 }
 
 void CDrawDlg::OnSize(UINT nType, int cx, int cy)
@@ -380,7 +381,7 @@ void CDrawDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		case SB_BOTTOM:			m_pData->DrawSet.WindowPos.Y = nPos - 200; break;
 		case SB_THUMBTRACK:		m_pData->DrawSet.WindowPos.Y = nPos; break;
 		default:
-			nPos = nPos;
+			m_pData->DrawSet.WindowPos.Y = nPos;
 			break;
 		}
 		if (m_pData->DrawSet.WindowPos.Y < 0)
@@ -391,7 +392,9 @@ void CDrawDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		si.nPos = (int)m_pData->DrawSet.WindowPos.Y;
 
 		SetScrollInfo(SB_VERT, &si, TRUE);
-		Invalidate();
+		//Invalidate();
+		::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
+
 	}
 	else if (WndId == IDC_SLIDERMGNF)
 	{
@@ -399,7 +402,7 @@ void CDrawDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		nPos = m_SliderMgnf.GetPos();
 
 		int PosValue = m_SliderMgnf.GetPos();
-		GetMgnPos(&PosValue, NULL, m_pData->DrawSet.ViewMltpl_Ext, 140);
+		GetMgnPos(&PosValue, nullptr, m_pData->DrawSet.ViewMltpl_Ext, 140);
 		if (nPos != PosValue)
 			bRedraw = true;
 		switch (nSBCode)
@@ -417,7 +420,7 @@ void CDrawDlg::OnVScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		}
 		if (bRedraw)
 		{
-			GetMgnPos(NULL, &m_pData->DrawSet.ViewMltpl_Ext, nPos, 140);
+			GetMgnPos(nullptr, &m_pData->DrawSet.ViewMltpl_Ext, nPos, 140);
 			RedrawMe();
 		}
 	}
@@ -449,7 +452,7 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		case SB_BOTTOM:			m_pData->DrawSet.WindowPos.X = nPos - 200; break;
 		case SB_THUMBTRACK:		m_pData->DrawSet.WindowPos.X = nPos; break;
 		default:
-			nPos = nPos;
+			m_pData->DrawSet.WindowPos.X = nPos;
 			break;
 		}
 		if (m_pData->DrawSet.WindowPos.X < 0)
@@ -460,7 +463,8 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		si.nPos = (int)m_pData->DrawSet.WindowPos.X;
 
 		SetScrollInfo(SB_HORZ, &si, TRUE);
-		Invalidate();
+		//Invalidate();
+		::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
 	}
 	else if (WndId == IDC_SLIDERVIEWPRC)
 	{
@@ -468,7 +472,7 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		nPos = m_SliderViewPrc.GetPos();
 
 		int PosValue = m_SliderViewPrc.GetPos();
-		GetPrcPos(&PosValue, NULL, m_ViewPrc, 140);
+		GetPrcPos(&PosValue, nullptr, m_ViewPrc, 140);
 		if (nPos != PosValue)
 			bRedraw = true;
 		switch (nSBCode)
@@ -486,7 +490,7 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		}
 		if (bRedraw)
 		{
-			GetPrcPos(NULL, &m_ViewPrc, nPos, 140);
+			GetPrcPos(nullptr, &m_ViewPrc, nPos, 140);
 			m_pData->DrawSet.ViewPoint.TimeInPc = m_ViewPrc;
 			RedrawMe();
 		}
@@ -499,7 +503,7 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 		nPos = m_SliderSpread.GetPos();
 
 		int PosValue = m_SliderSpread.GetPos();
-		GetPrcPos(&PosValue, NULL, m_ViewSpread, 140);
+		GetPrcPos(&PosValue, nullptr, m_ViewSpread, 140);
 		if (nPos != PosValue)
 			bRedraw = true;
 
@@ -520,7 +524,7 @@ void CDrawDlg::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 
 		if (bRedraw)
 		{
-			GetPrcPos(NULL, &m_ViewSpread, nPos, 140);
+			GetPrcPos(nullptr, &m_ViewSpread, nPos, 140);
 			m_pData->DrawSet.ViewPoint.Spread = m_ViewSpread;
 			RedrawMe();
 		}
@@ -538,6 +542,7 @@ void CDrawDlg::OnBnClicked_Save()
 {
 	if (m_pData)
 	{
+		EnterCriticalSection(&m_pData->Group->m_cs);
 		SDrawSettings oldDrawSet = m_pData->DrawSet;
 
 		SPos TraceSize = { 0 };
@@ -584,10 +589,10 @@ void CDrawDlg::OnBnClicked_Save()
 			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT | SP_DRAW_GROUPINFO, tmp);
 
 			char fileMane[500];
-			sprintf_s(fileMane, "C:\\SParticle\\BMP\\CALC_NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_PT%g_%d.bmp",
+			sprintf_s(fileMane, "C:\\SParticle\\BMP\\CALC_NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_PT%g_Thr%d_%I64d.bmp",
 				m_pData->Group->GetCount(), m_pData->ClassicType, m_pData->AdditiveType,
 				m_pData->WindType, m_pData->CollisionType, m_pData->DensityCalcType, m_pData->AccCalcType, m_pData->DensityDerivLevel,
-				m_pData->ParentSpaceThickness, GetTickCount());
+				m_pData->ParentSpaceThickness, m_pData->Group->m_ThreadsCur, GetTickCount64());
 
 			SaveBitmap(fileMane, DCMem, m_hDCBitmap);
 
@@ -596,14 +601,13 @@ void CDrawDlg::OnBnClicked_Save()
 
 			DCMem.SelectObject(hOldBitmap);
 			DeleteObject(hBitmap);
-			hBitmap = NULL;
+			hBitmap = nullptr;
 		}
 
 		m_pData->DrawSet = oldDrawSet;
 
+		LeaveCriticalSection(&m_pData->Group->m_cs);
 	}
-
-
 }
 
 void CDrawDlg::OnBnClicked_UpLeft()
@@ -621,8 +625,7 @@ void CDrawDlg::OnBnClicked_UpLeft()
 	si.nPos = 0;
 	SetScrollInfo(SB_VERT, &si, TRUE);
 
-	Invalidate();
-
+	::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
 }
 
 void CDrawDlg::OnBnClicked_Center()
@@ -643,7 +646,7 @@ void CDrawDlg::OnBnClicked_Center()
 	si.nPos = (int)m_pData->DrawSet.WindowPos.Y;
 	SetScrollInfo(SB_VERT, &si, TRUE);
 
-	Invalidate();
+	::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
 }
 
 void CDrawDlg::OnBnClickedButtonXyz()
@@ -653,7 +656,7 @@ void CDrawDlg::OnBnClickedButtonXyz()
 	else
 		m_XYZ = SP_DRAW_XY;
 
-	RedrawMe();
+	m_uRedrawFlag = 1;
 	OnBnClicked_Center();
 }
 
@@ -665,6 +668,7 @@ void CDrawDlg::OnBnClickedButtoncmd()
 
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDITCMD), tmps, SD_PARAMSLEN);
 		m_pData->Group->Cmd_Add(tmps);
+		m_pData->Group->Cmd_Add("REDRAW");
 		delete [] tmps;
 	}
 }
@@ -680,6 +684,7 @@ void CDrawDlg::OnBnClickedButtonGroup()
 
 		sprintf_s(tmps, SD_PARAMSLEN, "SET TRACE_GROUP_ARR = %d", m_pData->DrawSet.ShowGroupArrows);
 		m_pData->Group->Cmd_Add(tmps);
+		m_pData->Group->Cmd_Add("REDRAW");
 
 		delete[] tmps;
 	}

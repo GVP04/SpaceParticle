@@ -1,11 +1,12 @@
-
-// SpaceOMDlg.h : header file
+﻿// SpaceOMDlg.h : header file
 //
-
 #pragma once
 #include "CSP_Group.h"
 
 #define M_NCALCFIND		5
+
+UINT DoCalc_Find(LPVOID pParam);
+UINT DoCalc_1(LPVOID pParam);
 
 
 // CSpaceOMDlg dialog

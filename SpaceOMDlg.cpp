@@ -1,4 +1,4 @@
-
+﻿
 // SpaceOMDlg.cpp : implementation file
 //
 
@@ -17,7 +17,6 @@
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
 
 // CAboutDlg dialog used for App About
 
@@ -63,7 +62,7 @@ CSpaceOMDlg::CSpaceOMDlg(CWnd* pParent /*=nullptr*/)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 
-	m_Calc_1.CalcParams = new char [SD_PARAMSLEN];
+	m_Calc_1.CalcParams = new char [SD_PARAMSLEN + 100];
 	
 	m_Calc_1.Group = new CSP_Group;
 	m_Calc_1.Group->m_pCalc = &m_Calc_1;
@@ -127,7 +126,7 @@ BOOL CSpaceOMDlg::OnInitDialog()
 
 	// TODO: Add extra initialization here
 
-	SetTimer(1, 1000, NULL);
+	SetTimer(1, 1000, nullptr);
 
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -184,7 +183,7 @@ HCURSOR CSpaceOMDlg::OnQueryDragIcon()
 
 void CSpaceOMDlg::OnBnClicked_ShowTrace()
 {
-	if (m_Calc_1.DlgTrace == NULL)
+	if (m_Calc_1.DlgTrace == nullptr)
 	{
 		m_Calc_1.DlgTrace = new CDrawDlg(&m_Calc_1);
 		m_Calc_1.DlgTrace->Create(IDD_DIALOGDRAW, GetDesktopWindow());
@@ -227,40 +226,39 @@ void CSpaceOMDlg::OnBnClicked_StopCalc()
 
 	if ((m_Calc_1.Group->GetCalcState() & M_STATE_CALC) == M_STATE_CALC)
 	{
+		m_Calc_1.Group->SetCalcState(M_STATE_BREAK);
 		m_Calc_1.Group->ClearCalcState(M_STATE_CALC);
-		::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_CALCSIMPLE), 1);
-		::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_STOPCALC), 0);
 	}
 }
 
 void CSpaceOMDlg::DeleteAll()
 {
 	if (m_Calc_1.DlgTrace) delete m_Calc_1.DlgTrace;
-	m_Calc_1.DlgTrace = NULL;
+	m_Calc_1.DlgTrace = nullptr;
 
 	if (m_Calc_1.Group) delete m_Calc_1.Group;
-	m_Calc_1.Group = NULL;
+	m_Calc_1.Group = nullptr;
 
 	if (m_Calc_1.CalcParams) delete[] m_Calc_1.CalcParams;
-	m_Calc_1.CalcParams = NULL;
+	m_Calc_1.CalcParams = nullptr;
 
 
 	for (int i = 0; i < M_NCALCFIND; i++)
 	{
 		if (m_Calc_FIND[i].curCalc.DlgTrace) delete m_Calc_FIND[i].curCalc.DlgTrace;
-		m_Calc_FIND[i].curCalc.DlgTrace = NULL;
+		m_Calc_FIND[i].curCalc.DlgTrace = nullptr;
 
 		if (m_Calc_FIND[i].DlgFind) delete m_Calc_FIND[i].DlgFind;
-		m_Calc_FIND[i].DlgFind = NULL;
+		m_Calc_FIND[i].DlgFind = nullptr;
 
 		if (m_Calc_FIND[i].curCalc.Group) delete m_Calc_FIND[i].curCalc.Group;
-		m_Calc_FIND[i].curCalc.Group = NULL;
+		m_Calc_FIND[i].curCalc.Group = nullptr;
 
 		if (m_Calc_FIND[i].curCalc.CalcParams) delete m_Calc_FIND[i].curCalc.CalcParams;
-		m_Calc_FIND[i].curCalc.CalcParams = NULL;
+		m_Calc_FIND[i].curCalc.CalcParams = nullptr;
 
 		if (m_Calc_FIND[i].FindParams) delete m_Calc_FIND[i].FindParams;
-		m_Calc_FIND[i].FindParams = NULL;
+		m_Calc_FIND[i].FindParams = nullptr;
 	}
 }
 
@@ -313,7 +311,7 @@ void CSpaceOMDlg::OnBnClicked_RefreshTrace()
 		*m_Calc_1.CalcParams = 0;
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_1.CalcParams, SD_PARAMSLEN);
 
-		m_Calc_1.Group->ReadSettingsGroup(m_Calc_1.CalcParams, SGROUP_STEP| SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
+		m_Calc_1.Group->ReadSettingsGroup(m_Calc_1.CalcParams, /*SGROUP_STEP |*/ SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
 
 		LeaveCriticalSection(&m_Calc_1.Group->m_cs);
 
@@ -331,19 +329,19 @@ void CSpaceOMDlg::OnBnClicked_StartFind()
 		if (!(m_Calc_FIND[i].curCalc.Group->GetCalcState() & M_STATE_CALC))
 		{
 			if (m_Calc_FIND[i].FindParams) delete[] m_Calc_FIND[i].FindParams;
-			m_Calc_FIND[i].FindParams = NULL;
+			m_Calc_FIND[i].FindParams = nullptr;
 
 			if (m_Calc_FIND[i].curCalc.CalcParams) delete[] m_Calc_FIND[i].curCalc.CalcParams;
-			m_Calc_FIND[i].curCalc.CalcParams = NULL;
+			m_Calc_FIND[i].curCalc.CalcParams = nullptr;
 
 			if (m_Calc_FIND[i].DlgFind) delete m_Calc_FIND[i].DlgFind;
-			m_Calc_FIND[i].DlgFind = NULL;
+			m_Calc_FIND[i].DlgFind = nullptr;
 
 			if (m_Calc_FIND[i].curCalc.DlgTrace) delete m_Calc_FIND[i].curCalc.DlgTrace;
-			m_Calc_FIND[i].curCalc.DlgTrace = NULL;
+			m_Calc_FIND[i].curCalc.DlgTrace = nullptr;
 
 			if (m_Calc_FIND[i].curCalc.Group) delete m_Calc_FIND[i].curCalc.Group;
-			m_Calc_FIND[i].curCalc.Group = NULL;
+			m_Calc_FIND[i].curCalc.Group = nullptr;
 
 			m_Calc_FIND[i].curCalc.Stat.CLEAR();
 			i--;
@@ -352,11 +350,11 @@ void CSpaceOMDlg::OnBnClicked_StartFind()
 
 	if ( i < M_NCALCFIND)
 	{
-		m_Calc_FIND[i].FindParams = new char[SD_PARAMSLEN];
+		m_Calc_FIND[i].FindParams = new char[SD_PARAMSLEN + 100];
 		*m_Calc_FIND[i].FindParams = 0;
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_FIND[i].FindParams, SD_PARAMSLEN);
 
-		m_Calc_FIND[i].curCalc.CalcParams = new char[SD_PARAMSLEN];
+		m_Calc_FIND[i].curCalc.CalcParams = new char[SD_PARAMSLEN + 100];
 		*m_Calc_FIND[i].curCalc.CalcParams = 0;
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_FIND[i].curCalc.CalcParams, SD_PARAMSLEN);
 
@@ -364,11 +362,11 @@ void CSpaceOMDlg::OnBnClicked_StartFind()
 		m_Calc_FIND[i].curCalc.Group->m_pCalc = &m_Calc_FIND[i].curCalc;
 		m_Calc_FIND[i].curCalc.Group->m_pCalcFind = &m_Calc_FIND[i];
 
-		m_Calc_FIND[i].curCalc.Group->ReadSettingsGroup(m_Calc_FIND[i].curCalc.CalcParams, SGROUP_STEP | SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
+		m_Calc_FIND[i].curCalc.Group->ReadSettingsGroup(m_Calc_FIND[i].curCalc.CalcParams, SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
 
 		m_Calc_FIND[i].curCalc.DrawSet.iShowFlags |= SP_DRAW_TEXT | SP_DRAW_CLEARBKG | SP_DRAW_GROUPINFO;
 
-		if (m_Calc_FIND[i].DlgFind == NULL)
+		if (m_Calc_FIND[i].DlgFind == nullptr)
 		{
 			m_Calc_FIND[i].DlgFind = new CFindDlg;
 			m_Calc_FIND[i].DlgFind->Create(IDD_DIALOGFINDSP, GetDesktopWindow());
@@ -379,4 +377,3 @@ void CSpaceOMDlg::OnBnClicked_StartFind()
 		AfxBeginThread(DoCalc_Find, (LPVOID)&m_Calc_FIND[i]);
 	}
 }
-

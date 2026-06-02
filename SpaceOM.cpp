@@ -1,4 +1,4 @@
-
+﻿
 // SpaceOM.cpp : Defines the class behaviors for the application.
 //
 
@@ -7,10 +7,18 @@
 #include "SpaceOM.h"
 #include "SpaceOMDlg.h"
 #include <direct.h>
+#include "CommonFunc.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
+
+HPEN PenGrSpeed;
+HPEN PenGrAcc;
+HPEN PenDGrSpeed;
+HPEN PenDGrAcc;
+HPEN PenGrTrace;
+HPEN PenDGrTrace;
 
 
 // CSpaceOMApp
@@ -21,6 +29,23 @@ END_MESSAGE_MAP()
 
 
 // CSpaceOMApp construction
+/*
+UINT DoCalc_111(LPVOID pParam)
+{
+	int cc;
+	while (1)
+	{
+		int ii = GetTickCount();
+		if (ii != 0)
+		{
+			int j = (ii + 1234556) / ii;
+			cc = j;
+		}
+	}
+}
+*/
+
+void my_Test();
 
 CSpaceOMApp::CSpaceOMApp()
 {
@@ -30,30 +55,10 @@ CSpaceOMApp::CSpaceOMApp()
 	// TODO: add construction code here,
 	// Place all significant initialization in InitInstance
 
-	_chdir("C:\\SParticle");
 
+	ASSERT(_chdir("C:\\SParticle") == 0);
 
-	//SPos pointVel; pointVel.SET(1.0, 1.0, 0.0);
-	//SPos plainVel; plainVel.SET(0.0, 0.0, 0.0);
-	//SPos norm; norm.SET(-1.5, 0.1, 0.0);
-	//SPos refl, refl2, refl__;
-
-	//refl2.SET_AS_REFLECT(pointVel, plainVel, norm);
-	//refl.SET_AS_REFLECT(pointVel, norm);
-
-	//refl.NORMALIZE();
-
-
-	//SData p1, p2;
-	//p1.position.SET(1.0, 1.0, 1.0);
-	//p2.position.SET(1000.0, 1.0, 10.0);
-
-	//p1.Speed.SET(1.0, 10.0, 0.0);
-	//p2.Speed.SET(1.0, -10.0, 0.0);
-
-	//SPos relSP;
-	//double rs = SData::GetRelativeSpeed(p1, p2, &relSP);
-	//relSP.SET(1.0, 1.0, 1.0);
+	//my_Test();
 
 }
 
@@ -98,7 +103,14 @@ BOOL CSpaceOMApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CSpaceOMDlg *dlg = new CSpaceOMDlg;
+	PenGrSpeed = CreatePen(PS_DOT, 1, 0xB0D0B0);
+	PenGrAcc = CreatePen(PS_DOT, 1, 0xD0B0B0);
+	PenDGrSpeed = CreatePen(PS_DOT, 1, 0x308030);
+	PenDGrAcc = CreatePen(PS_DOT, 1, 0x803030);
+	PenGrTrace = CreatePen(PS_SOLID, 1, 0xB0B0B0);
+	PenDGrTrace = CreatePen(PS_SOLID, 1, 0x404040);
+
+	dlg = new CSpaceOMDlg;
 	m_pMainWnd = dlg;
 	INT_PTR nResponse = dlg->DoModal();
 	if (nResponse == IDOK)
@@ -117,6 +129,13 @@ BOOL CSpaceOMApp::InitInstance()
 		TRACE(traceAppMsg, 0, "Warning: if you are using MFC controls on the dialog, you cannot #define _AFX_NO_MFC_CONTROLS_IN_DIALOGS.\n");
 	}
 
+	DeleteObject(PenDGrAcc);
+	DeleteObject(PenDGrSpeed);
+	DeleteObject(PenGrAcc);
+	DeleteObject(PenGrSpeed);
+	DeleteObject(PenGrTrace);
+	DeleteObject(PenDGrTrace);
+
 	// Delete the shell manager created above.
 	if (pShellManager != nullptr)
 	{
@@ -134,3 +153,161 @@ BOOL CSpaceOMApp::InitInstance()
 	return FALSE;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+class PointDynamics {
+publicpublic:
+    // Расчёт третьей производной (рывка)
+    static Vector3D calculateJerk(const Vector3D& position, const Vector3D& velocity) {
+        double S = position.magnitude();
+        if (S <= 1.0) {
+            std::cerr << "Ошибка: S должно быть > 1\n";
+            return Vector3D();
+        }
+
+        double S_sq = S * S;
+        double a_magnitude = 1.0 / (S_sq - 1.0);
+        double d_a_dt = -2.0 * S * position.dot(velocity) / ((S_sq - 1.0) * (S_sq - 1.0));
+
+        // Единичный вектор направления
+        Vector3D n = position * (1.0 / S);
+
+        // Производная единичного вектора
+        Vector3D dn_dt = (velocity * (1.0 / S)) -
+            (position * (position.dot(velocity) / (S * S_sq)));
+
+        // Рывок
+        Vector3D jerk = n * d_a_dt + (dn_dt * a_magnitude);
+        return jerk;
+    }
+
+    // Расчёт четвёртой производной (snap) численно
+    static Vector3D calculateSnap(const Vector3D& position,
+        const Vector3D& velocity,
+        double dt = 1e-6) {
+        // Расчёт рывка в текущей точке
+        Vector3D currentJerk = calculateJerk(position, velocity);
+
+        // Приращение для численного дифференцирования
+        Vector3D newPosition = position + velocity * dt;
+        Vector3D newVelocity = velocity + calculateAcceleration(position) * dt;
+
+        // Расчёт рывка в смещённой точке
+        Vector3D nextJerk = calculateJerk(newPosition, newVelocity);
+
+        // Численная производная рывка
+        Vector3D snap = (nextJerk - currentJerk) * (1.0 / dt);
+        return snap;
+    }
+
+private:
+    // Расчёт ускорения (второй производной)
+    static Vector3D calculateAcceleration(const Vector3D& position) {
+        double S = position.magnitude();
+        if (S <= 1.0) return Vector3D();
+
+        double aMagnitude = 1.0 / (S * S - 1.0);
+        return position * (aMagnitude / S); // направление совпадает с позицией
+    }
+};
+
+// Пример использования
+int main() {
+    // Начальная позиция и скорость
+    Vector3D position(10.0, 0.0, 0.0);  // S ≈ 10
+    Vector3D velocity(0.0, 1.0, 0.5);
+
+    std::cout << "Позиция: (" << position.x << ", " << position.y << ", " << position.z << ")\n";
+    std::cout << "Скорость: (" << velocity.x << ", " << velocity.y << ", " << velocity.z << ")\n\n";
+
+    // Расчёт производных
+    Vector3D jerk = PointDynamics::calculateJerk(position, velocity);
+    Vector3D snap = PointDynamics::calculateSnap(position, velocity);
+
+    std::cout << "Третья производная (рывок):\n";
+    std::cout << "Jx = " << jerk.x << "\n";
+    std::cout << "Jy = " << jerk.y << "\n";
+    std::cout << "Jz = " << jerk.z << "\n\n";
+
+    std::cout << "Четвёртая производная (snap):\n";
+    std::cout << "Sx = " << snap.x << "\n";
+    std::cout << "Sy = " << snap.y << "\n";
+    std::cout << "Sz = " << snap.z << "\n";
+
+    return 0;
+}
+
+
+
+
+
+static Vector3D calculateSnap(const Vector3D& position, const Vector3D& velocity) {
+    double S = position.magnitude();
+    if (S <= 1.0) {
+        std::cerr << "Ошибка: S должно быть > 1 для корректного расчёта\n";
+        return Vector3D();
+    }
+
+    double S_sq = S * S;
+    double r_dot_v = position.dot(velocity);
+    double dot_S = r_dot_v / S;  // dS/dt
+
+    Vector3D acceleration = calculateAcceleration(position);
+    double v_dot_v = velocity.dot(velocity);  // |v|^2
+    double r_dot_a = position.dot(acceleration);  // r · a
+
+    // Компонент A и его производная dA/dt
+    double A = -2.0 * r_dot_v / ((S_sq - 1.0) * (S_sq - 1.0) * S);
+    double numerator_A = (v_dot_v + r_dot_a) * (S_sq - 1.0) * S -
+                   r_dot_v * (4.0 * S_sq * dot_S + (S_sq - 1.0) * dot_S);
+    double denominator_A = (S_sq - 1.0) * (S_sq - 1.0) * S * S;
+    double dA_dt = -2.0 * numerator_A / denominator_A;
+
+    // Компонент B и его производная dB/dt
+    double B = 1.0 / ((S_sq - 1.0) * S);
+    double dB_dt = -(2.0 * S * dot_S * (S_sq - 1.0) * S +
+               (S_sq - 1.0) * (S_sq - 1.0) * dot_S) /
+               ((S_sq - 1.0) * (S_sq - 1.0) * S * S);
+
+    // Вектор C и его производная dC/dt
+    Vector3D C = position * (-r_dot_v / (S_sq * S));
+    double factor_dC = (v_dot_v + r_dot_a) / (S * S * S) -
+                 3.0 * r_dot_v * dot_S / (S * S * S);
+    Vector3D dC_dt = velocity * factor_dC +
+                   position * (-dot_S * r_dot_v / (S_sq * S) - r_dot_v * dot_S / (S_sq * S_sq));
+
+    // Термы для расчёта snap
+    Vector3D term1 = position * dA_dt;  // dA/dt * r
+    Vector3D term2 = velocity * A;  // A * v
+    Vector3D term3 = (velocity + C) * dB_dt;  // dB/dt * (v + C)
+    Vector3D term4 = acceleration * B;  // B * a
+    Vector3D term5 = dC_dt * B;  // B * dC/dt
+
+    // Итоговая четвёртая производная
+    Vector3D snap = term1 + term2 + term3 + term4 + term5;
+    return snap;
+}
+
+
+
+
+
+
+
+
+*/

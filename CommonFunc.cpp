@@ -1,9 +1,22 @@
-// GP_term.cpp : Defines the class behaviors for the application.
+﻿// GP_term.cpp : Defines the class behaviors for the application.
 //
 
 
 #include "pch.h"
 #include "CommonFunc.h"
+
+
+int mRGB[16] = {
+	RGB(200, 0, 0),RGB(0, 200, 0),RGB(0, 0, 200),RGB(200, 200, 0),RGB(200, 0, 200),RGB(0, 200, 200),
+	RGB(200, 100, 0),RGB(200, 0, 100),RGB(200, 100, 100),RGB(100, 200, 0),RGB(0, 200, 100),RGB(100, 0, 200),
+	RGB(0, 100, 200),RGB(0, 100, 100),RGB(100, 0, 100),RGB(100, 100, 0),
+};
+
+int mRGBDark[16] = {
+	RGB(111, 0, 0),RGB(0, 111, 0),RGB(0, 0, 111),RGB(111, 111, 0),RGB(111, 0, 111),RGB(0, 111, 111),
+	RGB(111, 51, 0),RGB(111, 0, 51),RGB(111, 51, 51),RGB(51, 111, 0),RGB(0, 111, 51),RGB(51, 0, 111),
+	RGB(0, 51, 111),RGB(0, 51, 51),RGB(51, 0, 51),RGB(51, 51, 0),
+};
 
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -20,8 +33,8 @@ char* StrUpr_my(char* inout_str)
 			if (*inout_str >= 'a' && *inout_str <= 'z')
 				*inout_str -= 'a' - 'A';
 			else
-				if (*inout_str >= '�' && *inout_str <= '�')
-					*inout_str -= '�' - '�';
+				if (*inout_str >= 'а' && *inout_str <= 'я')
+					*inout_str -= 'а' - 'А';
 
 			inout_str++;
 		}
@@ -38,8 +51,8 @@ char* StrLwr_my(char* inout_str)
 			if (*inout_str >= 'A' && *inout_str <= 'Z')
 				*inout_str += 'a' - 'A';
 			else
-				if (*inout_str >= '�' && *inout_str <= '�')
-					*inout_str += '�' - '�';
+				if (*inout_str >= 'А' && *inout_str <= 'Я')
+					*inout_str += 'а' - 'А';
 
 			inout_str++;
 		}
@@ -61,39 +74,6 @@ UINT ShadowColor( UINT & incolor )
 	incolor &= RGB( 127, 127, 127 );
 	incolor ^= RGB( 7, 7, 7 );
 	return incolor;
-}
-
-void OptimColor( CDC *dc, UINT & iFRG, UINT & iBKG )
-{
-	UINT newRGBf;
-	UINT newRGBb;
-	iBKG = newRGBb = dc->GetNearestColor( iBKG );
-	iFRG = newRGBf = dc->GetNearestColor( iFRG );
-
-	while ( 1 )
-	{
-		Sleep( 10 );
-		if ( dc->GetNearestColor( newRGBb ) != iBKG ) newRGBb = iBKG = dc->GetNearestColor( newRGBb );
-		if ( dc->GetNearestColor( newRGBf ) != iFRG ) newRGBf = iFRG = dc->GetNearestColor( newRGBf );
-		UINT SSb = ( newRGBb % 256 + ( newRGBb / 256 ) % 256 + ( newRGBb / 65536 ) % 256 ) / 3;
-		UINT SSf = ( newRGBf % 256 + ( newRGBf / 256 ) % 256 + ( newRGBf / 65536 ) % 256 ) / 3;
-		if ( SSb < SSf )
-		{
-			UINT tmp = SSb;	SSb = SSf;	SSf = tmp;
-			tmp = newRGBb;	newRGBb = newRGBf;	newRGBf = tmp;
-		}
-
-		if ( SSb - SSf > 100 && dc->GetNearestColor( newRGBb ) != dc->GetNearestColor( newRGBf ) ) break;
-		SSb += 15;
-		SSf -= 15;
-		if ( SSb > 255 ) SSb = 255;
-		if ( SSf > 255 ) SSf = 0;
-		newRGBb = SSb + SSb * 256 + SSb * 65536;
-		newRGBf = SSf + SSf * 256 + SSf * 65536;
-	}
-
-	iBKG = dc->GetNearestColor( newRGBb );
-	iFRG = dc->GetNearestColor( newRGBf );
 }
 
 char * ReplaceChar( char *Str, char cOld, char cNew )
@@ -273,7 +253,7 @@ long GetIndexSubString( const CString & iString, const CString & SubString, long
 
 void qsCharLine( const char **Item, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	const char *x, *y;
 
 	i = left;
@@ -298,7 +278,7 @@ void qsCharLine( const char **Item, int left, int right )
 
 void qsCharILine( const char **Item, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	const char *x, *y;
 
 	i = left;
@@ -323,7 +303,7 @@ void qsCharILine( const char **Item, int left, int right )
 
 void qsCharLineAndDWORD( const char **Item, DWORD *dwItem, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	const char *x, *y;
 	DWORD dwTmp;
 
@@ -349,7 +329,7 @@ void qsCharLineAndDWORD( const char **Item, DWORD *dwItem, int left, int right )
 
 void qsCharILineAndDWORD( const char **Item, DWORD *dwItem, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	const char *x, *y;
 	DWORD dwTmp;
 
@@ -376,7 +356,7 @@ void qsCharILineAndDWORD( const char **Item, DWORD *dwItem, int left, int right 
 
 void qsBSTRLine( BSTR *Item, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	BSTR x, y;
 
 	i = left;
@@ -400,7 +380,7 @@ void qsBSTRLine( BSTR *Item, int left, int right )
 
 void qsBSTRILine( BSTR *Item, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	BSTR x, y;
 
 	i = left;
@@ -425,7 +405,7 @@ void qsBSTRILine( BSTR *Item, int left, int right )
 
 void qsVARIANT( VARIANT *Item, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	VARIANT x, y;
 	VariantInit( &x );
 	VariantInit( &y );
@@ -475,7 +455,7 @@ void qsVARIANT( VARIANT *Item, int left, int right )
 
 void qsVARIANTI( VARIANT *Item, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	VARIANT x, y;
 
 	i = left;
@@ -519,7 +499,11 @@ int CompareIntASC( const void *arg1, const void *arg2 )
 {
 	return *(int *)arg1 - *(int *)arg2;
 }
-int CompareIntDES( const void *arg1, const void *arg2 ) { return *(int *)arg2 - *(int *)arg1; }
+
+int CompareIntDES( const void *arg1, const void *arg2 )
+{
+	return *(int *)arg2 - *(int *)arg1; 
+}
 
 
 BOOL GPDeleteDir( const wchar_t * iDir )
@@ -832,7 +816,10 @@ const char *FindFieldNC( const char *iStr, int FieldNum, const char * delim )
 
 				if ( *posDelim == 0 ) { FieldNum--; pOut = ++posPos; }
 			}
-			else pOut++;
+			else
+			{
+				pOut++;
+			}
 
 	return pOut;
 }
@@ -854,7 +841,7 @@ const wchar_t *FindFieldEx( const wchar_t * iStr, int FieldNum, const wchar_t * 
 			pos++;
 		}
 		if ( !*pos )	iStr = L"";
-		else		iStr = pos + lendelim;
+		else { iStr = pos + lendelim; }
 	}
 
 	return iStr;
@@ -877,14 +864,14 @@ const char *FindFieldEx( const char * iStr, int FieldNum, const char * delim )
 			pos++;
 		}
 		if ( !*pos )	iStr = "";
-		else		iStr = pos + lendelim;
+		else { iStr = pos + lendelim; }
 	}
 
 	return iStr;
 }
 void qsRectYByNum( CRect *RectArr, UINT *NUMs, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	UINT x, y;
 
 	i = left;
@@ -908,7 +895,7 @@ void qsRectYByNum( CRect *RectArr, UINT *NUMs, int left, int right )
 
 void qsRectXByNum( CRect *RectArr, UINT *NUMs, int left, int right )
 {
-	register int i, j;
+	int i, j;
 	UINT x, y;
 
 	i = left;
@@ -1032,7 +1019,7 @@ BYTE * GetDblArr( BYTE *Arr, const char *oStr, const char *oStr2 )
 							*( Arr++ ) = (BYTE)( *oStr - 0x20 );
 			}
 		else
-			while ( *( Arr++ ) = *( ++oStr ) );
+			while ( (*( Arr++ ) = *( ++oStr )) );
 
 	}
 	return ret;
@@ -1511,7 +1498,7 @@ char * wStrReplace(char *dstStr, int iMaxLen, char *StrFind, char *StrReplace)
 		if (!StrReplace) StrReplace = "";
 
 		char *tmps = new char [iMaxLen];
-		char *posCopy = tmps, *tmpsPos = NULL;
+		char *posCopy = tmps, *tmpsPos = nullptr;
 		char *StrFindTmp, *dstStrCopy = dstStr;
 		int iStrFindLen = 0;
 
@@ -1568,7 +1555,7 @@ wchar_t * wStrReplace(wchar_t *dstStr, int iMaxLen, wchar_t *StrFind, wchar_t *S
 		if (!StrReplace) StrReplace = L"";
 
 		wchar_t *tmps = new wchar_t[iMaxLen];
-		wchar_t *posCopy = tmps, *tmpsPos = NULL;
+		wchar_t *posCopy = tmps, *tmpsPos = nullptr;
 		wchar_t *StrFindTmp, *dstStrCopy = dstStr;
 		int iStrFindLen = 0;
 
@@ -2030,98 +2017,13 @@ int wStrCompare( const char *srcStr1, const char *srcStr2 )
 }
 
 
-int ReadCalcParam(char* in_Src, char* in_Mask, SPos& data, double defValue, int inFlags)
-{
-	int ret = 0;
-	char* pos = in_Src;
-	int lenMask = (int)strlen(in_Mask);
-	if (!(inFlags & READPARAMS_NOT_USE_DEFS))
-	{
-		data.X = defValue;
-		data.Y = defValue;
-		data.Z = defValue;
-	}
-
-	while ((pos = strstr(pos, in_Mask)))
-	{
-		pos++;
-		char* posEQ = strstr(pos, "=");
-		if (posEQ++)
-		{
-			if (pos[lenMask] == 'X')
-			{
-				ret = 1;
-				data.X = atof(posEQ);
-			}
-			else	if (pos[lenMask] == 'Y')
-			{
-				ret = 1;
-				data.Y = atof(posEQ);
-			}
-			else	if (pos[lenMask] == 'Z')
-			{
-				ret = 1;
-				data.Z = atof(posEQ);
-			}
-		}
-	}
-	return ret;
-}
-
-
-
-
-int ReadCalcParam(char* in_Src, char* in_Mask, int& data, int defValue, int inFlags)
-{
-	int ret = 0;
-	char* pos = in_Src;
-	int lenMask = (int)strlen(in_Mask);
-	if (!(inFlags & READPARAMS_NOT_USE_DEFS)) data = defValue;
-
-	if ((pos = strstr(pos, in_Mask)))
-	{
-		pos++;
-		char* posEQ = strstr(pos, "=");
-		if (posEQ++)
-		{
-			while (*posEQ == ' ' || *posEQ == '\t') posEQ++;
-			if (*posEQ >= '0' && *posEQ <= '9')
-			{
-				ret = 1;
-				sscanf_s(posEQ, "%i", &data);
-			}
-		}
-	}
-	return ret;
-}
-
-int ReadCalcParam(char* in_Src, char* in_Mask, double& data, double defValue, int inFlags)
-{
-	int ret = 0;
-	char* pos = in_Src;
-	int lenMask = (int)strlen(in_Mask);
-	if (!(inFlags & READPARAMS_NOT_USE_DEFS)) data = defValue;
-
-	if ((pos = strstr(pos, in_Mask)))
-	{
-		pos++;
-		char* posEQ = strstr(pos, "=");
-		if (posEQ++)
-		{
-			data = atof(posEQ);
-			ret = 1;
-		}
-	}
-	return ret;
-}
-
 void DrawArrow(HDC hDC, int posSX, int posSY, int posEX, int posEY, int in_ArrLen)
 {
 	if (hDC)
 	{
 		if (posEX == posSX && posEY == posSY)
 		{
-			MoveToEx(hDC, posSX, posSY, NULL);
+			MoveToEx(hDC, posSX, posSY, nullptr);
 			LineTo(hDC, posEX + 1, posEY);
 			LineTo(hDC, posEX + 1, posEY + 1);
 			LineTo(hDC, posEX, posEY + 1);
@@ -2129,24 +2031,641 @@ void DrawArrow(HDC hDC, int posSX, int posSY, int posEX, int posEY, int in_ArrLe
 		}
 		else
 		{
-			MoveToEx(hDC, posSX, posSY, NULL);
+			MoveToEx(hDC, posSX, posSY, nullptr);
 			LineTo(hDC, posEX, posEY);
 
-			// ��������� ����������� �������
+			// Вычисляем направление стрелки
 			int dx = posEX - posSX;
 			int dy = posEY - posSY;
 			double length = (int)sqrt(dx * dx + dy * dy);
 			double arrowSize = in_ArrLen / length;
 
-			// ����������� ������
+			// Нормализуем вектор
 			dx = (int)((double)dx * arrowSize);
 			dy = (int)((double)dy * arrowSize);
 
-			// ��������� ����� ��� �������
-			MoveToEx(hDC, posEX, posEY, NULL);
+			// Вычисляем точки для стрелки
+			MoveToEx(hDC, posEX, posEY, nullptr);
 			LineTo(hDC, posEX - (dx - dy), posEY - (dy + dx));
-			MoveToEx(hDC, posEX, posEY, NULL);
+			MoveToEx(hDC, posEX, posEY, nullptr);
 			LineTo(hDC, posEX - (dx + dy), posEY - (dy - dx));
 		}
 	}
 }
+
+
+//A*X*X + B*X + C = 0
+TwoDoubleRoots QuadraticEequationSolution(double A, double B, double C)
+{
+	TwoDoubleRoots ret;
+	A += A;
+	// Вычисляем дискриминант
+	double tmp = A * C;
+	double discriminant = B * B - tmp - tmp;
+
+	if (A == 0.0)
+	{
+		ret.root2.Bits = 0x7FF8000000000000ULL;
+		if (B == 0.0) ret.root1.Bits = 0x7FF8000000000000ULL;
+		else          ret.root1.Dbl = -C / B;
+	}
+	else
+		if (discriminant > 0.0)
+		{ // Два различных действительных корня
+			double sqrtDiscr = sqrt(discriminant);
+
+			ret.root1.Dbl = (-B + sqrtDiscr) / A;
+			ret.root2.Dbl = (-B - sqrtDiscr) / A;
+		}
+		else
+			if (discriminant == 0)
+			{ // Уравнение имеет один действительный корень
+				ret.root1.Dbl = -B / A;
+				ret.root2.Bits = 0x7FF8000000000000ULL;
+			}
+			else // if (discriminant < 0.0) 
+			{ // Комплексные корни
+				ret.root1.Bits = 0x7FF8000000000000ULL;
+				ret.root2.Bits = 0x7FF8000000000000ULL;
+				//realPart = -b / A;
+				//imaginaryPart = sqrt(-discriminant) / A;
+			}
+
+	return ret;
+}
+
+//A*X*X + B*X + C = 0
+double QuadraticEequationSolutionNOpt(double A, double B, double C)
+{
+	DoubleBitsUnion ret;
+
+	// Вычисляем дискриминант
+	double discriminant = B * B - 4.0 * A * C;
+
+	if (A == 0.0)
+	{
+		if (B == 0.0)
+			ret.Bits = 0x7FF8000000000000ULL;
+		else
+			ret.Dbl = -C / B;
+	}
+	else
+		if (discriminant > 0.0)
+		{ // Два различных действительных корня
+			ret.Dbl = (-B + sqrt(discriminant)) / (2 * A);
+			if (ret.Dbl < 0)
+				ret.Dbl = (-B - sqrt(discriminant)) / (2 * A);
+		}
+		else
+			if (discriminant == 0)
+			{ // Уравнение имеет один действительный корень
+				ret.Dbl = -B / (2 * A);
+			}
+			else // if (discriminant < 0.0) 
+			{ // Комплексные корни
+				ret.Bits = 0x7FF8000000000000ULL;
+				//realPart = -b / (2 * A);
+				//imaginaryPart = sqrt(-discriminant) / (2 * A);
+			}
+
+	return ret.Dbl;
+}
+
+
+TwoDoubleRoots GetLinearViewTime222(const SData& BaseParticle, const SData& ViewParticle)
+{
+	//=================================Eequation
+	//(p1.x - (p2.x + p2.vx * t))^2 + (p1.y - (p2.y + p2.vy * t))^2 = (t - dt)^2 
+	//(p1.x - (p2.x + p2.vx * t))^2 + (p1.y - (p2.y + p2.vy * t))^2 = t^2 - 2 * t * dt + dt^2 
+	// p1.x^2 - 2 * p1.x*(p2.x + p2.vx * t) + (p2.x + p2.vx * t)^2 + p1.y^2 - 2*p1.y*(p2.y + p2.vy * t)+(p2.y + p2.vy * t)^2 -t^2 + 2 * t * dt - dt^2 
+	//=================================
+	//(p1.x  - p2.x) ^ 2 + (p1.y - p2.y) ^ 2 	- dt ^ 2
+	//2*t*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
+	// t ^ 2 * (p2.vx ^ 2+ p2.vy ^ 2- 1)
+	//=================================
+	// A = (p2.vx ^ 2+ p2.vy ^ 2- 1)
+	// B = 2*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
+	// C = (p1.x  - p2.x) ^ 2 + (p1.y - p2.y) ^ 2 	- dt ^ 2
+	//=================================
+	// A = p2v^2- 1
+	// B = 2*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
+	// C = dist_p1p2 ^ 2 - dt ^ 2
+	//=================================
+	// A = ViewParticle.Velocity.LENPWR2()- 1.0
+	// B = 2 * ( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
+	// C = dist_p1p2 ^ 2 - dt ^ 2
+	//=================================
+
+
+	double dt = BaseParticle.TimePoint - ViewParticle.TimePoint;
+	
+	//double A = ViewParticle.Velocity.LENPWR2() - 1.0;
+	
+	SPos dist = ViewParticle.Position;
+	dist.MINUS(BaseParticle.Position);
+	double C = dist.LENPWR2() - dt * dt;
+
+	double B = dist.DOT(ViewParticle.Velocity) + dt;
+	B += B;
+	
+
+	TwoDoubleRoots ret = QuadraticEequationSolution(ViewParticle.Velocity.LENPWR2() - 1.0, B, C);
+
+	dist= ViewParticle.Velocity;
+	dist.MULT(ret.root1.Dbl);
+	dist.ADD(ViewParticle.Position);
+
+	return QuadraticEequationSolution(ViewParticle.Velocity.LENPWR2() - 1.0, B, C);
+}
+
+//Функция вычисления точки на прямой как проекции на прямую произвольеной точки PointToProjection. Возвращает время если LineDirection это скорость
+//PointOnLine - точка на прямой. 
+//LineDirection - вектор направления прямой из (0.0.0)
+//PointToProjection 
+double GetProjectionPointOnLine(SPos &retPoint, const SPos &PointOnLine, const SPos LineDirection, const SPos &PointToProjection)
+{
+	double DenominatorAndTime = LineDirection.DOT_ME(); //LENPWR2
+
+	if (DenominatorAndTime != 0.0)
+	{
+		SPos VPB = PointToProjection;
+		VPB -= PointOnLine;
+		DenominatorAndTime = VPB.DOT(LineDirection) / DenominatorAndTime;
+
+		// Координаты основания перпендикуляра
+		retPoint = LineDirection;
+		retPoint *= DenominatorAndTime;
+		retPoint += PointOnLine;
+	}
+	else retPoint = PointOnLine;
+	//<0 == сближение
+	return -DenominatorAndTime;
+}
+
+double GetLinearViewTime(const SData& BaseParticle, const SData& ViewParticle)
+{
+	//lim(inf) =  (sqrt(D_pwr2 + H_pwr2 * (1.0 - V_pwr2)) - D * V) / (1.0 - V_pwr2);
+	SPos VP_AtTime = ViewParticle.Velocity;
+	VP_AtTime *= BaseParticle.TimePoint - ViewParticle.TimePoint;
+	VP_AtTime += ViewParticle.Position;
+
+	SPos ProjPoint;
+	double TimeToNorm = GetProjectionPointOnLine(ProjPoint, VP_AtTime, ViewParticle.Velocity, BaseParticle.Position);
+	double V_pwr2 = ViewParticle.Velocity.LENPWR2();
+	double V = sqrt(V_pwr2);
+	if (TimeToNorm < 0) V = -V;
+	double D_pwr2 = ProjPoint.GetDistancePwr2(VP_AtTime);
+	double D = sqrt(D_pwr2);
+	double H_pwr2 = ProjPoint.GetDistancePwr2(BaseParticle.Position);
+	//double H = sqrt(H_pwr2);
+
+	if (fabs(TimeToNorm) < 1.0e-15) TimeToNorm = 0.0;
+	if (H_pwr2 < 1.0e-14) H_pwr2 = 0.0;
+	if (D_pwr2 < 1.0e-14) D_pwr2 = D = 0.0;
+	if (V_pwr2 < 1.0e-14) V_pwr2 = V = 0.0;
+
+	double SS = 0.0;
+	if (V_pwr2 >= 1.0)
+	{
+		if (H_pwr2 == 0.0)
+		{
+			if (D_pwr2 == 0.0) SS = 0.0;
+			else if (V > 0.0)		SS = SP_MAX_TIME_DISTANCE;
+			else					SS = -SP_MAX_TIME_DISTANCE;
+		}
+		else
+		{
+			if (TimeToNorm <= 0.0)	SS = -SP_MAX_TIME_DISTANCE;
+			else if (D_pwr2 >= H_pwr2)		SS = -(D_pwr2 - H_pwr2) * 0.5 / D - D;
+			else					SS = -(D_pwr2 + H_pwr2) * 0.5 / D;
+		}
+	}
+	else
+		SS = -(sqrt(D_pwr2 + H_pwr2 * (1.0 - V_pwr2)) - D * V) / (1.0 - V_pwr2);
+
+	return SS;
+}
+
+
+
+double CalcTheta(SPos& k1, SPos& k2, SPos& k3)
+{
+	SPos tmp1 = k2; tmp1 -= k3;
+	SPos tmp2 = k1; tmp1 -= k2;
+	double minTh = 0.1;
+	double maxTh = 0.01;
+	double tmpVal = 0.15;
+
+	if (tmp2.X != 0.0)
+	{
+		tmpVal = fabs(tmp1.X / tmp2.X);
+		if (tmpVal < minTh) minTh = tmpVal;
+		if (tmpVal > maxTh) maxTh = tmpVal;
+	}
+	if (tmp2.Y != 0.0)
+	{
+		tmpVal = fabs(tmp1.Y / tmp2.Y);
+		if (tmpVal < minTh) minTh = tmpVal;
+		if (tmpVal > maxTh) maxTh = tmpVal;
+	}
+	if (tmp2.Z != 0.0)
+	{
+		tmpVal = fabs(tmp1.Z / tmp2.Z);
+		if (tmpVal < minTh) minTh = tmpVal;
+		if (tmpVal > maxTh) maxTh = tmpVal;
+	}
+
+	return maxTh > 0.1 ? maxTh : minTh;
+}
+
+void LimitedItgrl_rk411(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double dt, double *Theta)
+{
+	SPos k1_v, k1_r, k2_v, k2_r, k3_v, k3_r, k4_v, k4_r;
+
+	k1_v = SecondDerivative;  k1_v *= dt;
+	k1_r = FirstDerivative; k1_r *= dt;
+
+	k2_v = SecondDerivative; k2_v *= dt;
+	k2_r = k1_v; k2_r *= 0.5; k2_r += FirstDerivative;	k2_r.LIMIT_BY(LimitValue);	k2_r *= dt;
+
+	k3_v = SecondDerivative; k3_v *= dt;
+	k3_r = k2_v; k3_r *= 0.5; k3_r += FirstDerivative;	k3_r.LIMIT_BY(LimitValue);	k3_r *= dt;
+
+	k4_v = SecondDerivative;  k4_v *= dt;
+	k4_r = FirstDerivative; k4_r += k3_v;	k4_r.LIMIT_BY(LimitValue);	k4_r *= dt;
+
+	// Финальное обновление
+	resultOfFirst = k1_v; resultOfFirst += k2_v; resultOfFirst += k2_v; resultOfFirst += k3_v; resultOfFirst += k3_v; resultOfFirst += k4_v; resultOfFirst *= (1.0 / 6.0);
+	resultOfFirst += FirstDerivative;
+	resultOfFirst.LIMIT_BY(LimitValue);
+
+	result = k1_r; result += k2_r; result += k2_r; result += k3_r; result += k3_r; result += k4_r; result *= (1.0 / 6.0);
+
+	if (Theta)
+	{
+		*Theta = CalcTheta(k1_v, k2_v, k3_v);
+		if (*Theta < 0.1)
+			*Theta = CalcTheta(k1_r, k2_r, k3_r);
+	}
+}
+
+
+
+void LimitedItgrl_rk4(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double dt, double *Theta)
+{
+
+	SPos vel0 = FirstDerivative;
+
+	// Шаг 1: k1
+	SPos k1_pos = vel0;                   
+	SPos k1_vel = SecondDerivative;         
+
+	// Шаг 2: k2
+	SPos pos_k2 = k1_pos; pos_k2 *= (dt / 2.0);
+	SPos vel_k2 = k1_vel;  vel_k2 *= (dt / 2.0); vel_k2 += vel0; vel_k2.LIMIT_BY(LimitValue);
+	SPos k2_pos = vel_k2;
+	SPos k2_vel = SecondDerivative;
+
+	// Шаг 3: k3
+	SPos pos_k3 = k2_pos; pos_k3 *= (dt / 2.0);
+	SPos vel_k3 = k2_vel; vel_k3 *= (dt / 2.0); vel_k3 += vel0; vel_k3.LIMIT_BY(LimitValue);
+	SPos k3_pos = vel_k3;
+	SPos k3_vel = SecondDerivative;
+
+	// Шаг 4: k4
+	SPos pos_k4 = k3_pos;  pos_k4 *= dt;
+	SPos vel_k4 = k3_vel;  vel_k4 *= dt; vel_k4 += vel0;
+	SPos k4_pos = vel_k4;
+	SPos k4_vel = SecondDerivative;
+
+	// Расчёт итогового перемещения (интегрирование скорости)
+	result = k1_pos; result += k2_pos; result += k2_pos; result += k3_pos; result += k3_pos; result += k4_pos; result *= dt * (1.0 / 6.0);
+
+	// Расчёт итоговой скорости (интегрирование ускорения)
+	resultOfFirst = k1_vel; resultOfFirst += k2_vel; resultOfFirst += k2_vel; resultOfFirst += k3_vel; resultOfFirst += k3_vel; resultOfFirst += k4_vel; resultOfFirst *= dt * (1.0 / 6.0);
+	resultOfFirst += FirstDerivative;
+	resultOfFirst.LIMIT_BY(LimitValue);
+
+	if (Theta)
+	{
+		*Theta = CalcTheta(k1_vel, k2_vel, k3_vel);
+		if (*Theta < 0.1)
+			*Theta = CalcTheta(k1_pos, k2_pos, k3_pos);
+	}
+
+
+	/*
+
+	// Шаг 1: k1 — производные в начальной точке
+	Vector3D k1_pos = vel0;                            // d(pos)/dt = velocity
+	Vector3D k1_vel = calculateAcceleration(pos0);   // d(vel)/dt = acceleration(pos)
+
+	// Шаг 2: k2 — прогноз на середину шага (t + dt/2)
+	Vector3D pos_k2 = pos0 + k1_pos * (dt / 2.0);  // позиция через dt/2
+	Vector3D vel_k2 = vel0 + k1_vel * (dt / 2.0);  // скорость через dt/2
+
+	// Вычисляем k2 на основе прогноза pos_k2 и vel_k2
+	Vector3D k2_pos = vel_k2;                        // скорость в точке pos_k2
+	Vector3D k2_vel = calculateAcceleration(pos_k2); // ускорение в точке pos_k2
+
+	// Шаг 3: k3 — уточнённый прогноз на середину шага (t + dt/2)
+	Vector3D pos_k3 = pos0 + k2_pos * (dt / 2.0);  // уточнённая позиция через dt/2
+	Vector3D vel_k3 = vel0 + k2_vel * (dt / 2.0);  // уточнённая скорость через dt/2
+
+	// Вычисляем k3 на основе уточнённого прогноза pos_k3 и vel_k3
+	Vector3D k3_pos = vel_k3;                        // скорость в точке pos_k3
+	Vector3D k3_vel = calculateAcceleration(pos_k3); // ускорение в точке pos_k3
+
+	// Шаг 4: k4 — прогноз на конец шага (t + dt)
+	Vector3D pos_k4 = pos0 + k3_pos * dt;          // позиция через полный шаг dt
+	Vector3D vel_k4 = vel0 + k3_vel * dt;         // скорость через полный шаг dt
+
+	// Вычисляем k4 на основе прогноза pos_k4 и vel_k4
+	Vector3D k4_pos = vel_k4;                        // скорость в точке pos_k4
+	Vector3D k4_vel = calculateAcceleration(pos_k4); // ускорение в точке pos_k4
+
+	// Итоговое обновление позиции и скорости
+	finalPosition = pos0 + (k1_pos + 2.0 * k2_pos + 2.0 * k3_pos + k4_pos) * (dt / 6.0);
+	finalVelocity = vel0 + (k1_vel + 2.0 * k2_vel + 2.0 * k3_vel + k4_vel) * (dt / 6.0);
+
+	// Ограничение скорости в конце расчёта
+	double finalMag = finalVelocity.magnitude();
+	if (finalMag > Vmax && finalMag > 1e-10) {
+		finalVelocity = finalVelocity.normalize() * Vmax;
+	}
+
+	*/
+
+}
+
+
+
+
+//
+//void LimitedItgrl_rk4(SPos& result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double dt, double* Theta)
+//{
+//	SPos k1_v, k1_r, k2_v, k2_r, k3_v, k3_r, k4_v, k4_r, v_temp, r_temp;
+//
+//	// Этап 1
+//	k1_v = SecondDerivative;  k1_v *= dt;
+//	k1_r = FirstDerivative; k1_r *= dt;
+//
+//	// Этап 2
+//	v_temp = k1_v; v_temp *= 0.5; v_temp += FirstDerivative;
+//	v_temp.LIMIT_BY(LimitValue);
+//
+//	/////r_temp = k1_r; r_temp*=0.5;
+//	k2_v = SecondDerivative; k2_v *= dt;
+//	k2_r = v_temp; k2_r *= dt;
+//
+//	// Этап 3
+//	v_temp = k2_v; v_temp *= 0.5; v_temp += FirstDerivative;
+//	v_temp.LIMIT_BY(LimitValue);
+//	/////r_temp = k2_r; r_temp *= 0.5;
+//
+//	k3_v = SecondDerivative; k3_v *= dt;
+//	k3_r = v_temp; k3_r *= dt;
+//
+//	// Этап 4
+//	v_temp = FirstDerivative; v_temp += k3_v;
+//
+//	v_temp.LIMIT_BY(LimitValue);
+//	////r_temp = k3_r;
+//	k4_v = SecondDerivative;  k4_v *= dt;
+//	k4_r = v_temp; k4_r *= dt;
+//
+//	// Финальное обновление
+//
+//	resultOfFirst = k1_v; resultOfFirst += k2_v; resultOfFirst += k2_v; resultOfFirst += k3_v; resultOfFirst += k3_v; resultOfFirst += k4_v; resultOfFirst *= (1.0 / 6.0);
+//	resultOfFirst += FirstDerivative;
+//	//	velocity = FirstDerivative + (k1_v + k2_v + k3_v + k4_v) / 6.0;
+//	//	velocity.LIMIT_BY(LimitValue);// финальное ограничение
+//	resultOfFirst.LIMIT_BY(LimitValue);
+//	result = k1_r; result += k2_r; result += k2_r; result += k3_r; result += k3_r; result += k4_r; result *= (1.0 / 6.0);
+//
+//	if (Theta)
+//	{
+//		SPos tmp1 = k2_v; tmp1 -= k3_v;
+//		SPos tmp2 = k1_v; tmp1 -= k2_v;
+//		double minTh = 0.1;
+//		double maxTh = 0.01;
+//		double tmpVal = 0.15;
+//
+//		if (tmp2.X != 0.0)
+//		{
+//			tmpVal = fabs(tmp1.X / tmp2.X);
+//			if (tmpVal < minTh) minTh = tmpVal;
+//			if (tmpVal > maxTh) maxTh = tmpVal;
+//		}
+//		if (tmp2.Y != 0.0)
+//		{
+//			tmpVal = fabs(tmp1.Y / tmp2.Y);
+//			if (tmpVal < minTh) minTh = tmpVal;
+//			if (tmpVal > maxTh) maxTh = tmpVal;
+//		}
+//		if (tmp2.Z != 0.0)
+//		{
+//			tmpVal = fabs(tmp1.Z / tmp2.Z);
+//			if (tmpVal < minTh) minTh = tmpVal;
+//			if (tmpVal > maxTh) maxTh = tmpVal;
+//		}
+//
+//		if (maxTh < 0.1)
+//		{
+//			tmp1 = k2_r; tmp1 -= k3_r;
+//			tmp2 = k1_r; tmp1 -= k2_r;
+//
+//			if (tmp2.X != 0.0)
+//			{
+//				tmpVal = fabs(tmp1.X / tmp2.X);
+//				if (tmpVal < minTh) minTh = tmpVal;
+//				if (tmpVal > maxTh) maxTh = tmpVal;
+//			}
+//			if (tmp2.Y != 0.0)
+//			{
+//				tmpVal = fabs(tmp1.Y / tmp2.Y);
+//				if (tmpVal < minTh) minTh = tmpVal;
+//				if (tmpVal > maxTh) maxTh = tmpVal;
+//			}
+//			if (tmp2.Z != 0.0)
+//			{
+//				tmpVal = fabs(tmp1.Z / tmp2.Z);
+//				if (tmpVal < minTh) minTh = tmpVal;
+//				if (tmpVal > maxTh) maxTh = tmpVal;
+//			}
+//		}
+//
+//		if (maxTh > 0.1)
+//			*Theta = maxTh;
+//		else
+//			*Theta = minTh;
+//	}
+//}
+
+void test_LinearVP()
+{
+	SData BaseParticle = { 0 }, ViewParticle = { 0 };
+
+	double VPxArr[11] = { 0.0, -0.1, -0.2, -0.5, -0.99999, -1.0, -1.5, -2.0, -10.0 , -100.0 };
+	double VPyArr[11] = { 0.0, 0.1, 0.2, 0.5, 0.75, 0.99999, 1.0, 1.5, 2.0, 10.0, -100.0 };
+	double VVelArr[11] = { 1.0,-1.0,0.0, 0.1,-0.1, 0.5,-0.5, 0.75,-0.75, 0.99999,-0.99999, };
+
+
+	BaseParticle.Position.X = 2;
+	BaseParticle.Position.Y = 0;
+	BaseParticle.Position.Z = 0;
+
+	BaseParticle.TimePoint = 0.0;
+
+	FILE* tmp;
+	fopen_s(&tmp, "test_LinearVP.txt", "wt");
+	fprintf(tmp, "VParticle.Pos.X\tVParticle.Pos.Y\tVParticle.Vel.X\tVP_AtTime.X\tD\tH\tS\tV\tTimeToNorm\tSS\tSS_M2\tSS-SS_M2\n");
+
+
+	for (int Px = 0; Px < 11; Px++)
+		for (int Py = 0; Py < 11; Py++)
+			for (int Vx = 0; Vx < 11; Vx++)
+			{
+				ViewParticle.Position.X = VPxArr[Px];
+				ViewParticle.Position.Y = VPyArr[Py];
+				ViewParticle.Velocity.X = VVelArr[Vx];
+
+				//аналитический метод
+				////////////////////////////////////////////////////////////////////////
+				SPos VP_AtTime = ViewParticle.Velocity;
+				VP_AtTime *= BaseParticle.TimePoint - ViewParticle.TimePoint;
+				VP_AtTime += ViewParticle.Position;
+
+				SPos ProjPoint;
+				double TimeToNorm = GetProjectionPointOnLine(ProjPoint, VP_AtTime, ViewParticle.Velocity, BaseParticle.Position);
+				double V_pwr2 = ViewParticle.Velocity.LENPWR2();
+				double V = sqrt(V_pwr2);
+				if (TimeToNorm < 0) V = -V;
+				double D_pwr2 = ProjPoint.GetDistancePwr2(VP_AtTime);
+				double D = sqrt(D_pwr2);
+				double H_pwr2 = ProjPoint.GetDistancePwr2(BaseParticle.Position);
+				//double H = sqrt(H_pwr2);
+
+				if (fabs(TimeToNorm) < 1.0e-15) TimeToNorm = 0.0;
+				if (H_pwr2 < 1.0e-14) H_pwr2 = 0.0;
+				if (D_pwr2 < 1.0e-14) D_pwr2 = D = 0.0;
+				if (V_pwr2 < 1.0e-14) V_pwr2 = V = 0.0;
+
+				double SS = 0.0;
+				if (V_pwr2 >= 1.0)
+				{
+					if (H_pwr2 == 0.0)
+					{
+						if (D_pwr2 == 0.0) SS = 0.0;
+						else if (V > 0.0)		SS = SP_MAX_TIME_DISTANCE;
+						else					SS = -SP_MAX_TIME_DISTANCE;
+					}
+					else
+					{
+						if (TimeToNorm <= 0.0)	SS = -SP_MAX_TIME_DISTANCE;
+						else if (D_pwr2 >= H_pwr2)		SS = -(D_pwr2 - H_pwr2) * 0.5 / D - D;
+						else					SS = -(D_pwr2 + H_pwr2) * 0.5 / D;
+					}
+				}
+				else
+					SS = - (sqrt(D_pwr2 + H_pwr2 * (1.0 - V_pwr2)) - D * V) / (1.0 - V_pwr2);
+				
+				//////////////////////////////////////////////////////////////////////////////////
+
+				double SS_M2;
+				double S = VP_AtTime.GetDistance(BaseParticle.Position);
+
+				{//счетный метод /2
+					SData UpBrd = ViewParticle;
+					UpBrd.Position = VP_AtTime;
+					UpBrd.TimePoint = BaseParticle.TimePoint;
+					SData DnBrd;
+					DnBrd = UpBrd;
+
+					double DnMove = S * (1.0 - V);
+					UpBrd.LinearMove(-DnMove);
+					if (V > 0.0)
+					{
+						DnMove = S / (1 + V) + fabs(V);
+					}
+					else if (V < 0.0)
+					{
+						DnMove = S / (1 + V) + fabs(V);
+					}
+					else
+						DnMove = S;
+
+
+					if (DnMove > 1.0e10) DnMove = 1.0e10;
+
+					DnBrd.LinearMove(-DnMove);
+				
+					SData MidBrd;
+					double dist;
+
+					do
+					{
+						MidBrd = DnBrd;
+						MidBrd.LinearMove((UpBrd.TimePoint - DnBrd.TimePoint) * 0.5);
+						dist = BaseParticle.Position.GetDistance(MidBrd.Position);
+						if (dist > BaseParticle.TimePoint - MidBrd.TimePoint)
+							UpBrd = MidBrd;
+						else
+							if (dist < BaseParticle.TimePoint - MidBrd.TimePoint)
+								DnBrd = MidBrd;
+							else
+							{
+								UpBrd = DnBrd = MidBrd;
+							}
+					} while (UpBrd.TimePoint - DnBrd.TimePoint > 1.0e-14 * (fabs(UpBrd.TimePoint)));
+
+					SS_M2 = MidBrd.TimePoint;
+					if (dist > BaseParticle.TimePoint - MidBrd.TimePoint + 1.0e-12)
+						SS_M2 = -SP_MAX_TIME_DISTANCE;
+					else
+						if (dist < BaseParticle.TimePoint - MidBrd.TimePoint - 1.0e-12)
+							SS_M2 = SP_MAX_TIME_DISTANCE;
+						else
+							if (fabs(V) == 1.0 && (dist > S + 1.0e-12 || dist < S - 1.0e-12))
+							{
+								SS_M2 = SP_MAX_TIME_DISTANCE;
+								if (V > 0)
+									SS_M2 = SP_MAX_TIME_DISTANCE;
+								else
+									SS_M2 = -SP_MAX_TIME_DISTANCE;
+							}
+							else if (fabs(V) < 1.0e-12)
+								SS_M2 = -S;
+				}
+
+				double dlt = SS_M2 - SS;
+				if (fabs(dlt) < 1.0e-11) dlt = 0.0;
+
+				fprintf(tmp, "%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n",
+
+					ViewParticle.Position.X,
+					ViewParticle.Position.Y,
+					ViewParticle.Velocity.X,
+					VP_AtTime.X,
+					D,
+					sqrt(H_pwr2),
+					S,
+					V,
+					TimeToNorm,
+					SS,
+					SS_M2,
+					dlt
+				);
+			}
+	fclose(tmp);
+
+	exit(0);
+}
+
+
+
+void my_Test()
+{
+	test_LinearVP();
+}
+

@@ -1,4 +1,4 @@
-// CFindDlg.cpp : implementation file
+﻿// CFindDlg.cpp : implementation file
 //
 
 #include "pch.h"
@@ -21,9 +21,9 @@ IMPLEMENT_DYNAMIC(CFindDlg, CDialogEx)
 CFindDlg::CFindDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_DIALOGFINDSP, pParent)
 {
-	m_pData = NULL;
-	m_hDCBitmap = NULL;
-	m_LiveCntr = 10000;
+	m_pData = nullptr;
+	m_hDCBitmap = nullptr;
+	m_LiveCntr = 0;
 
 	m_BMP_Size.X = 2000;
 	m_BMP_Size.Y = 1000;
@@ -35,7 +35,7 @@ CFindDlg::CFindDlg(CWnd* pParent /*=nullptr*/)
 CFindDlg::~CFindDlg()
 {
 	if (m_hDCBitmap) DeleteObject(m_hDCBitmap);
-	m_hDCBitmap = NULL;
+	m_hDCBitmap = nullptr;
 }
 
 void CFindDlg::DoDataExchange(CDataExchange* pDX)
@@ -72,7 +72,7 @@ void CFindDlg::OnPaint()
 	dc.GetClipBox(&re);
 	CDC DCMem;
 	DCMem.CreateCompatibleDC(&dc);
-	if (m_hDCBitmap == NULL)
+	if (m_hDCBitmap == nullptr)
 	{
 		///////////CRect ClientRe;
 		///////////GetClientRect(&ClientRe);
@@ -125,7 +125,7 @@ BOOL CFindDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
 
-	SetTimer(1, 100, NULL);
+	SetTimer(1, 100, nullptr);
 
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// EXCEPTION: OCX Property Pages should return FALSE
@@ -149,6 +149,8 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 		try
 		{
 			HDC hDC = DCMem->m_hDC;
+			int m_PtrCount = m_pData->curCalc.Group->GetCount();
+
 
 			SDrawSettings oldDrawSet = m_pData->curCalc.DrawSet;
 
@@ -192,63 +194,78 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 			else
 				delta00.Y = cy - cx;
 
-			PaintTraceToCDC(DCMem, &m_pData->curCalc, SP_DRAW_XYZ | SP_DRAW_CLEARBKG, delta00);
+			PaintTraceToCDC(DCMem, &m_pData->curCalc, SP_DRAW_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_GROUPINFO, delta00);
 
 			m_pData->curCalc.DrawSet = oldDrawSet;
 
 			char tmps[300];
 			int posY = 10;
-			int txtlen = sprintf_s(tmps, 300, "nParticle = %d", m_pData->curCalc.Group->m_Count);
+			int txtlen = sprintf_s(tmps, 300, "nParticle = %d Elapsed = ", m_PtrCount);
+			txtlen += m_pData->curCalc.Time.GetElapsedCur(tmps + txtlen);
+
 			TextOutA(hDC, 1, posY, tmps, txtlen);
 			
 			
 			txtlen = sprintf_s(tmps, 300, "Current Iteration = %d Reported %d", m_pData->stat.Count, m_pData->stat.Reported);
 			posY += 20;TextOutA(hDC, 1, posY, tmps, txtlen);
 
-			txtlen = sprintf_s(tmps, 300, "CurStep %d   Time %g    Step %g", m_pData->curCalc.CurStep, m_pData->curCalc.Time.CurTime, m_pData->curCalc.Time.CurStep);
+			txtlen = sprintf_s(tmps, 300, "CurStep %d_%d   Time %4.4g    Step %5.5g", m_pData->FindCounter.GetCurLoop(), m_pData->FindCounter.GetCurStep(), m_pData->curCalc.Time.GetCurTime(), m_pData->curCalc.Time.GetStep());
 			posY += 20; TextOutA(hDC, 1, posY, tmps, txtlen);
 
-			txtlen = sprintf_s(tmps, 300, "MinRelDist %g  MaxRelDist % g     MinRelSpeed %g  MaxRelSpeed %g", m_pData->curCalc.Stat.Rel_Min.Distance.MMValue, m_pData->curCalc.Stat.Rel_Max.Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Speed.MMValue, m_pData->curCalc.Stat.Rel_Max.Speed.MMValue);
+			txtlen = sprintf_s(tmps, 300, "MinRelDistR %5.5g  MaxRelDistR %5.5g     MinRelDistP %5.5g  MaxRelDistP %5.5g     MinRelSpeed %5.5g  MaxRelSpeed %5.5g", m_pData->curCalc.Stat.Rel_Min.Real_Distance.MMValue, m_pData->curCalc.Stat.Rel_Max.Real_Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Phantom_Distance.MMValue, m_pData->curCalc.Stat.Rel_Max.Phantom_Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Velocity.MMValue, m_pData->curCalc.Stat.Rel_Max.Velocity.MMValue);
 			posY += 20; TextOutA(hDC, 1, posY, tmps, txtlen);
 
-			txtlen = sprintf_s(tmps, 300, "DltMinRelDistance %g  DltMinRelSpeed %g  DltMaxRelSpeed %g", m_pData->curCalc.Stat.Rel_Min.Distance.MMValue - m_pData->curCalc.Stat.Prev_Rel_Min.Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Speed.MMValue - m_pData->curCalc.Stat.Prev_Rel_Min.Speed.MMValue, m_pData->curCalc.Stat.Rel_Max.Speed.MMValue - m_pData->curCalc.Stat.Prev_Rel_Max.Speed.MMValue);
-			posY += 20; TextOutA(hDC, 1, posY, tmps, txtlen);
+//			txtlen = sprintf_s(tmps, 300, "DltMinRelDistance %5.5g  DltMinRelSpeed %5.5g  DltMaxRelSpeed %5.5g", m_pData->curCalc.Stat.Rel_Min.Distance.MMValue - m_pData->curCalc.Stat.Prev_Rel_Min.Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Velocity.MMValue - m_pData->curCalc.Stat.Prev_Rel_Min.Velocity.MMValue, m_pData->curCalc.Stat.Rel_Max.Velocity.MMValue - m_pData->curCalc.Stat.Prev_Rel_Max.Velocity.MMValue);
+//			posY += 20; TextOutA(hDC, 1, posY, tmps, txtlen);
+
+			GroupSummaryInfo GrInfo_Cur;
+			m_pData->curCalc.Group->GetGroupSummaryInfo(&GrInfo_Cur, m_pData->curCalc.Time.GetCurTime());
+
+			txtlen = sprintf_s(tmps, 300, "Group Velocity %3.3g | X=%3.3g Y=%3.3g Z=%3.3g", GrInfo_Cur.Velocity, GrInfo_Cur.Speed_3D.X, GrInfo_Cur.Speed_3D.Y, GrInfo_Cur.Speed_3D.Z);
+			TextOutA(hDC, 1, posY += 20, tmps, txtlen);
+			txtlen = sprintf_s(tmps, 300, "Group Accel %3.3g | X=%3.3g Y=%3.3g Z=%3.3g", GrInfo_Cur.Acceleration, GrInfo_Cur.Acceleration_3D.X, GrInfo_Cur.Acceleration_3D.Y, GrInfo_Cur.Acceleration_3D.Z);
+			TextOutA(hDC, 1, posY += 20, tmps, txtlen);
+			txtlen = sprintf_s(tmps, 300, "Group Pos X=%3.3g Y=%3.3g Z=%3.3g", GrInfo_Cur.Position.X, GrInfo_Cur.Position.Y, GrInfo_Cur.Position.Z);
+			TextOutA(hDC, 1, posY += 20, tmps, txtlen);
+
 
 			posY += 10;
-			for (int i = 0; i < m_pData->curCalc.Group->m_Count; i++)
+			for (int i = 0; i < m_PtrCount; i++)
 			{
 				SPos tmp = m_pData->curCalc.Group->m_Array[i]->GetCurPosition();
 				posY += 20; 
 				DCMem->SetTextColor(mRGB[(i) % 16]);
-				txtlen = sprintf_s(tmps, 300, "%d Position", i);
+				txtlen = sprintf_s(tmps, 300, "%0.2d Pos/Velocity", i);
 				TextOutA(hDC, 1, posY, tmps, txtlen);
 
 				DCMem->SetTextColor(RGB(0, 0, 0));
-				txtlen = sprintf_s(tmps, 300, "X=%g  Y=%g  Z=%g", tmp.X, tmp.Y, tmp.Z);
-				TextOutA(hDC, 60, posY, tmps, txtlen);
+				txtlen = sprintf_s(tmps, 300, "X%3.3g", tmp.X);
+				int tmpPosX = 100;
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
+				tmpPosX += txtlen * 8 + 5;
+				txtlen = sprintf_s(tmps, 300, "Y%3.3g", tmp.Y);
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
+				tmpPosX += txtlen * 8 + 5;
+				txtlen = sprintf_s(tmps, 300, "Z%3.3g", tmp.Z);
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
+
+				m_pData->curCalc.Group->m_Array[i]->GetCurSpeed(tmp);
+
+				tmpPosX += txtlen * 8 + 5;
+				txtlen = sprintf_s(tmps, 300, "S%3.3g", tmp.LEN());
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
+				tmpPosX += txtlen * 8 + 5;
+				txtlen = sprintf_s(tmps, 300, "X%3.3g", tmp.X);
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
+				tmpPosX += txtlen * 8 + 5;
+				txtlen = sprintf_s(tmps, 300, "Y%3.3g", tmp.Y);
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
+				tmpPosX += txtlen * 8 + 5;
+				txtlen = sprintf_s(tmps, 300, "Z%3.3g", tmp.Z);
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
 			}
-			posY += 10;
-			for (int i = 0; i < m_pData->curCalc.Group->m_Count; i++)
-			{
-				SPos tmp = m_pData->curCalc.Group->m_Array[i]->GetCurData()->Speed;
-				posY += 20;
-				DCMem->SetTextColor(mRGB[(i) % 16]);
-				txtlen = sprintf_s(tmps, 300, "%d Speed", i);
-				TextOutA(hDC, 1, posY, tmps, txtlen);
-
-				DCMem->SetTextColor(RGB(0, 0, 0));
-				txtlen = sprintf_s(tmps, 300, "%g --  X=%g  Y=%g  Z=%g", tmp.LEN(), tmp.X, tmp.Y, tmp.Z);
-				TextOutA(hDC, 60, posY, tmps, txtlen);
-			}
-
-
-
-//				txtlen = sprintf_s(tmps, 300, "Time = %15.15g  | TimeStep = %15.15g ", pData[nPoints - 1].TimePoint, m_pData->curCalc.Group->m_pCalc->Time.CurStep);
-//				TextOutA(hDC, 1, 30, tmps, txtlen);
 		}
 		catch (...) { ; }
-
-
 		LeaveCriticalSection(&m_pData->curCalc.Group->m_cs);
 	}
 
@@ -257,7 +274,7 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 
 void CFindDlg::OnBnClicked_Refresh()
 {
-	::RedrawWindow(m_hWnd, NULL, NULL, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
+	::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE | RDW_UPDATENOW | RDW_INVALIDATE);
 }
 
 
@@ -269,14 +286,17 @@ void CFindDlg::OnTimer(UINT_PTR nIDEvent)
 		if (m_pData)
 		{
 			KillTimer(nIDEvent);
-			m_LiveCntr+=100;
-			if (m_pData->m_FIND_REFRESH < 3000)	m_pData->m_FIND_REFRESH = 3000;
-			if (m_LiveCntr > m_pData->m_FIND_REFRESH * 2) m_LiveCntr = m_pData->m_FIND_REFRESH - 100;
-			if (m_LiveCntr < m_pData->m_FIND_REFRESH)
+			if (m_pData->m_FIND_REFRESH < 500)	m_pData->m_FIND_REFRESH = 500;
+
+			if (m_LiveCntr >= m_pData->m_FIND_REFRESH)
 			{
-				::RedrawWindow(m_hWnd, NULL, NULL, RDW_NOERASE| RDW_UPDATENOW| RDW_INVALIDATE);
+				::RedrawWindow(m_hWnd, nullptr, nullptr, RDW_NOERASE| RDW_UPDATENOW| RDW_INVALIDATE);
 			}
-			SetTimer(nIDEvent, 100, NULL);
+			m_LiveCntr -= 100;
+			if (m_LiveCntr <= 0) 
+				m_LiveCntr = m_pData->m_FIND_REFRESH;
+
+			SetTimer(nIDEvent, 100, nullptr);
 		}
 		break;
 	default:
@@ -331,10 +351,10 @@ void CFindDlg::OnBnClicked_Save()
 			hOldBitmap = (HBITMAP)DCMem.SelectObject(m_hDCBitmap);
 
 			char fileMane[500];
-			sprintf_s(fileMane, "C:\\SParticle\\BMP\\FIND_NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_nc%0.3d_PT%g_%d.bmp", 
+			sprintf_s(fileMane, "C:\\SParticle\\BMP\\FIND_NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_nc%0.3d_PT%g_%I64d.bmp", 
 				m_pData->curCalc.Group->GetCount(), m_pData->curCalc.ClassicType, m_pData->curCalc.AdditiveType, 
 				m_pData->curCalc.WindType, m_pData->curCalc.CollisionType, m_pData->curCalc.DensityCalcType, m_pData->curCalc.AccCalcType, m_pData->curCalc.DensityDerivLevel,
-				m_pData->stat.Count, m_pData->curCalc.ParentSpaceThickness, GetTickCount());
+				m_pData->stat.Count, m_pData->curCalc.ParentSpaceThickness, GetTickCount64());
 			SaveBitmap(fileMane, DCMem, m_hDCBitmap);
 
 			DCMem.SelectObject(hOldBitmap);
@@ -345,5 +365,5 @@ void CFindDlg::OnBnClicked_Save()
 
 void CFindDlg::OnBnClickedButtonRefreshlive()
 {
-	m_LiveCntr = 0;
+	m_LiveCntr = 10000;
 }

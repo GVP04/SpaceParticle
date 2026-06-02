@@ -1,4 +1,4 @@
-#pragma once
+п»ї#pragma once
 #include "afxdialogex.h"
 #include "CSpParticle.h"
 
@@ -25,7 +25,7 @@ public:
 
 private:
 	HBITMAP m_hDCBitmap;
-	SPos m_BMP_Size;  //размер картинки
+	SPos m_BMP_Size;  //СЂР°Р·РјРµСЂ РєР°СЂС‚РёРЅРєРё
 	void PaintToCDC(CDC* DCMem);
 	int m_LiveCntr;
 
