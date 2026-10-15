@@ -23,28 +23,11 @@
 
 
 using SquizeFlag = int;
+using T_TimeCompare = double;
 
 SquizeFlag DA_ADD_FlagFromResult(SquizeFlag in_Flags);
 
-#ifndef UseTemplates_in_H
-	using T_Data = SData;
-	using T_TimeCompare = double;
-#endif // UseTemplates_in_H
-
-	/*
-#ifdef UseTemplates_in_H
-#else
-#endif // UseTemplates_in_H
-
-#ifndef UseTemplates_in_H
-#endif // UseTemplates_in_H
-
-	*/
-
-
-#ifdef UseTemplates_in_H
-	template <typename T_Data>
-#endif // UseTemplates_in_H
+template <typename T_Data>
 struct QuickData
 {
 //		friend class SPTraceArray;
@@ -61,9 +44,7 @@ struct QuickData
 	void SHIFT() { PulledOut = *PrevPrev; PrevPrev = Prev; Prev = Cur; }
 };
 
-#ifdef UseTemplates_in_H
-	template <typename T_Data>
-#endif // UseTemplates_in_H
+template <typename T_Data>
 class SPTraceArray
 {
 public:
@@ -75,14 +56,8 @@ protected:
 	int CurPos_Real;
 	int MaxItems;
 
-#ifdef UseTemplates_in_H
 	QuickData<T_Data> m_QuickData;
 	QuickData<T_Data>* GetQuickDataPtr() {	return &m_QuickData;}
-#else
-	QuickData m_QuickData;
-	QuickData* GetQuickDataPtr() {	return &m_QuickData;}
-#endif // UseTemplates_in_H
-
 
 	void Init(bool in_bClear = false) {
 		if (m_Array == nullptr)
@@ -108,11 +83,7 @@ protected:
 
 
 public:
-#ifdef UseTemplates_in_H
 	QuickData<T_Data>* const GetQuickDataPtr_C() { return &m_QuickData; }
-#else
-	QuickData const GetQuickDataPtr_C() { return &m_QuickData; }
-#endif
 
 	//const QuickData* GetQuickDataPtr_C() { return &m_QuickData; }
 
@@ -159,7 +130,9 @@ public:
 		}
 	};
 
-	int AddData(const T_Data& in_Data)
+	T_TimeCompare GetCurTime() { return m_QuickData.Cur->TimePoint; }
+
+	virtual int AddData(const T_Data& in_Data)
 	{
 		int DoAdd = DA_ADD_RESULT_ADDED;
 
@@ -180,6 +153,7 @@ public:
 		}
 		m_Array[CurPos_Real] = in_Data;
 		m_QuickData.Cur = m_Array + CurPos_Real;
+		m_QuickData.Cur->TAD_OnAdd(m_QuickData.Prev);
 
 		return DoAdd;
 	};
@@ -191,6 +165,8 @@ public:
 		if (CurPos >= 0)
 		{
 			*m_QuickData.Cur = in_Data;
+			m_QuickData.Cur->TAD_OnUpdate(m_QuickData.Prev);
+
 			DoAdd |= DA_ADD_RESULT_UPDATED;
 		}
 		else
@@ -220,59 +196,6 @@ public:
 		}
 
 		return ret;
-	}
-};
-
-// Инициализация статического члена SPTraceArray
-//template <typename T_Data>
-//const T_Data SPTraceArray<T_Data>::StaticTmp = T_Data();
-
-
-#ifdef UseTemplates_in_H
-template <typename T_Data, typename T_TimeCompare>
-class SPTraceArrayDynamic : public SPTraceArray<T_Data>
-#else
-class SPTraceArrayDynamic : public SPTraceArray
-#endif // UseTemplates_in_H
-{
-private:
-	T_TimeCompare SqueezeStep;
-	SquizeFlag CompareFlag;
-
-public:
-
-	SPTraceArrayDynamic(int in_MaxItems, T_TimeCompare in_SqueezeStep) : SPTraceArray(in_MaxItems), SqueezeStep(in_SqueezeStep)
-	{
-		CompareFlag = 0;
-	}
-
-	void SetCompareFlag(SquizeFlag in_CompareFlag) { CompareFlag = in_CompareFlag; }
-
-	void SetSqueezeStep(T_TimeCompare in_SqueezeStep) {	SqueezeStep = in_SqueezeStep;}
-	T_TimeCompare GetSqueezeStep() {return SqueezeStep;	}
-	T_TimeCompare GetCurTime() { return GetCurData()->TimePoint; }
-
-	int AddDataDynamic(const T_Data& in_Data, int in_Flags)
-	{
-		int DoAdd = DA_ADD_RESULT_NONE;
-
-		if ((in_Flags & DA_ADD_FLAG_UPDATE))
-			DoAdd = UpdateData(in_Data);
-		else if ((in_Flags & DA_ADD_FLAG_ADD_FORCE) || GetCurPos() < 2)
-			DoAdd = AddData(in_Data);
-		else
-		{
-			if ((in_Flags & DA_ADD_FLAG_SQUISE) || GetPrevData()->TAD_IsToSquize(GetPrevPrevData(), SqueezeStep, CompareFlag))
-			{
-				m_QuickData.COPYCURTOPREV();
-				DoAdd = UpdateData(in_Data);
-				T_Data::TAD_CorrectData(*m_QuickData.PrevPrev, *m_QuickData.Prev);
-				DoAdd |= DA_ADD_RESULT_SQUISED;
-			}
-			else
-				DoAdd = AddData(in_Data);
-		}
-		return DoAdd;
 	}
 
 	int GetLowIdxByTime(T_TimeCompare in_ViewTime, int StrtIdx) const
@@ -309,7 +232,6 @@ public:
 				}
 				else
 				{
-					int deltaIdx = CurPos - CurPos_Real;
 					int min = CurPos_Real - CurPos + StrtIdx + 1;
 					int max = CurPos_Real;
 
@@ -348,9 +270,8 @@ public:
 		if (CurPos_Real >= 0)
 		{
 			if (in_ViewTime >= m_Array[CurPos_Real].TimePoint) ret = CurPos;
-			else if (m_Array[CurPos_Real == CurPos ? 0 : CurPos_Real+1].TimePoint <= in_ViewTime)
+			else if (m_Array[CurPos_Real == CurPos ? 0 : CurPos_Real + 1].TimePoint <= in_ViewTime)
 			{
-				int deltaIdx = CurPos - CurPos_Real;
 				int min = CurPos_Real - CurPos;
 				int max = CurPos_Real;
 
@@ -381,6 +302,7 @@ public:
 		}
 		return ret;
 	}
+
 
 	void GetMinMaxTracePos(SPos& min_Pos, SPos& max_Pos, int idx_Start, int idx_End) const
 	{
@@ -416,7 +338,7 @@ public:
 
 		SData* pos = m_Array + strt1;
 
-		for(int i = strt1; i <= end1; i++, pos++)
+		for (int i = strt1; i <= end1; i++, pos++)
 		{
 			if (min_Pos.X > pos->Position.X)
 				min_Pos.X = pos->Position.X;
@@ -436,7 +358,7 @@ public:
 
 		pos = m_Array + strt2;
 
-		for(int i = strt2; i <= end2; i++, pos++)
+		for (int i = strt2; i <= end2; i++, pos++)
 		{
 			if (min_Pos.X > pos->Position.X)
 				min_Pos.X = pos->Position.X;
@@ -456,37 +378,140 @@ public:
 	}
 };
 
+// Инициализация статического члена SPTraceArray
+//template <typename T_Data>
+//const T_Data SPTraceArray<T_Data>::StaticTmp = T_Data();
 
-#ifdef UseTemplates_in_H
 template <typename T_Data, typename T_TimeCompare>
-#endif // UseTemplates_in_H
+class SPTraceArrayDynamic : public SPTraceArray<T_Data>
+{
+private:
+	T_TimeCompare SqueezeStep;
+	SquizeFlag CompareFlag;
+
+public:
+
+	SPTraceArrayDynamic(int in_MaxItems, T_TimeCompare in_SqueezeStep) : SPTraceArray(in_MaxItems), SqueezeStep(in_SqueezeStep)
+	{
+		CompareFlag = 0;
+	}
+
+	void SetCompareFlag(SquizeFlag in_CompareFlag) { CompareFlag = in_CompareFlag; }
+
+	void SetSqueezeStep(T_TimeCompare in_SqueezeStep) {	SqueezeStep = in_SqueezeStep;}
+	T_TimeCompare GetSqueezeStep() {return SqueezeStep;	}
+
+	int AddDataDynamic(const T_Data& in_Data, int in_Flags)
+	{
+		int DoAdd = DA_ADD_RESULT_NONE;
+
+		if ((in_Flags & DA_ADD_FLAG_UPDATE))
+			DoAdd = UpdateData(in_Data);
+		else if ((in_Flags & DA_ADD_FLAG_ADD_FORCE) || GetCurPos() < 2)
+			DoAdd = AddData(in_Data);
+		else
+		{
+			if ((in_Flags & DA_ADD_FLAG_SQUISE) || GetPrevData()->TAD_IsToSquize(GetPrevPrevData(), SqueezeStep, CompareFlag))
+			{
+				m_QuickData.COPYCURTOPREV();
+				DoAdd = UpdateData(in_Data);
+				T_Data::TAD_CorrectData(*m_QuickData.PrevPrev, *m_QuickData.Prev);
+				DoAdd |= DA_ADD_RESULT_SQUISED;
+			}
+			else
+				DoAdd = AddData(in_Data);
+		}
+		return DoAdd;
+	}
+
+
+};
+
+template <typename T_Data>
+class SPTraceArrayEternal : public SPTraceArray<T_Data>
+{
+private:
+
+public:
+
+	SPTraceArrayEternal(int in_MaxItems) : SPTraceArray(in_MaxItems)
+	{
+		;
+	}
+
+
+	T_TimeCompare GetCurTime() { return GetCurData()->TimePoint; }
+	//Добавляет элемент в массив. Если  массив заполнен, то сжимает его с шагом времени по элементам *2 без исключений.
+	virtual int AddData(const T_Data& in_Data) override
+	{
+		int DoAdd = 0;
+
+		if (CurPos < MaxItems)
+		{
+			m_QuickData.SHIFT();
+			CurPos++;
+			CurPos_Real = CurPos;
+			m_Array[CurPos_Real] = in_Data;
+			m_QuickData.Cur = m_Array + CurPos_Real;
+			m_QuickData.Cur->TAD_OnAdd(m_QuickData.Prev);
+		}
+		else
+		{
+			double dTime = in_Data.TimePoint - m_Array[0].TimePoint;
+			double Step = dTime /(double) CurPos; Step += Step;
+			int Src = 1,Dst = 0;
+
+			while (Src <= CurPos)
+			{
+				while (Src < CurPos && Step > m_Array[Src].TimePoint - m_Array[Dst].TimePoint)
+					Src++;
+
+				if (++Dst < Src)
+				{
+					m_Array[Dst] = m_Array[Src++];
+					m_Array[Dst].TAD_OnUpdate(m_Array + Dst - 1);
+				}
+			}
+
+			CurPos = CurPos_Real = Dst;
+			DoAdd = AddData(in_Data);
+		}
+		return DoAdd;
+	};
+};
+
+
+#define	TA_TYPE_MAIN		0x00000001
+#define	TA_TYPE_SECONDATY	0x00000002
+#define	TA_TYPE_ETERNAL		0x00000004
+
+
+template <typename T_Data, typename T_TimeCompare>
 class SPTraceArrayDynEx
 {
 private:
-#ifdef UseTemplates_in_H
 	SPTraceArrayDynamic<T_Data, T_TimeCompare>* m_SDArrayMain;
 	SPTraceArrayDynamic<T_Data, T_TimeCompare>* m_SDArraySecond;
-#else
-	SPTraceArrayDynamic* m_SDArrayMain;
-	SPTraceArrayDynamic* m_SDArraySecond;
-#endif // UseTemplates_in_H
+	SPTraceArrayEternal<T_Data>* m_SDArrayEternal;
 
 	SPTime* m_pTime;
-#ifdef UseTemplates_in_H
 	QuickData<T_Data>* m_pQuickData;
-#else
-	QuickData* m_pQuickData;
-#endif
+
 	int CurPos;
 	int IdDeltaMainSecond;
-	int CalcCurPos()
-	{
-		IdDeltaMainSecond = m_SDArraySecond->GetCurPos() + 1;
-		return CurPos = m_SDArrayMain->GetCurPos() + IdDeltaMainSecond;
-	}
+	int IdDeltaSecondEternal;
 
 	int MaxItemsMain;
 	int MaxItemsSecond;
+	int MaxItemsEternal;
+
+
+	int CalcCurPos()
+	{
+		IdDeltaSecondEternal = m_SDArrayEternal->GetCurPos() + 1;
+		IdDeltaMainSecond = m_SDArraySecond->GetCurPos() + 1 + IdDeltaSecondEternal;
+		return CurPos = m_SDArrayMain->GetCurPos() + IdDeltaMainSecond;
+	}
 
 	void SetMaxCountValue(int in_MaxItems, double in_ArvivePart = 0.0625)
 	{
@@ -498,7 +523,7 @@ private:
 		if (ArchCount < 8) ArchCount = 8;
 		MaxItemsMain = in_MaxItems - ArchCount;
 		MaxItemsSecond = ArchCount;
-
+		MaxItemsEternal = MaxItemsSecond / 4;
 	};
 
 	void SetMaxCountValue(int in_MaxItemsMain, int in_MaxItemsSecond)
@@ -508,24 +533,17 @@ private:
 
 		MaxItemsMain = in_MaxItemsMain;
 		MaxItemsSecond = in_MaxItemsSecond;
-
+		MaxItemsEternal = MaxItemsSecond / 4;
 	};
 
 	void Init(int in_bClear)
 	{
-#ifdef UseTemplates_in_H
-
 		if (m_SDArrayMain) delete m_SDArrayMain;
-		m_SDArrayMain = nullptr;
+		m_SDArrayMain = new SPTraceArrayDynamic<T_Data, T_TimeCompare>(MaxItemsMain, m_pTime->GetTraceMinStep());
 		if (m_SDArraySecond) delete m_SDArraySecond;
-		m_SDArraySecond = nullptr;
-
-		if (m_SDArrayMain == nullptr) m_SDArrayMain = new SPTraceArrayDynamic<T_Data, T_TimeCompare>(MaxItemsMain, m_pTime->GetTraceMinStep());
-		if (m_SDArraySecond == nullptr) m_SDArraySecond = new SPTraceArrayDynamic<T_Data, T_TimeCompare>(MaxItemsSecond, m_pTime->GetHistoryMinStep());
-#else
-		if (m_SDArrayMain == nullptr) m_SDArrayMain = new SPTraceArrayDynamic(MaxItemsMain, m_pTime->GetTraceMinStep());
-		if (m_SDArraySecond == nullptr) m_SDArraySecond = new SPTraceArrayDynamic(MaxItemsSecond, m_pTime->GetHistoryMinStep());
-#endif // UseTemplates_in_H
+		m_SDArraySecond = new SPTraceArrayDynamic<T_Data, T_TimeCompare>(MaxItemsSecond, m_pTime->GetHistoryMinStep());
+		if (m_SDArrayEternal) delete m_SDArrayEternal;
+		m_SDArrayEternal = new SPTraceArrayEternal<T_Data>(MaxItemsEternal);
 
 		m_pQuickData = m_SDArrayMain->GetQuickDataPtr_C();
 
@@ -533,14 +551,21 @@ private:
 	}
 
 public:
+	int GetEternalCount() const { return m_SDArrayEternal->GetCurPos() + 1; }
+	int GetSecondaryCount() const { return m_SDArraySecond->GetCurPos() + 1; }
+	int GetMainCount() const { return m_SDArraySecond->GetCurPos() + 1; }
+	int GetStartIdSecondary()const { return IdDeltaSecondEternal - 1; }
+	int GetStartIdMain()const { return IdDeltaMainSecond - 1; }
 
 	SPTraceArrayDynEx(int in_MaxItems, SPTime* in_pTime)
 	{
 		m_pTime = in_pTime;
 		IdDeltaMainSecond = 0;
+		IdDeltaSecondEternal = 0;
 
 		m_SDArrayMain = nullptr;
 		m_SDArraySecond = nullptr;
+		m_SDArrayEternal = nullptr;
 		m_pQuickData = nullptr;
 
 		SetMaxCountValue(in_MaxItems);
@@ -551,9 +576,11 @@ public:
 	{
 		m_pTime = in_pTime;
 		IdDeltaMainSecond = 0;
+		IdDeltaSecondEternal = 0;
 
 		m_SDArrayMain = nullptr;
 		m_SDArraySecond = nullptr;
+		m_SDArrayEternal = nullptr;
 		m_pQuickData = nullptr;
 
 		SetMaxCountValue(in_MaxItemsMain, in_MaxItemsSecond);
@@ -564,35 +591,35 @@ public:
 	{
 		MaxItemsMain = 0;
 		MaxItemsSecond = 0;
+		MaxItemsEternal = 0;
 		m_pQuickData = nullptr;
 
 		if (m_SDArrayMain) delete m_SDArrayMain;
 		m_SDArrayMain = nullptr;
 		if (m_SDArraySecond) delete m_SDArraySecond;
 		m_SDArraySecond = nullptr;
+		if (m_SDArrayEternal) delete m_SDArrayEternal;
+		m_SDArrayEternal = nullptr;
 	}
 
 	int SetMaxItemsCount(int in_nMaxItems)
 	{
-		int OldMaxItemsMain = MaxItemsMain;
-		int OldMaxItemsSecond = MaxItemsSecond;
-
 		SetMaxCountValue(in_nMaxItems);
-
 		Init(SP_CLEAR_SOFT);
 
-		return MaxItemsMain + MaxItemsSecond;
+		return MaxItemsMain + MaxItemsSecond + MaxItemsEternal;
 	}
 
 
 	void Clear(int in_bClear)
 	{
-		if (!m_SDArrayMain || !m_SDArraySecond)
+		if (!m_SDArrayMain || !m_SDArraySecond || !m_SDArrayEternal)
 			Init(in_bClear);
 		else
 		{
 			m_SDArrayMain->Clear(in_bClear);
 			m_SDArraySecond->Clear(SP_CLEAR_HARD);
+			m_SDArrayEternal->Clear(SP_CLEAR_HARD);
 		}
 		CalcCurPos();
 	}
@@ -604,6 +631,10 @@ public:
 		if ((ret & DA_ADD_RESULT_PULLOUT))
 		{
 			int ret2 = m_SDArraySecond->AddDataDynamic(m_SDArrayMain->GetPullOutData(), in_Flags >> DA_ADD_LEVEL_MOVECOUNT);
+
+			if ((ret2 & DA_ADD_RESULT_PULLOUT))
+				m_SDArrayEternal->AddData(m_SDArraySecond->GetPullOutData());
+
 			ret2 <<= DA_ADD_LEVEL_MOVECOUNT;
 			ret |= ret2;
 		}
@@ -618,38 +649,26 @@ public:
 	inline T_Data* const GetPrevData() { return m_SDArrayMain->GetPrevData(); }
 	int GetCurPos() { return CurPos; }
 	T_TimeCompare GetCurTime() { return m_SDArrayMain->GetCurTime(); }
-	int GetCountMax() { return m_SDArrayMain->GetCountMax() + m_SDArrayMain->GetCountMax(); }
+	int GetCountMax() { return m_SDArrayMain->GetCountMax() + m_SDArraySecond->GetCountMax() + m_SDArrayEternal->GetCountMax(); }
 
 	T_Data& operator[](int in_DataId)
 	{
-		T_Data* ret;
-
-		if (CurPos >= MaxItemsMain)
-		{
-			if (in_DataId > m_SDArraySecond->GetCurPos())
-				ret = m_SDArrayMain->GetDataById(in_DataId - IdDeltaMainSecond);
-			else
-				ret = m_SDArraySecond->GetDataById(in_DataId);
-		}
-		else
-			ret = m_SDArrayMain->GetDataById(in_DataId);
-
-		return *ret;
+		return *GetDataById(in_DataId);
 	}
 
 	T_Data* GetDataById(int in_DataId)
 	{
 		T_Data* ret = nullptr;
-
-		if (CurPos >= MaxItemsMain)
+		if (in_DataId >= 0)
 		{
-			if (in_DataId > m_SDArraySecond->GetCurPos())
-				ret = m_SDArrayMain->GetDataById(in_DataId - IdDeltaMainSecond);
+			if (in_DataId < IdDeltaSecondEternal)
+				ret = m_SDArrayEternal->GetDataById(in_DataId);
 			else
-				ret = m_SDArraySecond->GetDataById(in_DataId);
+				if (in_DataId < IdDeltaMainSecond)
+					ret = m_SDArraySecond->GetDataById(in_DataId - IdDeltaSecondEternal);
+			else
+				ret = m_SDArrayMain->GetDataById(in_DataId - IdDeltaMainSecond);
 		}
-		else
-			ret = m_SDArrayMain->GetDataById(in_DataId);
 
 		return ret;
 	}
@@ -660,10 +679,12 @@ public:
 
 		if (CurPos >= 0)
 		{
-			if (m_SDArrayMain->GetDataById(0)->TimePoint <= in_ViewTime)
-				ret = m_SDArrayMain->GetLowIdxByTime(in_ViewTime, StrtIdx - IdDeltaMainSecond) + IdDeltaMainSecond;
-			else
-				ret = m_SDArraySecond->GetLowIdxByTime(in_ViewTime, StrtIdx);
+			if ((ret = m_SDArrayMain->GetLowIdxByTime(in_ViewTime, StrtIdx - IdDeltaMainSecond)) >= 0)
+				ret += IdDeltaMainSecond;
+			else if ((ret = m_SDArraySecond->GetLowIdxByTime(in_ViewTime, StrtIdx - IdDeltaSecondEternal)) >= 0)
+				ret += IdDeltaSecondEternal;
+			else 
+				ret = m_SDArrayEternal->GetLowIdxByTime(in_ViewTime, StrtIdx);
 		}
 
 		return ret;
@@ -675,10 +696,12 @@ public:
 
 		if (CurPos >= 0)
 		{
-			if (m_SDArrayMain->GetDataById(0)->TimePoint <= in_ViewTime)
-				ret = m_SDArrayMain->GetLowIdxByTime(in_ViewTime) + IdDeltaMainSecond;
+			if ((ret = m_SDArrayMain->GetLowIdxByTime(in_ViewTime)) >= 0)
+				ret += IdDeltaMainSecond;
+			else if ((ret = m_SDArraySecond->GetLowIdxByTime(in_ViewTime)) >= 0)
+				ret += IdDeltaSecondEternal;
 			else
-				ret = m_SDArraySecond->GetLowIdxByTime(in_ViewTime);
+				ret = m_SDArrayEternal->GetLowIdxByTime(in_ViewTime);
 		}
 
 		return ret;
@@ -688,18 +711,18 @@ public:
 	{
 		if (CurPos >= 0)
 		{
-			if (m_SDArraySecond->GetCurPos() >= 0)
-			{
-				if (idx_Start < m_SDArraySecond->GetCurPos())
-					m_SDArraySecond->GetMinMaxTracePos(min_Pos, max_Pos, idx_Start, idx_End);
+			if (idx_End < 0) idx_End = CurPos;
+			if (idx_Start < 0) idx_Start = 0;
 
-				if (idx_End < 0) idx_End = CurPos;
+			if (m_SDArrayEternal->GetCurPos() >= idx_Start)
+				m_SDArrayEternal->GetMinMaxTracePos(min_Pos, max_Pos, idx_Start, idx_End);
 
-				if (idx_End >= m_SDArraySecond->GetCurPos())
-					m_SDArrayMain->GetMinMaxTracePos(min_Pos, max_Pos, idx_Start - IdDeltaMainSecond, idx_End - IdDeltaMainSecond);
-			}
-			else
-				m_SDArrayMain->GetMinMaxTracePos(min_Pos, max_Pos, idx_Start, idx_End);
+			if (idx_Start < IdDeltaMainSecond && idx_End > IdDeltaSecondEternal)
+				m_SDArraySecond->GetMinMaxTracePos(min_Pos, max_Pos, idx_Start - IdDeltaSecondEternal, idx_End - IdDeltaSecondEternal);
+
+			if (idx_End > IdDeltaMainSecond)
+				m_SDArrayMain->GetMinMaxTracePos(min_Pos, max_Pos, idx_Start - IdDeltaMainSecond, idx_End - IdDeltaMainSecond);
+
 		}
 	}
 

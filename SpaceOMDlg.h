@@ -16,6 +16,8 @@ class CSpaceOMDlg : public CDialogEx
 public:
 	CSpaceOMDlg(CWnd* pParent = nullptr);	// standard constructor
 	~CSpaceOMDlg();	// standard constructor
+	void LoadSetting();
+	void SaveSettings(const char *inStr, const char* inStrDecoded);
 
 // Dialog Data
 #ifdef AFX_DESIGN_TIME

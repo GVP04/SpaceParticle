@@ -90,6 +90,27 @@ struct SPos
 		Z += in_Add.Z;
 	}
 
+	inline void SET_AS_SUMM(const SPos& in_Vector1, const SPos& in_Vector2)
+	{
+		X = in_Vector1.X + in_Vector2.X;
+		Y = in_Vector1.Y + in_Vector2.Y;
+		Z = in_Vector1.Z + in_Vector2.Z;
+	}
+
+	//суммирует и нормализует результат
+	inline void SET_AS_SUMM_EQ1(const SPos& in_Vector1, const SPos& in_Vector2)
+	{
+		X = in_Vector1.X + in_Vector2.X;
+		Y = in_Vector1.Y + in_Vector2.Y;
+		Z = in_Vector1.Z + in_Vector2.Z;
+
+		double LenPwr2 = 1.0 / sqrt(X * X + Y * Y + Z * Z);
+		X *= LenPwr2;
+		Y *= LenPwr2;
+		Z *= LenPwr2;
+
+	}
+
 	void ADD(const double in_Add)
 	{
 		X += in_Add;
@@ -126,6 +147,47 @@ struct SPos
 		Z *= in_Mult;
 	}
 
+	inline void SET_AS_MULT(const SPos& in_Vector1, double in_Mult)
+	{
+		X = in_Vector1.X * in_Mult;
+		Y = in_Vector1.Y * in_Mult;
+		Z = in_Vector1.Z * in_Mult;
+	}
+
+	inline void ADDIntegralStep(const SPos& Derivative, double StepValue)
+	{
+		X += Derivative.X * StepValue;
+		Y += Derivative.Y * StepValue;
+		Z += Derivative.Z * StepValue;
+	}
+
+	inline void ADDIntegralStep(const SPos& Derivative, const SPos& Derivative2, double StepValue)
+	{
+		double mltpl = StepValue * StepValue * 0.5;
+		X += Derivative.X * StepValue + Derivative2.X * mltpl;
+		Y += Derivative.Y * StepValue + Derivative2.Y * mltpl;
+		Z += Derivative.Z * StepValue + Derivative2.Z * mltpl;
+	}
+
+
+	//сделать вектор суммой CurrentValue и произведения Derivative на StepValue
+	inline void SET_AS_IntegralOf(const SPos& CurrentValue, const SPos& Derivative, double StepValue)
+	{
+		X = CurrentValue.X + Derivative.X * StepValue;
+		Y = CurrentValue.Y + Derivative.Y * StepValue;
+		Z = CurrentValue.Z + Derivative.Z * StepValue;
+	}
+
+	inline void SET_AS_IntegralOf(const SPos& CurrentValue, const SPos& Derivative, const SPos& Derivative2, double StepValue)
+	{
+		X = CurrentValue.X + Derivative.X * StepValue;
+		Y = CurrentValue.Y + Derivative.Y * StepValue;
+		Z = CurrentValue.Z + Derivative.Z * StepValue;
+		StepValue = StepValue * StepValue * 0.5;
+		X += Derivative2.X * StepValue;
+		Y += Derivative2.Y * StepValue;
+		Z += Derivative2.Z * StepValue;
+	}
 	void DIV(double in_DIV)
 	{
 		if (in_DIV != 0.0)
@@ -202,12 +264,89 @@ struct SPos
 		Z = in_Vector1.X * in_Vector2.Y - in_Vector1.Y * in_Vector2.X;
 	}
 
+	//вектор из in_Point1, ортогональный плоскости трех точек in_Point1, in_Point2, in_Point3
+	inline void SET_AS_NORMAL_TO_PLANE_FROM_1(const SPos& in_Point1, const SPos& in_Point2, const SPos& in_Point3)
+	{
+		SPos Delta_12;
+		Delta_12.X = in_Point1.X - in_Point2.X;
+		Delta_12.Y = in_Point1.Y - in_Point2.Y;
+		Delta_12.Z = in_Point1.Z - in_Point2.Z;
+
+		SPos Delta_13;
+		Delta_13.X = in_Point1.X - in_Point3.X;
+		Delta_13.Y = in_Point1.Y - in_Point3.Y;
+		Delta_13.Z = in_Point1.Z - in_Point3.Z;
+
+		X = Delta_12.Y * Delta_13.Z - Delta_12.Z * Delta_13.Y + in_Point1.X;
+		Y = Delta_12.Z * Delta_13.X - Delta_12.X * Delta_13.Z + in_Point1.Y;
+		Z = Delta_12.X * Delta_13.Y - Delta_12.Y * Delta_13.X + in_Point1.Z;
+	}
+
+	//вектор из 0,0,0, ортогональный плоскости трех точек in_Point1, in_Point2, in_Point3
+	inline void SET_AS_NORMAL_TO_PLANE_FROM_0(const SPos& in_Point1, const SPos& in_Point2, const SPos& in_Point3)
+	{
+		SPos Delta_12;
+		Delta_12.X = in_Point1.X - in_Point2.X;
+		Delta_12.Y = in_Point1.Y - in_Point2.Y;
+		Delta_12.Z = in_Point1.Z - in_Point2.Z;
+
+		SPos Delta_13;
+		Delta_13.X = in_Point1.X - in_Point3.X;
+		Delta_13.Y = in_Point1.Y - in_Point3.Y;
+		Delta_13.Z = in_Point1.Z - in_Point3.Z;
+
+		X = Delta_12.Y * Delta_13.Z - Delta_12.Z * Delta_13.Y;
+		Y = Delta_12.Z * Delta_13.X - Delta_12.X * Delta_13.Z;
+		Z = Delta_12.X * Delta_13.Y - Delta_12.Y * Delta_13.X;
+	}
+
+	//вектор из 0,0,0, ортогональный плоскости трех точек this, in_Point2, in_Point3
+	inline void SET_AS_NORMAL_TO_PLANE_FROM_0(const SPos& in_Point2, const SPos& in_Point3)
+	{
+		SPos Delta_12;
+		Delta_12.X = X - in_Point2.X;
+		Delta_12.Y = Y - in_Point2.Y;
+		Delta_12.Z = Z - in_Point2.Z;
+
+		SPos Delta_13;
+		Delta_13.X = X - in_Point3.X;
+		Delta_13.Y = Y - in_Point3.Y;
+		Delta_13.Z = Z - in_Point3.Z;
+
+		X = Delta_12.Y * Delta_13.Z - Delta_12.Z * Delta_13.Y;
+		Y = Delta_12.Z * Delta_13.X - Delta_12.X * Delta_13.Z;
+		Z = Delta_12.X * Delta_13.Y - Delta_12.Y * Delta_13.X;
+	}
+
+	//установить как вектор из this, ортогональный плоскости трех точек this, in_Point2, in_Point3
+	inline void SET_AS_NORMAL_TO_PLANE_FROM_this(const SPos& in_Point2, const SPos& in_Point3)
+	{
+		SPos Delta_12;
+		Delta_12.X = X - in_Point2.X;
+		Delta_12.Y = Y - in_Point2.Y;
+		Delta_12.Z = Z - in_Point2.Z;
+
+		SPos Delta_13;
+		Delta_13.X = X - in_Point3.X;
+		Delta_13.Y = Y - in_Point3.Y;
+		Delta_13.Z = Z - in_Point3.Z;
+
+		X = Delta_12.Y * Delta_13.Z - Delta_12.Z * Delta_13.Y + X;
+		Y = Delta_12.Z * Delta_13.X - Delta_12.X * Delta_13.Z + Y;
+		Z = Delta_12.X * Delta_13.Y - Delta_12.Y * Delta_13.X + Z;
+	}
+
+
 	//длина от 0,0,0
 	inline double LEN() const { return sqrt(X * X + Y * Y + Z * Z); }
 	inline double LENPWR2() const { return X * X + Y * Y + Z * Z; }
 	inline bool IsZero() const { return X == 0.0 && Y == 0.0 && Z == 0.0; }
 	inline bool HaveZero() const { return X == 0.0 || Y == 0.0 || Z == 0.0; }
 	inline double LENPWR3() const { double tmp = LEN();	return tmp * tmp * tmp; }
+	inline bool IsCollinear(const SPos& cmpSPos) const { return Y * cmpSPos.Z - Z * cmpSPos.Y == 0.0 && Z * cmpSPos.X - Z * cmpSPos.Z == 0.0 && X * cmpSPos.Y - Y * cmpSPos.X == 0.0; }
+
+
+
 
 	static double GetDistance(const SPos& Ptr1, const SPos& Ptr2) { return sqrt(GetDistancePwr2(Ptr1, Ptr2)); }
 
@@ -248,8 +387,20 @@ struct SPos
 			Z *= Len;
 		}
 	}
-
-	void SET_LENGHT(double in_Norm) {
+	//==NORMALIZE()
+	void SET_LENGHT_TO_1()
+	{
+		double Len = LEN();
+		if (Len != 0.0)
+		{
+			Len = 1.0 / Len;
+			X *= Len;
+			Y *= Len;
+			Z *= Len;
+		}
+	}
+	void SET_LENGHT(double in_Norm) 
+	{//3 +* * 1 / sqrt
 		double Len = LEN();
 		if (Len != 0.0)
 		{
@@ -297,9 +448,9 @@ struct SPos
 		MINUS(n_norm);
 	}
 
-	void SET_AS_REFLECT(const SPos& Velocity, const SPos& planeVelocity, const SPos& Normal)
+	void SET_AS_REFLECT(const SPos& ParticleVelocity, const SPos& planeVelocity, const SPos& Normal)
 	{
-		*this = Velocity;
+		*this = ParticleVelocity;
 		MINUS(planeVelocity);
 
 		SPos n_norm = Normal;
@@ -411,26 +562,35 @@ struct SPos
 		Z = (in_Point2.Z - in_Point1.Z) * Proportion + in_Point1.Z;
 	}
 
-	void SET_AS_NORMAL(const SPos& in_Point1, const SPos& in_Point2, double in_Lenght = 1.0)
+	void SET_AS_NORMAL_VECTOR(const SPos& in_Point1, const SPos& in_Point2, double in_Lenght = 1.0)
 	{
 		*this = in_Point1;
 		MINUS(in_Point2);
 		SET_LENGHT(in_Lenght);
 	}
 
-	void SET_AS_NORMAL( const SPos& in_Point2, double in_Lenght = 1.0)
+	void SET_AS_NORMAL_VECTOR( const SPos& in_Point2, double in_Lenght = 1.0)
 	{
 		MINUS(in_Point2);
 		SET_LENGHT(in_Lenght);
 	}
 
-
-	void SET_AS_PROJECTION_OF(const SPos &in_SrcVector)
+	double SET_AS_PROJECTION_OF(const SPos &in_SrcVector)
 	{
-		MULT(DOT(in_SrcVector) / LENPWR2());
+		double ret_Dot;
+		MULT((ret_Dot = DOT(in_SrcVector)) / LENPWR2());
+		return ret_Dot;
 	}
 
-	void SET_AS_PROJECTION_OF_TO_NORMAL(const SPos& in_SrcVector)
+	double SET_AS_PROJECTION_ONTO_LINE(const SPos& in_DstVector)
+	{
+		double ret_Dot = DOT(in_DstVector);
+		SET_AS_MULT(in_DstVector, ret_Dot / in_DstVector.LENPWR2());
+		return ret_Dot;
+	}
+
+
+	void SET_AS_PROJECTION_OF_TO_R1(const SPos& in_SrcVector)
 	{
 		MULT(DOT(in_SrcVector));
 	}
@@ -452,8 +612,18 @@ struct SPos
 		return DOT(in_SrcVector);
 	}
 
+	//смещает точку на расстояние от другой точки по линни этих точек
+	void MOVE_TO_DISTANCE_FROM(const SPos& pointFrom, double distance)
+	{
+		// Вектор от точки плоскости до проецируемой точки
+		MINUS(pointFrom);
+		SET_LENGHT(distance);
+		ADD(pointFrom);
+	}
+
+
 	//сделать проекцией вектора(себя) на плоскость, если вектор и нормаль из одной точки на плоскости
-	void SET_AS_PROJECTION_ON_PLANE(const SPos& in_PlaneNormal)
+	void SET_AS_PROJECTION_ONTO_PLANE(const SPos& in_PlaneNormal)
 	{
 		double LenNormPwr2 = in_PlaneNormal.LENPWR2();
 		if (LenNormPwr2 != 0.0)
@@ -464,7 +634,17 @@ struct SPos
 			Z -= tmpMltpl * in_PlaneNormal.Z;
 		}
 	}
-	void SET_AS_PROJECTION_ON_PLANE_NORMAL(const SPos& in_PlaneNormal)
+	void SET_AS_PROJECTION_ONTO_PLANE(const SPos& in_PlaneNormal, double in_PlaneNormalLenPwr2)
+	{//3 *+*-   1 /
+		if (in_PlaneNormalLenPwr2 != 0.0)
+		{
+			double tmpMltpl = DOT(in_PlaneNormal) / in_PlaneNormalLenPwr2;
+			X -= tmpMltpl * in_PlaneNormal.X;
+			Y -= tmpMltpl * in_PlaneNormal.Y;
+			Z -= tmpMltpl * in_PlaneNormal.Z;
+		}
+	}
+	void SET_AS_PROJECTION_ONTO_PLANE_R1(const SPos& in_PlaneNormal)
 	{
 			double tmpMltpl = DOT(in_PlaneNormal);
 			X -= tmpMltpl * in_PlaneNormal.X;
@@ -472,35 +652,18 @@ struct SPos
 			Z -= tmpMltpl * in_PlaneNormal.Z;
 	}
 	//сделать проекцией точки на плоскость, если заданы точка на плоскости и нормаль из этой точки
-	void SET_AS_PROJECTION_ON_PLANE(const SPos& point, const SPos& planePoint, const SPos& in_PlaneNormal)
+	void SET_AS_PROJECTION_ONTO_PLANE(const SPos& point, const SPos& planePoint, const SPos& in_PlaneNormal)
 	{
 		// Вектор от точки плоскости до проецируемой точки
 		*this = point;
 		MINUS(planePoint);
-		SET_AS_PROJECTION_ON_PLANE(in_PlaneNormal);
+		SET_AS_PROJECTION_ONTO_PLANE(in_PlaneNormal);
 	}
 
-	//void SET_AS_PROJECTION_ON_PLANE__(const SPos& point, const SPos& planePoint, const SPos& in_PlaneNormal)
-	//{
-	//	//вычисляется по формуле : D = -(A * x0 + B * y0 + C * z0), где(x0, y0, z0) — координаты точки на плоскости.
-	//	//double D = -in_PlaneNormal.DOT(planePoint);  //не используется здесь
-	//	// Скалярное произведение вектора point на нормаль
-	//	//double dotProduct = point.DOT(in_PlaneNormal);
-	//	// Скалярное произведение нормали на себя
-	//	//double normSquared = in_PlaneNormal.DOT_ME(); //==LENPWR2
-	//	//projOnNormal.MULT(dotProduct / normSquared);
-
-
-	//	// Проекция вектора на нормаль
-	//	SPos projOnNormal = in_PlaneNormal;
-	//	projOnNormal.MULT(point.DOT(in_PlaneNormal) / in_PlaneNormal.DOT_ME());
-
-	//	// Проекция вектора на плоскость
-	//	*this = point;
-	//	MINUS(projOnNormal);
-	//}
-
-
+	double PERIMETR() const
+	{
+		return fabs(X) + fabs(Y) + fabs(Z);
+	}
 
 	//сделать прямой, являющейся пересечением двух плоскостей. Нормали из одной точки, лежащей на этой прямой
 	void SET_AS_CROSS_OF_PLANES(const SPos& in_PlaneNormal1, const SPos& in_PlaneNormal2)
@@ -644,12 +807,16 @@ struct SData
 	SPos Velocity;
 	SPos Accel_2_3D;
 	SPos Jerk_3_3D;
+	SPos Velocity_Linear;
+
 	//SPos Snap_4_3D;
 	//SPos Crackle_5_3D;
 	//SPos Pop_6_3D;
 	double AbsSpeed;
 	double Density;
 	double TimePoint; // типа, это момент времени
+	int State;
+	int Reserve;
 
 	void CLEAR()
 	{
@@ -657,9 +824,11 @@ struct SData
 		Velocity = { 0 };
 		Accel_2_3D = { 0 };
 		Jerk_3_3D = { 0 };
+		Velocity_Linear = { 0 };
 		AbsSpeed = 0.0;
 		Density = 0.0;
-		TimePoint = -9.0e99;
+		TimePoint = 0.0;
+		State = 0;
 	};
 
 	void SET_AS_FARAWAY()
@@ -672,6 +841,12 @@ struct SData
 	bool IS_FARAWAY() const
 	{
 		return TimePoint < -1.0e10 || Position.X > 1.0e10; // || Position.Y > 1.0e10 || Position.Z > 1.0e10;
+	}
+
+	void SET_Velocity()
+	{
+		Velocity_Linear = Velocity;
+		AbsSpeed = Velocity.LEN();
 	}
 
 	static int PRINT_AS_NULL(char* io_Str, int in_StrLen, int in_Flags, int in_ValueDelim = '\t', int in_SubValueDelim = '\t') 
@@ -834,25 +1009,75 @@ struct SData
 		return ret;
 	};
 
-	bool IsSlowdown() const
-	{
-		return Velocity.GET_PROJECTION_SIGN(Accel_2_3D) < 0.0;
-	}
-
-	double GetRelativeSpeed(const SData& Ptr1, SPos* const RSpeed3D) const { return  SData::GetRelativeSpeed(*this, Ptr1, RSpeed3D); }
-	static double GetRelativeSpeed(const SData& Ptr1, const SData& Ptr2, SPos* const RSpeed3D) 
-	{
+	double GetRelativeSpeedFromVelocity(const SData& Ptr1, SPos* const RSpeed3D) const { return  SData::GetRelativeSpeedFromVelocity(*this, Ptr1, RSpeed3D); }
+	static double GetRelativeSpeedFromVelocity(const SData& Ptr1, const SData& Ptr2, SPos* const RSpeed3D) 
+	{// < 0 сближение
 		double ret = 0.0;
-		SPos distanceVector = Ptr2.Position; 
-		distanceVector.MINUS(Ptr1.Position);
-
-		SPos velocityVector = Ptr2.Velocity;
-		velocityVector.MINUS(Ptr1.Velocity);
-
-		if (RSpeed3D)
-			*RSpeed3D = velocityVector;
+		SPos distanceVector; distanceVector.SET_AS_DELTA(Ptr2.Position, Ptr1.Position);
+		SPos velocityVector = Ptr2.Velocity; velocityVector.SET_AS_DELTA(Ptr2.Velocity, Ptr1.Velocity);
 
 		ret = distanceVector.GET_PROJECTION_LENGHT_OF(velocityVector);
+		if (isnan(ret)) ret = 0.0;
+		if (RSpeed3D)
+		{
+			*RSpeed3D = velocityVector;
+			RSpeed3D->SET_LENGHT(fabs(ret));
+		}
+
+		return ret;
+	}
+
+	static double GetRelativeSpeedFromVelocity(const SData& Ptr1, const SPos& StablePoint, SPos* const RSpeed3D)
+	{// < 0 сближение
+		double ret = 0.0;
+		SPos distanceVector; distanceVector.SET_AS_DELTA(StablePoint, Ptr1.Position);
+
+		ret = distanceVector.GET_PROJECTION_LENGHT_OF(Ptr1.Velocity);
+		if (isnan(ret)) ret = 0.0;
+		if (RSpeed3D)
+		{
+			*RSpeed3D = Ptr1.Velocity;
+			RSpeed3D->SET_LENGHT(fabs(ret));
+		}
+
+		return ret;
+	}
+
+	double GetRelativeSpeedFromVelocity_Linear(const SData& Ptr1, SPos* const RSpeed3D) const 
+	{
+		return  SData::GetRelativeSpeedFromVelocity_Linear(*this, Ptr1, RSpeed3D); 
+	}
+
+	static double GetRelativeSpeedFromVelocity_Linear(const SData& Ptr1, const SData& Ptr2, SPos* const RSpeed3D)
+	{// < 0 сближение
+		double ret = 0.0;
+		SPos distanceVector; distanceVector.SET_AS_DELTA(Ptr2.Position, Ptr1.Position);
+
+		SPos velocityVector; velocityVector.SET_AS_DELTA(Ptr2.Velocity_Linear, Ptr1.Velocity_Linear);
+
+		ret = distanceVector.GET_PROJECTION_LENGHT_OF(velocityVector);
+		if (isnan(ret)) ret = 0.0;
+		if (RSpeed3D)
+		{
+			*RSpeed3D = velocityVector;
+			RSpeed3D->SET_LENGHT(fabs(ret));
+		}
+
+		return ret;
+	}
+
+	static double GetRelativeSpeedFromVelocity_Linear(const SData& Ptr1, const SPos& StablePoint, SPos* const RSpeed3D)
+	{// < 0 сближение
+		double ret = 0.0;
+		SPos distanceVector; distanceVector.SET_AS_DELTA(StablePoint, Ptr1.Position);
+
+		ret = distanceVector.GET_PROJECTION_LENGHT_OF(Ptr1.Velocity_Linear);
+		if (isnan(ret)) ret = 0.0;
+		if (RSpeed3D)
+		{
+			*RSpeed3D = Ptr1.Velocity_Linear;
+			RSpeed3D->SET_LENGHT(fabs(ret));
+		}
 
 		return ret;
 	}
@@ -864,9 +1089,7 @@ struct SData
 
 	void LinearMove(double in_Time, int in_ClearFlag = LINEARMOVECLEARFLAG_NONE)
 	{
-		SPos delta = Velocity;
-		delta.MULT(in_Time);
-		Position.ADD(delta);
+		Position.ADDIntegralStep(Velocity_Linear, in_Time);
 		TimePoint += in_Time;
 		if (in_ClearFlag)
 		{
@@ -876,7 +1099,7 @@ struct SData
 		}
 	}
 
-	int SetLinearFrom(const SData& Data1, const SData& Data2, double in_Time)
+	int SetLinearFromVelosity(const SData& Data1, const SData& Data2, double in_Time)
 	{
 		int ret = -1;
 
@@ -888,6 +1111,42 @@ struct SData
 				double mltpl = (in_Time - Data1.TimePoint) / (Data2.TimePoint - Data1.TimePoint);
 				Position.SET_AS_MIDDLE_POINT(Data1.Position, Data2.Position, mltpl);
 				Velocity.SET_AS_MIDDLE_POINT(Data1.Velocity, Data2.Velocity, mltpl);
+				Velocity_Linear = Velocity;
+				Accel_2_3D.SET_AS_MIDDLE_POINT(Data1.Accel_2_3D, Data2.Accel_2_3D, mltpl);
+				Jerk_3_3D.SET_AS_MIDDLE_POINT(Data1.Jerk_3_3D, Data2.Jerk_3_3D, mltpl);
+				//SPos Snap_4_3D;
+				//SPos Crackle_5_3D;
+				//SPos Pop_6_3D;
+
+				TimePoint = in_Time;
+
+				AbsSpeed = (Data2.AbsSpeed - Data1.AbsSpeed) * mltpl + Data1.AbsSpeed;
+				Density = (Data2.Density - Data1.Density) * mltpl + Data1.Density;
+			}
+			else
+				if (in_Time == Data2.TimePoint)
+					*this = Data2;
+		}
+		else
+			if (in_Time == Data1.TimePoint)
+				*this = Data1;
+
+		return ret;
+	}
+
+	int SetLinearFromVelocity_Linear(const SData& Data1, const SData& Data2, double in_Time)
+	{
+		int ret = -1;
+
+		if (in_Time > Data1.TimePoint)
+		{
+			if (in_Time < Data2.TimePoint)
+			{
+				ret = 0;
+				double mltpl = (in_Time - Data1.TimePoint) / (Data2.TimePoint - Data1.TimePoint);
+				Position.SET_AS_MIDDLE_POINT(Data1.Position, Data2.Position, mltpl);
+				Velocity.SET_AS_MIDDLE_POINT(Data1.Velocity_Linear, Data2.Velocity_Linear, mltpl);
+				Velocity_Linear = Velocity;
 				Accel_2_3D.SET_AS_MIDDLE_POINT(Data1.Accel_2_3D, Data2.Accel_2_3D, mltpl);
 				Jerk_3_3D.SET_AS_MIDDLE_POINT(Data1.Jerk_3_3D, Data2.Jerk_3_3D, mltpl);
 				//SPos Snap_4_3D;
@@ -911,7 +1170,7 @@ struct SData
 	}
 
 	//вычисление точки перехода на скорость in_AbsSpeed. ускорение === const
-	double GetTimeToSpeed(double in_AbsSpeed) const
+	double GetTimeToSpeedByVelocity(double in_AbsSpeed) const
 	{
 		//double A = Accel_2_3D.LENPWR2();
 		double B = Accel_2_3D.DOT(Velocity); B += B;
@@ -930,7 +1189,7 @@ struct SData
 	}
 
 	//вычисление точки перехода на скорость in_AbsSpeed. ускорение === const
-	double GetTimeToSpeedPwr2(double in_AbsSpeedPwr2) const
+	double GetTimeToSpeedPwr2ByVelocity(double in_AbsSpeedPwr2) const
 	{
 		//double A = Accel_2_3D.LENPWR2();
 		double B = Accel_2_3D.DOT(Velocity); B += B;
@@ -946,6 +1205,89 @@ struct SData
 				ret = 0x7FF8000000000000ULL;
 		}
 		return ret;
+	}
+
+	//вычисление точки перехода на скорость in_AbsSpeed. ускорение === const
+	double GetTimeToSpeedByVelocity_Linear(double in_AbsSpeed) const
+	{
+		//double A = Accel_2_3D.LENPWR2();
+		double B = Accel_2_3D.DOT(Velocity_Linear); B += B;
+		//double C = Velocity_Linear.LENPWR2() - in_AbsSpeed*in_AbsSpeed;
+
+		TwoDoubleRoots result = QuadraticEequationSolution(/*A*/Accel_2_3D.LENPWR2(), B, /*C*/Velocity_Linear.LENPWR2() - in_AbsSpeed* in_AbsSpeed);
+
+		double ret = result.root1.Dbl;
+		if (isnan(ret) || ret < 0.0)
+		{
+			ret = result.root2.Dbl;
+			if (isnan(ret) || ret < 0.0)
+				ret = 0x7FF8000000000000ULL;
+		}
+		return ret;
+	}
+
+	//вычисление точки перехода на скорость in_AbsSpeed. ускорение === const
+	double GetTimeToSpeedPwr2ByVelocity_Linear(double in_AbsSpeedPwr2) const
+	{
+		//double A = Accel_2_3D.LENPWR2();
+		double B = Accel_2_3D.DOT(Velocity_Linear); B += B;
+		//double C = Velocity_Linear.LENPWR2() - in_AbsSpeed;
+
+		TwoDoubleRoots result = QuadraticEequationSolution(/*A*/Accel_2_3D.LENPWR2(), B, /*C*/Velocity_Linear.LENPWR2() - in_AbsSpeedPwr2);
+
+		double ret = result.root1.Dbl;
+		if (isnan(ret) || ret < 0.0)
+		{
+			ret = result.root2.Dbl;
+			if (isnan(ret) || ret < 0.0)
+				ret = 0x7FF8000000000000ULL;
+		}
+		return ret;
+	}
+
+	bool TAD_OnAdd(SData* PrevData)
+	{
+		PrevData->Velocity_Linear.SET_AS_DELTA(Position, PrevData->Position);
+		double dTime = TimePoint - PrevData->TimePoint;
+		if (dTime > 0.0)
+		{
+			PrevData->Velocity_Linear /= dTime;
+			if (PrevData->Velocity_Linear.LEN() > 1.0)
+				PrevData->Velocity_Linear.SET_LENGHT_TO_1();
+		}
+		else
+			PrevData->Velocity_Linear = PrevData->Velocity;
+
+
+		Velocity_Linear = Velocity;
+
+		ASSERT((dTime = PrevData->Velocity_Linear.LEN()) <= 1.00000000000001);
+		ASSERT(Velocity_Linear.LEN() <= 1.00000000000001);
+
+
+		return true; //false если проблема
+	}
+
+	bool TAD_OnUpdate(SData* PrevData)
+	{
+		PrevData->Velocity_Linear.SET_AS_DELTA(Position, PrevData->Position);
+
+		double dTime = TimePoint - PrevData->TimePoint;
+		if (dTime > 0.0)
+		{
+			PrevData->Velocity_Linear /= dTime;
+			if (PrevData->Velocity_Linear.LEN() > 1.0)
+				PrevData->Velocity_Linear.SET_LENGHT_TO_1();
+		}
+		else
+			PrevData->Velocity_Linear = PrevData->Velocity;
+
+		Velocity_Linear = Velocity;
+
+		ASSERT(PrevData->Velocity_Linear.LEN() <= 1.00000000000001);
+		ASSERT(Velocity_Linear.LEN() <= 1.00000000000001);
+
+		return true; //false если проблема
 	}
 
 	bool TAD_IsToSquize(const SData* PrevPrevData, double SqueezeStep, int CompareFlag) const
@@ -986,6 +1328,6 @@ struct SData
 #define READPARAMS_USE_DEFS			0x0
 
 
-int ReadCalcParam(char* in_Src, const char* in_Mask, SPos& data, double defValu, int inFlags = READPARAMS_USE_DEFS);
-int ReadCalcParam(char* in_Src, const char* in_Mask, int& data, int defValue, int inFlags = READPARAMS_USE_DEFS);
-int ReadCalcParam(char* in_Src, const char* in_Mask, double& data, double defValue, int inFlags = READPARAMS_USE_DEFS);
+int ReadCalcParam(const char* in_Src, const char* in_Mask, SPos& data, double defValu, int inFlags = READPARAMS_USE_DEFS);
+int ReadCalcParam(const char* in_Src, const char* in_Mask, int& data, int defValue, int inFlags = READPARAMS_USE_DEFS);
+int ReadCalcParam(const char* in_Src, const char* in_Mask, double& data, double defValue, int inFlags = READPARAMS_USE_DEFS);

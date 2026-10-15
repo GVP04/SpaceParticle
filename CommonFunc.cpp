@@ -6,18 +6,6 @@
 #include "CommonFunc.h"
 
 
-int mRGB[16] = {
-	RGB(200, 0, 0),RGB(0, 200, 0),RGB(0, 0, 200),RGB(200, 200, 0),RGB(200, 0, 200),RGB(0, 200, 200),
-	RGB(200, 100, 0),RGB(200, 0, 100),RGB(200, 100, 100),RGB(100, 200, 0),RGB(0, 200, 100),RGB(100, 0, 200),
-	RGB(0, 100, 200),RGB(0, 100, 100),RGB(100, 0, 100),RGB(100, 100, 0),
-};
-
-int mRGBDark[16] = {
-	RGB(111, 0, 0),RGB(0, 111, 0),RGB(0, 0, 111),RGB(111, 111, 0),RGB(111, 0, 111),RGB(0, 111, 111),
-	RGB(111, 51, 0),RGB(111, 0, 51),RGB(111, 51, 51),RGB(51, 111, 0),RGB(0, 111, 51),RGB(51, 0, 111),
-	RGB(0, 51, 111),RGB(0, 51, 51),RGB(51, 0, 51),RGB(51, 51, 0),
-};
-
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
 ///////////////////////////////////////////////
@@ -32,9 +20,9 @@ char* StrUpr_my(char* inout_str)
 		{
 			if (*inout_str >= 'a' && *inout_str <= 'z')
 				*inout_str -= 'a' - 'A';
-			else
-				if (*inout_str >= 'а' && *inout_str <= 'я')
-					*inout_str -= 'а' - 'А';
+			//else
+			//	if (*inout_str >= 'а' && *inout_str <= 'я')
+			//		*inout_str -= 'а' - 'А';
 
 			inout_str++;
 		}
@@ -50,9 +38,9 @@ char* StrLwr_my(char* inout_str)
 		{
 			if (*inout_str >= 'A' && *inout_str <= 'Z')
 				*inout_str += 'a' - 'A';
-			else
-				if (*inout_str >= 'А' && *inout_str <= 'Я')
-					*inout_str += 'а' - 'А';
+			//else
+			//	if (*inout_str >= 'А' && *inout_str <= 'Я')
+			//		*inout_str += 'а' - 'А';
 
 			inout_str++;
 		}
@@ -415,7 +403,7 @@ void qsVARIANT( VARIANT *Item, int left, int right )
 
 	if ( V_VT( Item ) == VT_BSTR )
 	{
-		HRESULT hr = VariantCopy( &x, Item + ( left + right ) / 2 );
+		VariantCopy( &x, Item + ( left + right ) / 2 );
 		do
 		{
 			while ( wcscmp( Item[ i ].bstrVal, x.bstrVal ) < 0 && i < right )
@@ -425,8 +413,9 @@ void qsVARIANT( VARIANT *Item, int left, int right )
 
 			if ( i <= j )
 			{
-				hr = VariantCopy( &y, Item + i );
-				hr = VariantCopy( Item + i, Item + j );	hr = VariantCopy( Item + j, &y );
+				VariantCopy( &y, Item + i );
+				VariantCopy( Item + i, Item + j );
+				VariantCopy( Item + j, &y );
 				i++;				j--;
 			}
 		} while ( i <= j );
@@ -618,7 +607,8 @@ wchar_t *ExtractField( wchar_t * destStr, int iMaxLen, const char * iStr, int Fi
 
 wchar_t *ExtractField( wchar_t * destStr, int iMaxLen, const wchar_t * iStr, int FieldNum, const wchar_t * delim )
 {
-	if ( destStr && delim  && *delim )
+	if (destStr && delim && *delim)
+	{
 		if ( delim[ 1 ] == 0 ) ExtractField( destStr, iMaxLen, iStr, FieldNum, *delim );
 		else
 		{
@@ -650,6 +640,7 @@ wchar_t *ExtractField( wchar_t * destStr, int iMaxLen, const wchar_t * iStr, int
 				}
 			*pOut = 0;
 		}
+	}
 	return destStr;
 }
 
@@ -1160,7 +1151,8 @@ DWORD FindInSortArrayIC( const char *ccFindWhat, const char **ccArray, DWORD dwI
 wchar_t * wStrReplace( wchar_t *dstStr, wchar_t DestChar, wchar_t SrcChar )
 {
 	wchar_t * ret = dstStr;
-	if ( dstStr )
+	if (dstStr)
+	{
 		if ( SrcChar == 0 )
 		{
 			wchar_t *srcStr = dstStr;
@@ -1178,6 +1170,7 @@ wchar_t * wStrReplace( wchar_t *dstStr, wchar_t DestChar, wchar_t SrcChar )
 					*( dstStr++ ) = SrcChar;
 				else
 					dstStr++;
+	}
 
 	return ret;
 }
@@ -2135,47 +2128,47 @@ double QuadraticEequationSolutionNOpt(double A, double B, double C)
 TwoDoubleRoots GetLinearViewTime222(const SData& BaseParticle, const SData& ViewParticle)
 {
 	//=================================Eequation
-	//(p1.x - (p2.x + p2.vx * t))^2 + (p1.y - (p2.y + p2.vy * t))^2 = (t - dt)^2 
-	//(p1.x - (p2.x + p2.vx * t))^2 + (p1.y - (p2.y + p2.vy * t))^2 = t^2 - 2 * t * dt + dt^2 
-	// p1.x^2 - 2 * p1.x*(p2.x + p2.vx * t) + (p2.x + p2.vx * t)^2 + p1.y^2 - 2*p1.y*(p2.y + p2.vy * t)+(p2.y + p2.vy * t)^2 -t^2 + 2 * t * dt - dt^2 
+	//(p1.x - (p2.x + p2.vx * t))^2 + (p1.y - (p2.y + p2.vy * t))^2 = (t - deltaTime)^2 
+	//(p1.x - (p2.x + p2.vx * t))^2 + (p1.y - (p2.y + p2.vy * t))^2 = t^2 - 2 * t * deltaTime + deltaTime^2 
+	// p1.x^2 - 2 * p1.x*(p2.x + p2.vx * t) + (p2.x + p2.vx * t)^2 + p1.y^2 - 2*p1.y*(p2.y + p2.vy * t)+(p2.y + p2.vy * t)^2 -t^2 + 2 * t * deltaTime - deltaTime^2 
 	//=================================
-	//(p1.x  - p2.x) ^ 2 + (p1.y - p2.y) ^ 2 	- dt ^ 2
-	//2*t*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
+	//(p1.x  - p2.x) ^ 2 + (p1.y - p2.y) ^ 2 	- deltaTime ^ 2
+	//2*t*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + deltaTime)
 	// t ^ 2 * (p2.vx ^ 2+ p2.vy ^ 2- 1)
 	//=================================
 	// A = (p2.vx ^ 2+ p2.vy ^ 2- 1)
-	// B = 2*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
-	// C = (p1.x  - p2.x) ^ 2 + (p1.y - p2.y) ^ 2 	- dt ^ 2
+	// B = 2*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + deltaTime)
+	// C = (p1.x  - p2.x) ^ 2 + (p1.y - p2.y) ^ 2 	- deltaTime ^ 2
 	//=================================
 	// A = p2v^2- 1
-	// B = 2*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
-	// C = dist_p1p2 ^ 2 - dt ^ 2
+	// B = 2*( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + deltaTime)
+	// C = dist_p1p2 ^ 2 - deltaTime ^ 2
 	//=================================
-	// A = ViewParticle.Velocity.LENPWR2()- 1.0
-	// B = 2 * ( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + dt)
-	// C = dist_p1p2 ^ 2 - dt ^ 2
+	// A = ViewParticle.Velocity_Linear.LENPWR2()- 1.0
+	// B = 2 * ( p2.vx*(p2.x - p1.x) + p2.vy*(p2.y - p1.y) + deltaTime)
+	// C = dist_p1p2 ^ 2 - deltaTime ^ 2
 	//=================================
 
 
-	double dt = BaseParticle.TimePoint - ViewParticle.TimePoint;
+	double deltaTime = BaseParticle.TimePoint - ViewParticle.TimePoint;
 	
-	//double A = ViewParticle.Velocity.LENPWR2() - 1.0;
+	//double A = ViewParticle.Velocity_Linear.LENPWR2() - 1.0;
 	
 	SPos dist = ViewParticle.Position;
 	dist.MINUS(BaseParticle.Position);
-	double C = dist.LENPWR2() - dt * dt;
+	double C = dist.LENPWR2() - deltaTime * deltaTime;
 
-	double B = dist.DOT(ViewParticle.Velocity) + dt;
+	double B = dist.DOT(ViewParticle.Velocity_Linear) + deltaTime;
 	B += B;
 	
 
-	TwoDoubleRoots ret = QuadraticEequationSolution(ViewParticle.Velocity.LENPWR2() - 1.0, B, C);
+	TwoDoubleRoots ret = QuadraticEequationSolution(ViewParticle.Velocity_Linear.LENPWR2() - 1.0, B, C);
 
-	dist= ViewParticle.Velocity;
+	dist= ViewParticle.Velocity_Linear;
 	dist.MULT(ret.root1.Dbl);
 	dist.ADD(ViewParticle.Position);
 
-	return QuadraticEequationSolution(ViewParticle.Velocity.LENPWR2() - 1.0, B, C);
+	return QuadraticEequationSolution(ViewParticle.Velocity_Linear.LENPWR2() - 1.0, B, C);
 }
 
 //Функция вычисления точки на прямой как проекции на прямую произвольеной точки PointToProjection. Возвращает время если LineDirection это скорость
@@ -2205,13 +2198,17 @@ double GetProjectionPointOnLine(SPos &retPoint, const SPos &PointOnLine, const S
 double GetLinearViewTime(const SData& BaseParticle, const SData& ViewParticle)
 {
 	//lim(inf) =  (sqrt(D_pwr2 + H_pwr2 * (1.0 - V_pwr2)) - D * V) / (1.0 - V_pwr2);
-	SPos VP_AtTime = ViewParticle.Velocity;
+	const SPos *VP_Velocity;
+
+	VP_Velocity = &ViewParticle.Velocity_Linear;
+
+	SPos VP_AtTime = *VP_Velocity;
 	VP_AtTime *= BaseParticle.TimePoint - ViewParticle.TimePoint;
 	VP_AtTime += ViewParticle.Position;
 
 	SPos ProjPoint;
-	double TimeToNorm = GetProjectionPointOnLine(ProjPoint, VP_AtTime, ViewParticle.Velocity, BaseParticle.Position);
-	double V_pwr2 = ViewParticle.Velocity.LENPWR2();
+	double TimeToNorm = GetProjectionPointOnLine(ProjPoint, VP_AtTime, *VP_Velocity, BaseParticle.Position);
+	double V_pwr2 = VP_Velocity->LENPWR2();
 	double V = sqrt(V_pwr2);
 	if (TimeToNorm < 0) V = -V;
 	double D_pwr2 = ProjPoint.GetDistancePwr2(VP_AtTime);
@@ -2246,6 +2243,27 @@ double GetLinearViewTime(const SData& BaseParticle, const SData& ViewParticle)
 	return SS;
 }
 
+double GetIntersectionRadiusOfTwoSpheresPwr2(const SPos & Sph1_Center, double Sph1_Radius, const SPos& Sph2_Center, double Sph2_Radius)
+{
+	double RadiusPwr2;
+	double distancePwr2 = Sph1_Center.GetDistancePwr2(Sph2_Center);
+	double distance = sqrt(distancePwr2);
+	double Sph1_RadiusPwr2 = Sph1_Radius * Sph1_Radius;
+
+	// Проверяем условия существования пересечения
+	if (distance <= Sph1_Radius + Sph2_Radius && distance > fabs(Sph1_Radius - Sph2_Radius))
+	{
+		// Вычисляем d1 — расстояние от Sph1_Center до плоскости пересечения
+		double d1 = (Sph1_RadiusPwr2 - Sph2_Radius * Sph2_Radius + distancePwr2) / (distance + distance);
+
+		// Радиус окружности пересечения
+		RadiusPwr2 = Sph1_RadiusPwr2 - d1 * d1;
+	}
+	else RadiusPwr2 = -1.0;
+
+	return RadiusPwr2;
+}
+
 
 
 double CalcTheta(SPos& k1, SPos& k2, SPos& k3)
@@ -2278,21 +2296,21 @@ double CalcTheta(SPos& k1, SPos& k2, SPos& k3)
 	return maxTh > 0.1 ? maxTh : minTh;
 }
 
-void LimitedItgrl_rk411(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double dt, double *Theta)
+void LimitedItgrl_rk411(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double deltaTime, double *Theta)
 {
 	SPos k1_v, k1_r, k2_v, k2_r, k3_v, k3_r, k4_v, k4_r;
 
-	k1_v = SecondDerivative;  k1_v *= dt;
-	k1_r = FirstDerivative; k1_r *= dt;
+	k1_v = SecondDerivative;  k1_v *= deltaTime;
+	k1_r = FirstDerivative; k1_r *= deltaTime;
 
-	k2_v = SecondDerivative; k2_v *= dt;
-	k2_r = k1_v; k2_r *= 0.5; k2_r += FirstDerivative;	k2_r.LIMIT_BY(LimitValue);	k2_r *= dt;
+	k2_v = SecondDerivative; k2_v *= deltaTime;
+	k2_r = k1_v; k2_r *= 0.5; k2_r += FirstDerivative;	k2_r.LIMIT_BY(LimitValue);	k2_r *= deltaTime;
 
-	k3_v = SecondDerivative; k3_v *= dt;
-	k3_r = k2_v; k3_r *= 0.5; k3_r += FirstDerivative;	k3_r.LIMIT_BY(LimitValue);	k3_r *= dt;
+	k3_v = SecondDerivative; k3_v *= deltaTime;
+	k3_r = k2_v; k3_r *= 0.5; k3_r += FirstDerivative;	k3_r.LIMIT_BY(LimitValue);	k3_r *= deltaTime;
 
-	k4_v = SecondDerivative;  k4_v *= dt;
-	k4_r = FirstDerivative; k4_r += k3_v;	k4_r.LIMIT_BY(LimitValue);	k4_r *= dt;
+	k4_v = SecondDerivative;  k4_v *= deltaTime;
+	k4_r = FirstDerivative; k4_r += k3_v;	k4_r.LIMIT_BY(LimitValue);	k4_r *= deltaTime;
 
 	// Финальное обновление
 	resultOfFirst = k1_v; resultOfFirst += k2_v; resultOfFirst += k2_v; resultOfFirst += k3_v; resultOfFirst += k3_v; resultOfFirst += k4_v; resultOfFirst *= (1.0 / 6.0);
@@ -2311,7 +2329,7 @@ void LimitedItgrl_rk411(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative
 
 
 
-void LimitedItgrl_rk4(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double dt, double *Theta)
+void LimitedItgrl_rk4(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double deltaTime, double *Theta)
 {
 
 	SPos vel0 = FirstDerivative;
@@ -2321,28 +2339,28 @@ void LimitedItgrl_rk4(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, 
 	SPos k1_vel = SecondDerivative;         
 
 	// Шаг 2: k2
-	SPos pos_k2 = k1_pos; pos_k2 *= (dt / 2.0);
-	SPos vel_k2 = k1_vel;  vel_k2 *= (dt / 2.0); vel_k2 += vel0; vel_k2.LIMIT_BY(LimitValue);
+	SPos pos_k2 = k1_pos; pos_k2 *= (deltaTime / 2.0);
+	SPos vel_k2 = k1_vel;  vel_k2 *= (deltaTime / 2.0); vel_k2 += vel0; vel_k2.LIMIT_BY(LimitValue);
 	SPos k2_pos = vel_k2;
 	SPos k2_vel = SecondDerivative;
 
 	// Шаг 3: k3
-	SPos pos_k3 = k2_pos; pos_k3 *= (dt / 2.0);
-	SPos vel_k3 = k2_vel; vel_k3 *= (dt / 2.0); vel_k3 += vel0; vel_k3.LIMIT_BY(LimitValue);
+	SPos pos_k3 = k2_pos; pos_k3 *= (deltaTime / 2.0);
+	SPos vel_k3 = k2_vel; vel_k3 *= (deltaTime / 2.0); vel_k3 += vel0; vel_k3.LIMIT_BY(LimitValue);
 	SPos k3_pos = vel_k3;
 	SPos k3_vel = SecondDerivative;
 
 	// Шаг 4: k4
-	SPos pos_k4 = k3_pos;  pos_k4 *= dt;
-	SPos vel_k4 = k3_vel;  vel_k4 *= dt; vel_k4 += vel0;
+	SPos pos_k4 = k3_pos;  pos_k4 *= deltaTime;
+	SPos vel_k4 = k3_vel;  vel_k4 *= deltaTime; vel_k4 += vel0;
 	SPos k4_pos = vel_k4;
 	SPos k4_vel = SecondDerivative;
 
 	// Расчёт итогового перемещения (интегрирование скорости)
-	result = k1_pos; result += k2_pos; result += k2_pos; result += k3_pos; result += k3_pos; result += k4_pos; result *= dt * (1.0 / 6.0);
+	result = k1_pos; result += k2_pos; result += k2_pos; result += k3_pos; result += k3_pos; result += k4_pos; result *= deltaTime * (1.0 / 6.0);
 
 	// Расчёт итоговой скорости (интегрирование ускорения)
-	resultOfFirst = k1_vel; resultOfFirst += k2_vel; resultOfFirst += k2_vel; resultOfFirst += k3_vel; resultOfFirst += k3_vel; resultOfFirst += k4_vel; resultOfFirst *= dt * (1.0 / 6.0);
+	resultOfFirst = k1_vel; resultOfFirst += k2_vel; resultOfFirst += k2_vel; resultOfFirst += k3_vel; resultOfFirst += k3_vel; resultOfFirst += k4_vel; resultOfFirst *= deltaTime * (1.0 / 6.0);
 	resultOfFirst += FirstDerivative;
 	resultOfFirst.LIMIT_BY(LimitValue);
 
@@ -2357,36 +2375,36 @@ void LimitedItgrl_rk4(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, 
 	/*
 
 	// Шаг 1: k1 — производные в начальной точке
-	Vector3D k1_pos = vel0;                            // d(pos)/dt = velocity
-	Vector3D k1_vel = calculateAcceleration(pos0);   // d(vel)/dt = acceleration(pos)
+	Vector3D k1_pos = vel0;                            // d(pos)/deltaTime = velocity
+	Vector3D k1_vel = calculateAcceleration(pos0);   // d(vel)/deltaTime = acceleration(pos)
 
-	// Шаг 2: k2 — прогноз на середину шага (t + dt/2)
-	Vector3D pos_k2 = pos0 + k1_pos * (dt / 2.0);  // позиция через dt/2
-	Vector3D vel_k2 = vel0 + k1_vel * (dt / 2.0);  // скорость через dt/2
+	// Шаг 2: k2 — прогноз на середину шага (t + deltaTime/2)
+	Vector3D pos_k2 = pos0 + k1_pos * (deltaTime / 2.0);  // позиция через deltaTime/2
+	Vector3D vel_k2 = vel0 + k1_vel * (deltaTime / 2.0);  // скорость через deltaTime/2
 
 	// Вычисляем k2 на основе прогноза pos_k2 и vel_k2
 	Vector3D k2_pos = vel_k2;                        // скорость в точке pos_k2
 	Vector3D k2_vel = calculateAcceleration(pos_k2); // ускорение в точке pos_k2
 
-	// Шаг 3: k3 — уточнённый прогноз на середину шага (t + dt/2)
-	Vector3D pos_k3 = pos0 + k2_pos * (dt / 2.0);  // уточнённая позиция через dt/2
-	Vector3D vel_k3 = vel0 + k2_vel * (dt / 2.0);  // уточнённая скорость через dt/2
+	// Шаг 3: k3 — уточнённый прогноз на середину шага (t + deltaTime/2)
+	Vector3D pos_k3 = pos0 + k2_pos * (deltaTime / 2.0);  // уточнённая позиция через deltaTime/2
+	Vector3D vel_k3 = vel0 + k2_vel * (deltaTime / 2.0);  // уточнённая скорость через deltaTime/2
 
 	// Вычисляем k3 на основе уточнённого прогноза pos_k3 и vel_k3
 	Vector3D k3_pos = vel_k3;                        // скорость в точке pos_k3
 	Vector3D k3_vel = calculateAcceleration(pos_k3); // ускорение в точке pos_k3
 
-	// Шаг 4: k4 — прогноз на конец шага (t + dt)
-	Vector3D pos_k4 = pos0 + k3_pos * dt;          // позиция через полный шаг dt
-	Vector3D vel_k4 = vel0 + k3_vel * dt;         // скорость через полный шаг dt
+	// Шаг 4: k4 — прогноз на конец шага (t + deltaTime)
+	Vector3D pos_k4 = pos0 + k3_pos * deltaTime;          // позиция через полный шаг deltaTime
+	Vector3D vel_k4 = vel0 + k3_vel * deltaTime;         // скорость через полный шаг deltaTime
 
 	// Вычисляем k4 на основе прогноза pos_k4 и vel_k4
 	Vector3D k4_pos = vel_k4;                        // скорость в точке pos_k4
 	Vector3D k4_vel = calculateAcceleration(pos_k4); // ускорение в точке pos_k4
 
 	// Итоговое обновление позиции и скорости
-	finalPosition = pos0 + (k1_pos + 2.0 * k2_pos + 2.0 * k3_pos + k4_pos) * (dt / 6.0);
-	finalVelocity = vel0 + (k1_vel + 2.0 * k2_vel + 2.0 * k3_vel + k4_vel) * (dt / 6.0);
+	finalPosition = pos0 + (k1_pos + 2.0 * k2_pos + 2.0 * k3_pos + k4_pos) * (deltaTime / 6.0);
+	finalVelocity = vel0 + (k1_vel + 2.0 * k2_vel + 2.0 * k3_vel + k4_vel) * (deltaTime / 6.0);
 
 	// Ограничение скорости в конце расчёта
 	double finalMag = finalVelocity.magnitude();
@@ -2402,37 +2420,37 @@ void LimitedItgrl_rk4(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, 
 
 
 //
-//void LimitedItgrl_rk4(SPos& result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double dt, double* Theta)
+//void LimitedItgrl_rk4(SPos& result, SPos& resultOfFirst, SPos& FirstDerivative, SPos& SecondDerivative, double LimitValue, double deltaTime, double* Theta)
 //{
 //	SPos k1_v, k1_r, k2_v, k2_r, k3_v, k3_r, k4_v, k4_r, v_temp, r_temp;
 //
 //	// Этап 1
-//	k1_v = SecondDerivative;  k1_v *= dt;
-//	k1_r = FirstDerivative; k1_r *= dt;
+//	k1_v = SecondDerivative;  k1_v *= deltaTime;
+//	k1_r = FirstDerivative; k1_r *= deltaTime;
 //
 //	// Этап 2
 //	v_temp = k1_v; v_temp *= 0.5; v_temp += FirstDerivative;
 //	v_temp.LIMIT_BY(LimitValue);
 //
 //	/////r_temp = k1_r; r_temp*=0.5;
-//	k2_v = SecondDerivative; k2_v *= dt;
-//	k2_r = v_temp; k2_r *= dt;
+//	k2_v = SecondDerivative; k2_v *= deltaTime;
+//	k2_r = v_temp; k2_r *= deltaTime;
 //
 //	// Этап 3
 //	v_temp = k2_v; v_temp *= 0.5; v_temp += FirstDerivative;
 //	v_temp.LIMIT_BY(LimitValue);
 //	/////r_temp = k2_r; r_temp *= 0.5;
 //
-//	k3_v = SecondDerivative; k3_v *= dt;
-//	k3_r = v_temp; k3_r *= dt;
+//	k3_v = SecondDerivative; k3_v *= deltaTime;
+//	k3_r = v_temp; k3_r *= deltaTime;
 //
 //	// Этап 4
 //	v_temp = FirstDerivative; v_temp += k3_v;
 //
 //	v_temp.LIMIT_BY(LimitValue);
 //	////r_temp = k3_r;
-//	k4_v = SecondDerivative;  k4_v *= dt;
-//	k4_r = v_temp; k4_r *= dt;
+//	k4_v = SecondDerivative;  k4_v *= deltaTime;
+//	k4_r = v_temp; k4_r *= deltaTime;
 //
 //	// Финальное обновление
 //
@@ -2504,7 +2522,9 @@ void LimitedItgrl_rk4(SPos &result, SPos& resultOfFirst, SPos& FirstDerivative, 
 
 void test_LinearVP()
 {
-	SData BaseParticle = { 0 }, ViewParticle = { 0 };
+	SData BaseParticle, ViewParticle;
+	BaseParticle.CLEAR();
+	ViewParticle.CLEAR();
 
 	double VPxArr[11] = { 0.0, -0.1, -0.2, -0.5, -0.99999, -1.0, -1.5, -2.0, -10.0 , -100.0 };
 	double VPyArr[11] = { 0.0, 0.1, 0.2, 0.5, 0.75, 0.99999, 1.0, 1.5, 2.0, 10.0, -100.0 };
@@ -2669,3 +2689,1343 @@ void my_Test()
 	test_LinearVP();
 }
 
+
+
+
+double SpeedByPhantom(const SData& Phantom, const SPos& Particle, const SPos& ParticleDirection, SPos *ResVelocity) 
+{
+	SPos r0; r0.SET_AS_DELTA(Particle, Phantom.Position);
+
+	SPos DirectionNorm = ParticleDirection; // единичный вектор направления
+	DirectionNorm.NORMALIZE();
+
+	double a = r0.DOT(Phantom.Velocity_Linear);       // числитель
+	double b = r0.DOT(DirectionNorm);       // знаменатель
+	double ret = a / b;
+
+	if (ResVelocity)
+	{
+		DirectionNorm *= ret;
+		*ResVelocity = DirectionNorm;
+	}
+
+	return ret;
+}
+
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R==1 от A и B.Рассчитать положение и скорость C в момент T1, если расстояние от C до A и B не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+int compute_2NP_master_LinearMove_R1(const SData& Phantom_Acur, const SData& Phantom_Bcur, const SData& Phantom_Anext, const SData& Phantom_Bnext, const SData& DataCur, SData& data_Out, double deltaTime)
+{
+	int ret;
+	//know how
+	SPos movement;
+	GetMoveToClosestEequiDistantPoint_R1_FAST(Phantom_Anext.Position, Phantom_Bnext.Position, DataCur.Position, movement);
+
+	double vMoveLEN = movement.LEN();
+	double tmpSpeed = vMoveLEN / deltaTime;
+	data_Out.Velocity = movement;
+
+	if (tmpSpeed > 1.0)
+	{
+		data_Out.Velocity.SET_LENGHT_TO_1();
+		data_Out.AbsSpeed = 1.0;
+		movement.SET_AS_MULT(data_Out.Velocity, deltaTime);
+		ret = 0x11;
+	}
+	else
+	{
+		data_Out.Velocity.SET_LENGHT(tmpSpeed);
+		data_Out.AbsSpeed = tmpSpeed;
+		ret = 0x00;
+	}
+
+	data_Out.Position.SET_AS_SUMM(DataCur.Position, movement);
+	data_Out.Velocity_Linear = data_Out.Velocity;
+
+	return ret;
+}
+
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B.A и B влияют только на C.Рассчитать положение и скорость C в момент T1, если A и B вырабатывают значительное ускорение модулем  W, которое стремится сместить C с расстояния R от точки B.Перемещение C минимизировано.Скорость не может по модулю превышать 1. W стремится к бесконечности
+int compute_2AP_master_Motion(const SData& Phantom_A, const SData& Phantom_B, const SData& DataCur, SData& data_Out, double deltaTime)
+{
+	int ret = 0x11;
+	SPos distanceTo_A; distanceTo_A.SET_AS_DELTA(DataCur.Position, Phantom_A.Position);
+	SPos distanceTo_B; distanceTo_B.SET_AS_DELTA(DataCur.Position, Phantom_B.Position);
+
+	if (distanceTo_A.DOT(Phantom_A.Velocity_Linear) < 0) distanceTo_A.INVERT();
+	if (distanceTo_B.DOT(Phantom_B.Velocity_Linear) < 0) distanceTo_B.INVERT();
+
+	data_Out.Accel_2_3D = { 0 };
+	data_Out.Jerk_3_3D = { 0 };
+
+	data_Out.Velocity.SET_AS_SUMM_EQ1(distanceTo_A, distanceTo_B);
+
+	if (isnan(data_Out.Velocity.X))
+	{
+		data_Out.Velocity = { 0 };
+		data_Out.Velocity_Linear = { 0 };
+		data_Out.AbsSpeed = 0.0;
+	}
+	else
+	{
+		data_Out.AbsSpeed = 1.0;
+		data_Out.Velocity_Linear = data_Out.Velocity;
+		data_Out.Position.SET_AS_IntegralOf(DataCur.Position, data_Out.Velocity_Linear, deltaTime);
+	}
+
+	return ret;
+}
+
+//две точки A и B произвольно и с произвольным постоянным ускорением движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии от A и B.Рассчитать положение и скорость C в момент T1, если расстояние R от C до A и B не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+int compute_2NP_master_AccMove(const SData& Phantom_A, const SData& Phantom_B, SData& data_Out, double deltaTime)
+{
+	int ret;
+	SPos distanceTo_A = data_Out.Position; distanceTo_A -= Phantom_A.Position;
+	SPos distanceTo_B = data_Out.Position; distanceTo_B -= Phantom_B.Position;
+
+	double D2 = distanceTo_A.LENPWR2();
+	double ProjectionAB = distanceTo_A.DOT(distanceTo_B);          // ProjectionAB
+	double D4 = D2 * D2;
+	double D = D4 - ProjectionAB * ProjectionAB;            // определитель
+	SPos tmp;
+
+	// Вырожденный случай: почти на прямой AB
+	if (fabs(D) < 1e-12 * D4)
+	{
+		data_Out.Velocity.SET_AS_MIDDLE_POINT(Phantom_A.Velocity_Linear, Phantom_B.Velocity_Linear);
+		data_Out.Accel_2_3D.SET_AS_MIDDLE_POINT(Phantom_A.Accel_2_3D, Phantom_B.Accel_2_3D);
+
+		tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		tmp = data_Out.Accel_2_3D;
+		tmp *= deltaTime * deltaTime * 0.5;
+		data_Out.Position += tmp;
+		ret = 0x11;
+		data_Out.Velocity_Linear = data_Out.Velocity;
+	}
+	else
+	{
+		double pA = distanceTo_A.DOT(Phantom_A.Velocity_Linear);
+		double pB = distanceTo_B.DOT(Phantom_B.Velocity_Linear);
+		D = 1.0 / D;
+		double lambda = (pA * D2 - pB * ProjectionAB) * D;
+		double mu = (pB * D2 - pA * ProjectionAB) * D;
+
+
+		data_Out.Velocity = distanceTo_A;
+		data_Out.Velocity *= lambda;
+		tmp = distanceTo_B; tmp *= mu;
+		data_Out.Velocity += tmp;
+
+		if (data_Out.Velocity.LENPWR2() > 1.0)
+		{
+			data_Out.Velocity.SET_LENGHT_TO_1();
+			ret = 0x11;
+		}
+		else
+			ret = 0x00;
+
+		// Квадраты модулей разностей скоростей
+		SPos uA = data_Out.Velocity; distanceTo_A -= Phantom_A.Velocity_Linear;
+		SPos uB = data_Out.Velocity; distanceTo_B -= Phantom_B.Velocity_Linear;
+
+		double uA2 = uA.LENPWR2();
+		double uB2 = uB.LENPWR2();
+
+		double qA = distanceTo_A.DOT(Phantom_A.Accel_2_3D) - uA2;
+		double qB = distanceTo_B.DOT(Phantom_B.Accel_2_3D) - uB2;
+
+		double alpha = (qA * D2 - qB * ProjectionAB) * D;
+		double beta = (qB * D2 - qA * ProjectionAB) * D;
+
+		data_Out.Accel_2_3D = distanceTo_A; data_Out.Accel_2_3D *= alpha;
+		distanceTo_B *= beta;
+		data_Out.Accel_2_3D += distanceTo_B;
+
+		tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		tmp = data_Out.Accel_2_3D;
+		tmp *= deltaTime * deltaTime * 0.5;
+		data_Out.Position += tmp;
+		data_Out.Velocity_Linear = data_Out.Velocity;
+	}
+	data_Out.AbsSpeed = data_Out.Velocity_Linear.LEN();
+
+	return ret;
+}
+
+//две точки A и B произвольно и с произвольным постоянным ускорением движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R==1 от A и B.Рассчитать положение и скорость C в момент T1, если расстояние R==1 от C до A и B не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+int compute_2NP_master_AccMove_R1(const SData& Phantom_A, const SData& Phantom_B, SData& data_Out, double deltaTime)
+{
+	int ret;
+	SPos distanceTo_A = data_Out.Position; distanceTo_A -= Phantom_A.Position;
+	SPos distanceTo_B = data_Out.Position; distanceTo_B -= Phantom_B.Position;
+
+	double ProjectionAB = distanceTo_A.DOT(distanceTo_B);          // ProjectionAB
+	double D = 1.0 - ProjectionAB * ProjectionAB;            // определитель
+	SPos tmp;
+
+	// Вырожденный случай: почти на прямой AB
+	if (fabs(D) < 1e-12)
+	{
+		data_Out.Velocity.SET_AS_MIDDLE_POINT(Phantom_A.Velocity_Linear, Phantom_B.Velocity_Linear);
+		data_Out.Accel_2_3D.SET_AS_MIDDLE_POINT(Phantom_A.Accel_2_3D, Phantom_B.Accel_2_3D);
+
+		tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		tmp = data_Out.Accel_2_3D;
+		tmp *= deltaTime * deltaTime * 0.5;
+		data_Out.Position += tmp;
+		ret = 0x11;
+		data_Out.Velocity_Linear = data_Out.Velocity;
+	}
+	else
+	{
+		double pA = distanceTo_A.DOT(Phantom_A.Velocity_Linear);
+		double pB = distanceTo_B.DOT(Phantom_B.Velocity_Linear);
+		D = 1.0 / D;
+		double lambda = (pA - pB * ProjectionAB) * D;
+		double mu = (pB - pA * ProjectionAB) * D;
+
+
+		data_Out.Velocity = distanceTo_A;
+		data_Out.Velocity *= lambda;
+		tmp = distanceTo_B; tmp *= mu;
+		data_Out.Velocity += tmp;
+
+		if (data_Out.Velocity.LENPWR2() > 1.0)
+		{
+			data_Out.Velocity.SET_LENGHT_TO_1();
+			ret = 0x11;
+		}
+		else
+			ret = 0x00;
+
+		// Квадраты модулей разностей скоростей
+		SPos uA = data_Out.Velocity; distanceTo_A -= Phantom_A.Velocity_Linear;
+		SPos uB = data_Out.Velocity; distanceTo_B -= Phantom_B.Velocity_Linear;
+
+		double uA2 = uA.LENPWR2();
+		double uB2 = uB.LENPWR2();
+
+		double qA = distanceTo_A.DOT(Phantom_A.Accel_2_3D) - uA2;
+		double qB = distanceTo_B.DOT(Phantom_B.Accel_2_3D) - uB2;
+
+		double alpha = (qA - qB * ProjectionAB) * D;
+		double beta = (qB - qA * ProjectionAB) * D;
+
+		data_Out.Accel_2_3D = distanceTo_A; data_Out.Accel_2_3D *= alpha;
+		distanceTo_B *= beta;
+		data_Out.Accel_2_3D += distanceTo_B;
+
+		tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		tmp = data_Out.Accel_2_3D;
+		tmp *= deltaTime * deltaTime * 0.5;
+		data_Out.Position += tmp;
+		data_Out.Velocity_Linear = data_Out.Velocity;
+	}
+	data_Out.AbsSpeed = data_Out.Velocity_Linear.LEN();
+	return ret;
+}
+
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B.A и B влияют только на C.Рассчитать положение и скорость C в момент T1, если A вырабатывает значительное ускорение модулем  W, которое стремится вернуть C на расстояние R от точки A, а B вырабатывает ускорение модулем W, которое стремится сместить C с расстояния R от точки B.Перемещение C минимизировано.Скорость не может по модулю превышать 1. W стремится к бесконечности
+int compute_NPAP_master_LinearMove(const SData& Phantom_NP, const SData& Phantom_NP_next, const SData& Phantom_AP, const SData& data_Cur, SData& data_Out, double deltaTime)
+{
+	//выравнивание точки на критическое расстояние не здесь
+	//предельный случай идеального расположения на одной прямой не рассматриваем
+	//внешнее ускорение не учитывается, так как есть частица AP, которая гасит внешнее влияние своим бесконечным ускорением
+	//на выходе всегда предельная скорость
+	//модули скорости от хозяев одинаковы
+	SData Res_AP;
+	compute_1_Master_LinearMovement(Phantom_NP, data_Cur, data_Out.Position, data_Out.Velocity, deltaTime);		//перемещение 
+
+	//для AP только вектор скорости
+	compute_1_Master_LinearMovement(Phantom_AP, data_Cur, Res_AP.Position, Res_AP.Velocity, deltaTime);		//перемещение 
+
+
+	//скорость от AP == 1 по сути - ускорение равно бесконечности.Следовательно в нормальной плоскости максимально возможное с учетом скорости от NP
+	Res_AP.Velocity.SET_LENGHT_TO_1();
+	//AP всегда на барьере усиливает движение
+	//if (data_Out.Velocity.DOT(Res_AP.Velocity) < 0.0)
+		Res_AP.Velocity.INVERT();
+	
+	//приблизительно. считаем что шаг мал и AP в плоскости нормали
+	Res_AP.Velocity.SET_AS_PROJECTION_ONTO_PLANE(data_Out.Velocity);
+	Res_AP.Velocity.SET_LENGHT(sqrt(1.0- data_Out.Velocity.LENPWR2()));
+
+	data_Out.Velocity += Res_AP.Velocity;
+	data_Out.Velocity.SET_LENGHT_TO_1();
+
+	data_Out.AbsSpeed = 1.0;
+	data_Out.Velocity_Linear = data_Out.Velocity;
+
+	data_Out.Position.SET_AS_IntegralOf(data_Cur.Position, data_Out.Velocity, deltaTime);
+
+	//приведение на барьер NP
+	data_Out.Position -= Phantom_NP_next.Position;
+	data_Out.Position.SET_LENGHT_TO_1();
+	data_Out.Position += Phantom_NP_next.Position;
+
+	int ret;
+	if (fabs(data_Out.Position.GetDistance(data_Cur.Position) - 1.0) < 1.0e-12)
+		ret = 0x00;
+	else
+		ret = 0x10;
+
+
+
+	return ret;
+}
+
+int compute_NPAP_master_LinearMove_AI(const SData& Phantom_NP, const SData& Phantom_AP, SData& data_Out, double deltaTime) 
+{
+	int ret;
+	SPos distanceTo_A = data_Out.Position; distanceTo_A -= Phantom_NP.Position;
+	SPos distanceTo_B = data_Out.Position; distanceTo_B -= Phantom_AP.Position;
+
+	double criticalDistancePwr2 = distanceTo_A.LENPWR2();
+	double ProjectionAB = distanceTo_A.DOT(distanceTo_B);          // ProjectionAB
+
+	double D = (criticalDistancePwr2 - ProjectionAB) * (criticalDistancePwr2 + ProjectionAB);
+
+	if (D < 1e-14) {
+		// Вырожденный случай: distanceTo_A и distanceTo_B почти параллельны
+		data_Out.Velocity = Phantom_NP.Velocity_Linear;
+		SPos tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		ret = 0x10;
+	}
+	else
+	{
+		double pNP = distanceTo_A.DOT(Phantom_NP.Velocity_Linear);
+		double pAP = distanceTo_B.DOT(Phantom_AP.Velocity_Linear);
+		D = 1.0 / D;
+		double lambda = (pNP * criticalDistancePwr2 - pAP * ProjectionAB) * D;
+		double mu = (pAP * criticalDistancePwr2 - pNP * ProjectionAB) * D;
+
+		distanceTo_A *= lambda;
+		distanceTo_B *= mu;
+		data_Out.Velocity = distanceTo_A;
+		data_Out.Velocity += distanceTo_B;
+
+		// Ограничение на модуль скорости: 
+		if (data_Out.Velocity.LENPWR2() > 1.0)
+		{
+			data_Out.Velocity.SET_LENGHT_TO_1();
+			ret = 0x11;
+		}
+		else ret = 0x10;
+
+		SPos tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+	}
+
+	data_Out.AbsSpeed = data_Out.Velocity.LEN();
+	data_Out.Velocity_Linear = data_Out.Velocity;
+
+	return ret;
+}
+
+int compute_NPAP_master_LinearMove_R1_AI(const SData& Phantom_NP, const SData& Phantom_AP, SData& data_Out, double deltaTime)
+{
+	int ret;
+	SPos distanceTo_A = data_Out.Position; distanceTo_A -= Phantom_NP.Position;
+	SPos distanceTo_B = data_Out.Position; distanceTo_B -= Phantom_AP.Position;
+
+	double ProjectionAB = distanceTo_A.DOT(distanceTo_B);          // ProjectionAB
+
+	double D = (1.0 - ProjectionAB) * (1.0 + ProjectionAB);
+
+	if (D < 1e-14) {
+		// Вырожденный случай: distanceTo_A и distanceTo_B почти параллельны
+		data_Out.Velocity = Phantom_NP.Velocity_Linear;
+		SPos tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		ret = 0x10;
+	}
+	else
+	{
+		double pNP = distanceTo_A.DOT(Phantom_NP.Velocity_Linear);
+		double pAP = distanceTo_B.DOT(Phantom_AP.Velocity_Linear);
+		D = 1.0 / D;
+		double lambda = (pNP  - pAP * ProjectionAB) * D;
+		double mu = (pAP - pNP * ProjectionAB) * D;
+
+		distanceTo_A *= lambda;
+		distanceTo_B *= mu;
+		data_Out.Velocity = distanceTo_A;
+		data_Out.Velocity += distanceTo_B;
+
+		// Ограничение на модуль скорости: 
+		if (data_Out.Velocity.LENPWR2() > 1.0)
+		{
+			data_Out.Velocity.SET_LENGHT_TO_1();
+			ret = 0x11;
+		}
+		else ret = 0x10;
+
+		SPos tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+	}
+
+	data_Out.AbsSpeed = data_Out.Velocity.LEN();
+	data_Out.Velocity_Linear = data_Out.Velocity;
+
+	return ret;
+}
+
+//точка A произвольно и равноускоренно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии R от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_master_AccMove(const SData& Phantom_A, SData& data_Out, double deltaTime)
+{
+	SPos deltaPosition = Phantom_A.Position; deltaPosition -= data_Out.Position;
+	double DistancePwr2 = deltaPosition.LENPWR2();
+
+	if (DistancePwr2 < 1e-14) //Вырожденный случай
+	{
+		SPos tmp = Phantom_A.Velocity_Linear; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		tmp = Phantom_A.Accel_2_3D;
+		tmp *= deltaTime * deltaTime * 0.5;
+		data_Out.Position += tmp;
+	}
+	else
+	{
+		double p = deltaPosition.DOT(Phantom_A.Velocity_Linear);
+		data_Out.Velocity = deltaPosition;
+		data_Out.Velocity *= p / DistancePwr2;
+
+		SPos DeltaVelocity = Phantom_A.Velocity_Linear;  DeltaVelocity -= data_Out.Velocity;            // разность скоростей
+		double DeltaVelocityPwr2 = DeltaVelocity.LENPWR2();
+		double q = deltaPosition.DOT(Phantom_A.Accel_2_3D) + DeltaVelocityPwr2;
+		data_Out.Accel_2_3D = deltaPosition;
+		data_Out.Accel_2_3D *= (q / DistancePwr2);
+
+		SPos tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		tmp = data_Out.Accel_2_3D;
+		tmp *= deltaTime * deltaTime * 0.5;
+		data_Out.Position += tmp;
+	}
+	data_Out.AbsSpeed = data_Out.Velocity.LEN();
+	data_Out.Velocity_Linear = data_Out.Velocity;
+}
+
+//точка A произвольно и равноускоренно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии 1 от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_master_AccMoveR1(const SData& Phantom_A, SData& data_Out, double deltaTime)
+{
+	SPos deltaPosition = Phantom_A.Position; deltaPosition -= data_Out.Position;
+	deltaPosition.SET_LENGHT_TO_1();
+	//выравнивание точки на критическое расстояние
+	data_Out.Position = Phantom_A.Position;
+	data_Out.Position -= deltaPosition;
+
+	//определение ыектора скорости
+	data_Out.Velocity = deltaPosition;
+	data_Out.Velocity *= deltaPosition.DOT(Phantom_A.Velocity_Linear);
+
+	// разность скоростей
+	SPos DeltaVelocity = Phantom_A.Velocity_Linear;  DeltaVelocity -= data_Out.Velocity;
+
+	data_Out.Accel_2_3D = deltaPosition;
+	data_Out.Accel_2_3D *= deltaPosition.DOT(Phantom_A.Accel_2_3D) + DeltaVelocity.LENPWR2();
+
+	SPos tmp = data_Out.Velocity; tmp *= deltaTime;
+	data_Out.Position += tmp;
+	tmp = data_Out.Accel_2_3D;
+	tmp *= deltaTime * deltaTime * 0.5;
+	data_Out.Position += tmp;
+	data_Out.AbsSpeed = data_Out.Velocity.LEN();
+	data_Out.Velocity_Linear = data_Out.Velocity;
+}
+
+//точка A произвольно и равномерно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии R от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_Master_LinearMove(const SData& Phantom_A, SData& data_Out, double deltaTime) 
+{
+	SPos deltaPosition = Phantom_A.Position; deltaPosition -= data_Out.Position;
+	double DistancePwr2Inv = 1.0 / deltaPosition.LENPWR2();
+
+	if (DistancePwr2Inv > 1e14) //Вырожденный случай
+	{
+		SPos tmp = Phantom_A.Velocity_Linear; tmp *= deltaTime;
+		data_Out.Position += tmp;
+	}
+	else
+	{
+		data_Out.Velocity = deltaPosition;
+		data_Out.Velocity *= deltaPosition.DOT(Phantom_A.Velocity_Linear) * DistancePwr2Inv;
+
+		SPos deltaVekociy = Phantom_A.Velocity_Linear;  deltaVekociy -= data_Out.Velocity_Linear;
+		data_Out.Accel_2_3D = deltaPosition;
+		data_Out.Accel_2_3D *=  deltaVekociy.LENPWR2() * DistancePwr2Inv;
+
+		SPos tmp = data_Out.Velocity; tmp *= deltaTime;
+		data_Out.Position += tmp;
+		tmp = data_Out.Accel_2_3D;
+		tmp *= deltaTime * deltaTime * 0.5;
+		data_Out.Position += tmp;
+	}
+	data_Out.AbsSpeed = data_Out.Velocity.LEN();
+	data_Out.Velocity_Linear = data_Out.Velocity;
+}
+
+//точка A произвольно и равномерно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии 1 от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_Master_LinearMoveR1_Fine(const SData& Phantom_A, SData& data_Out, double deltaTime)
+{//!!!!!есть данные фантома в будущем. есть возможность посчитать более точно
+
+	SPos deltaPosition; deltaPosition.SET_AS_DELTA(data_Out.Position, Phantom_A.Position);
+
+	if (Phantom_A.AbsSpeed == 0.0)
+	{
+		double newTime = data_Out.TimePoint;
+		data_Out = Phantom_A;
+		data_Out.TimePoint = newTime;
+	}
+	else
+	{
+		SPos vHat = Phantom_A.Velocity_Linear;
+		vHat *= 1.0 / Phantom_A.AbsSpeed; // единичный вектор скорости A
+
+		// Разложение deltaPosition на компоненты вдоль и поперёк vHat
+		double proj = deltaPosition.DOT(vHat); // проекция на vHat
+		SPos d_par = vHat; d_par *= proj;      // параллельная составляющая
+		SPos d_perp = deltaPosition;  d_perp -= d_par; // перпендикулярная составляющая
+
+		double d_perp_len = d_perp.LEN();
+
+		// Если d_perp нулевой (deltaPosition параллелен Phantom_A.Velocity_Linear), то C движется строго параллельно A
+		if (d_perp_len == 0.0)
+		{
+			double newTime = data_Out.TimePoint;
+			SPos NewPos = Phantom_A.Velocity_Linear;  NewPos *= deltaTime; NewPos += data_Out.Position;
+			data_Out = Phantom_A;
+			data_Out.Position = NewPos;
+			data_Out.TimePoint = newTime;
+	}
+		else
+		{
+			// Единичный вектор в направлении d_perp
+			SPos d_perp_hat = d_perp; d_perp_hat /= d_perp_len;
+
+			// Нормаль к плоскости (vHat, d_perp) — ось вращения
+			// n уже единичный, потому что vHat и d_perp_hat ортогональны и единичны
+			SPos n; n.SET_AS_CROSS(vHat, d_perp_hat);
+
+			// Угол поворота за deltaTime: theta = Phantom_A.AbsSpeed * deltaTime (линейная скорость Phantom_A.AbsSpeed, радиус 1)
+			double theta = Phantom_A.AbsSpeed * deltaTime;
+
+			// Поворот d_perp в плоскости на угол theta вокруг оси n
+			// Формула Родрига: d_perp(t) = d_perp*cos(theta) + (n × d_perp)*sin(theta)
+			SPos n_cross_dperp; n_cross_dperp.SET_AS_CROSS(n, d_perp_hat);   // это единичный вектор, перпендикулярный d_perp и n
+
+			SPos tmp;
+			tmp.SET_AS_MULT(n_cross_dperp, sin(theta));
+			SPos d_perp_rot; d_perp_rot.SET_AS_MULT(d_perp_hat, cos(theta));
+			d_perp_rot += tmp;
+			// вернуть исходную длину
+			d_perp_rot *= d_perp_len;
+
+			// Итоговый вектор d(T1)
+			SPos d1; d1.SET_AS_SUMM(d_par, d_perp_rot);
+
+			// Позиция A в T1
+			SPos Phantom_ANewPos = Phantom_A.Velocity_Linear;  Phantom_ANewPos *= deltaTime; Phantom_ANewPos += Phantom_A.Position;
+
+			// Позиция C в T1
+			data_Out.Position.SET_AS_SUMM(Phantom_ANewPos, d1);
+
+			// Скорость data_Out.Velocity = Phantom_A.Velocity_Linear + ddot
+			// ddot — производная d(t): поворот вектора d_perp с угловой скоростью Phantom_A.AbsSpeed вокруг n
+			// ddot = Phantom_A.AbsSpeed * (n × d(t))
+			SPos n_cross_d1; n_cross_d1.SET_AS_CROSS(n, d1);
+			SPos ddot; ddot.SET_AS_MULT(n_cross_d1, Phantom_A.AbsSpeed);
+			data_Out.Velocity.SET_AS_SUMM(Phantom_A.Velocity_Linear, ddot);
+			data_Out.Velocity_Linear = data_Out.Velocity;
+			data_Out.AbsSpeed = data_Out.Velocity.LEN();
+
+			// Ускорение C: aC = ddotdot = -Phantom_A.AbsSpeed^2 * d_perp_rot (центростремительное в плоскости)
+			// Либо через вторую производную: aC = Phantom_A.AbsSpeed * (n × ddot) = Phantom_A.AbsSpeed^2 * (n × (n × d1)) = -Phantom_A.AbsSpeed^2 * (d1 - d_par)
+			// Но проще: aC = -Phantom_A.AbsSpeed*Phantom_A.AbsSpeed * d_perp_rot
+			data_Out.Accel_2_3D.SET_AS_MULT(d_perp_rot, -Phantom_A.AbsSpeed * Phantom_A.AbsSpeed);
+			data_Out.Velocity_Linear = data_Out.Velocity;
+		}
+	}
+}
+
+
+void compute_1_Master_LinearMoveR1_Fast____(const SData& Phantom_A1, const SData& Phantom_A2, const SData& data_C1, SData& data_C2_Out, double deltaTime)
+{
+	// 1. Скорость движения точки А (постоянная)
+	SPos v_A; v_A.SET_AS_DELTA(Phantom_A2.Position, Phantom_A1.Position);
+	v_A /= deltaTime;
+
+	// 2. Начальное направление связи от А1 к С1
+	SPos u1;
+	u1.SET_AS_DELTA(data_C1.Position, Phantom_A1.Position);
+	u1.NORMALIZE();
+
+	// 3. Расчет начального ускорения C1_Position с учетом связи
+	SPos relative_v1; relative_v1.SET_AS_DELTA(data_C1.Velocity, v_A);
+	double lambda1 = -relative_v1.LENPWR2() - u1.DOT(data_C1.Accel_2_3D);
+	SPos a_C1 = u1;
+	a_C1 *= lambda1; 
+	a_C1+= data_C1.Accel_2_3D;
+
+	// 4. Интегрирование Тейлора для нахождения нового положения и скорости в момент deltaTime
+	SPos tmp;
+	tmp = a_C1; a_C1 *= deltaTime;
+	data_C2_Out.Velocity.SET_AS_SUMM(data_C1.Velocity, tmp);
+
+	data_C2_Out.Position = data_C1.Velocity;
+	data_C2_Out.Position *= deltaTime;
+	tmp *= (0.5 * deltaTime);
+	data_C2_Out.Position += tmp;
+	data_C2_Out.Position += data_C1.Position;
+
+	// 5. Коррекция направления связи в конечной точке и расчет конечного ускорения
+	SPos u2;
+	u2.SET_AS_DELTA(data_C2_Out.Position, Phantom_A2.Position);
+	u2.NORMALIZE();
+	SPos relative_v2; relative_v2.SET_AS_DELTA(data_C2_Out.Velocity, v_A);
+	double lambda2 = -relative_v2.LENPWR2() - u2.DOT(data_C1.Accel_2_3D);
+	data_C2_Out.Accel_2_3D = u2;
+	data_C2_Out.Accel_2_3D *= lambda2;
+	data_C2_Out.Accel_2_3D += data_C1.Accel_2_3D;
+}
+
+void compute_1_Master_LinearMovement(const SData& Phantom_A, const SData& data_Src, SPos& Out_Position, SPos& Out_Velocity, double deltaTime)
+{//!!!!!есть данные фантома в будущем. есть возможность посчитать более точно
+	SPos deltaPosition;
+	deltaPosition.SET_AS_DELTA(Phantom_A.Position, data_Src.Position);
+
+	Out_Velocity = deltaPosition;
+	Out_Velocity *= deltaPosition.DOT(Phantom_A.Velocity_Linear);
+
+	Out_Position = Out_Velocity; 
+	Out_Position *= deltaTime;
+}
+
+
+//переместить заданную точку в пространстве на ближайшую точку, которая равноудалена от точек Point_A и Point_B
+void MoveToClosestEequiDistantPoint(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move)
+{
+	SPos Delta_BA; Delta_BA.SET_AS_DELTA(Point_B, Point_A);
+	double L2 = Delta_BA.LENPWR2();
+
+	if (L2 > 1e-14)
+	{
+		SPos Point_Middle_AB;  Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+		Point_Middle_AB -= Point_To_Move;
+		Delta_BA *= Point_Middle_AB.DOT(Delta_BA) / L2;
+		Point_To_Move += Delta_BA;
+	}
+}
+
+//переместить заданную точку в пространстве на ближайшую точку, которая равноудалена от точек Point_A и Point_B на расстояние EequiDistant
+void MoveToClosestEequiDistantPoint(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move, double EequiDistant)
+{
+	SPos Point_Middle_AB;  
+	Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+
+	SPos Delta_BA; Delta_BA.SET_AS_DELTA(Point_B, Point_A);
+	double L2 = Delta_BA.LENPWR2();
+
+	if (L2 > 1e-14) 
+	{
+		SPos PTF_To_MAB = Point_Middle_AB; 
+		PTF_To_MAB -= Point_To_Move;
+		Delta_BA *= PTF_To_MAB.DOT(Delta_BA) / L2;
+		Point_To_Move += Delta_BA;
+		Point_To_Move -= Point_Middle_AB;
+		Point_To_Move.SET_LENGHT(sqrt(EequiDistant * EequiDistant - L2 * 0.25));
+		Point_To_Move += Point_Middle_AB;
+	}
+	else
+	{
+		Point_To_Move -= Point_Middle_AB;
+		Point_To_Move.SET_LENGHT(EequiDistant);
+		Point_To_Move += Point_Middle_AB;
+	}
+}
+
+//переместить заданную точку в пространстве на ближайшую точку, которая равноудалена от точек Point_A и Point_B на расстояние 1
+void MoveToClosestEequiDistantPoint_R1(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move)
+{
+	SPos Point_Middle_AB;
+	Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+
+	SPos Delta_BA; Delta_BA.SET_AS_DELTA(Point_B, Point_A);
+	double L2 = Delta_BA.LENPWR2();
+
+	if (L2 > 1e-14)
+	{
+		SPos PTF_To_MAB = Point_Middle_AB;
+		PTF_To_MAB -= Point_To_Move;
+		Delta_BA *= PTF_To_MAB.DOT(Delta_BA) / L2;
+		Point_To_Move += Delta_BA;
+		Point_To_Move -= Point_Middle_AB;
+		Point_To_Move.SET_LENGHT(sqrt(1.0 - L2 * 0.25));
+		Point_To_Move += Point_Middle_AB;
+	}
+	else
+	{
+		Point_To_Move -= Point_Middle_AB;
+		Point_To_Move.SET_LENGHT_TO_1();
+		Point_To_Move += Point_Middle_AB;
+	}
+}
+
+void MoveToClosestEequiDistantPoint_R1_FAST(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move)
+{	//3 +*-+*- *+*- +* * + 1 // sqrt  
+
+	SPos Point_Middle_AB; //центр координат 0 0 0
+	Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+	SPos PlaneNormal;
+	PlaneNormal.SET_AS_DELTA(Point_A, Point_Middle_AB);
+	double PlaneNormalLenPwr2 = PlaneNormal.LENPWR2();
+
+	if (PlaneNormalLenPwr2 > 1e-14)
+	{
+		 SPos pojPoint;
+		 pojPoint.SET_AS_DELTA(Point_To_Move, Point_Middle_AB);//приведение к координатам 0 0 0 == Point_Middle_AB
+		 pojPoint.SET_AS_PROJECTION_ONTO_PLANE(PlaneNormal, PlaneNormalLenPwr2);
+		 pojPoint.SET_LENGHT(sqrt(1.0 - PlaneNormalLenPwr2));
+		 Point_To_Move.SET_AS_SUMM(pojPoint, Point_Middle_AB);
+	}
+	else
+	{
+		Point_To_Move -= Point_Middle_AB;
+		Point_To_Move.SET_LENGHT_TO_1();
+		Point_To_Move += Point_Middle_AB;
+	}
+}
+//вычислить перемещение точки в пространстве на ближайшую точку, которая равноудалена от точек Point_A и Point_B на расстояние 1
+void GetMoveToClosestEequiDistantPoint_R1_FAST(const SPos& Point_A, const SPos& Point_B, const SPos& Point_To_Move, SPos& Movement)
+{	//3 +*-+*- *+*- +* * + 1 // sqrt  
+
+	SPos Point_Middle_AB; //центр координат 0 0 0
+	Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+	SPos PlaneNormal;
+	PlaneNormal.SET_AS_DELTA(Point_A, Point_Middle_AB);
+	double PlaneNormalLenPwr2 = PlaneNormal.LENPWR2();
+
+	if (PlaneNormalLenPwr2 > 1e-14)
+	{
+		SPos MovementStart00;
+		MovementStart00.SET_AS_DELTA(Point_To_Move, Point_Middle_AB);//приведение к координатам 0 0 0 == Point_Middle_AB
+		Movement = MovementStart00;
+		Movement.SET_AS_PROJECTION_ONTO_PLANE(PlaneNormal, PlaneNormalLenPwr2);
+		Movement.SET_LENGHT(sqrt(1.0 - PlaneNormalLenPwr2));
+		Movement -= MovementStart00;
+	}
+	else
+	{
+		Movement.SET_AS_DELTA(Point_B, Point_A);
+	}
+}
+
+//переместить заданную точку в пространстве на расстояние EequiDistant от точки Point_A
+void MoveToDistantPoint(const SPos& Point_A, SPos& Point_To_Move, double EequiDistant)
+{
+	Point_To_Move -= Point_A;
+	Point_To_Move.SET_LENGHT(EequiDistant);
+	Point_To_Move += Point_A;
+}
+
+//переместить заданную точку в пространстве на расстояние 1 от точки Point_A
+void MoveToDistantPoint_R1(const SPos& Point_A, SPos& Point_To_Move)
+{
+	Point_To_Move -= Point_A;
+	Point_To_Move.SET_LENGHT_TO_1();
+	Point_To_Move += Point_A;
+}
+
+
+
+
+
+
+
+/*
+две точки A и B произвольно и равномерно движутся в пространстве. В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B. A и B влияют только на C. Рассчитать положение и скорость C в момент T1, если A вырабатывает значительное ускорение модулем  W, которое стремится вернуть C на расстояние R от точки A, а B вырабатывает ускорение модулем W, которое стремится сместить C с расстояния R от точки B. Перемещение C минимизировано. Скорость не может по модулю превышать 1. W стремится к бесконечности
+
+ult compute_C_minimal_motion_with_cap(
+	const SPos& rA, const SPos& rB, const SPos& rC,
+	const SPos& vA, const SPos& vB,
+	double R, double dt
+) {
+	const double eps = 1e-12;
+
+	SPos distanceTo_A = rC - rA;
+	SPos distanceTo_B = rC - rB;
+
+	double R2 = R*R;
+	double M = dot(distanceTo_A, distanceTo_B);
+	double D = R2*R2 - M*M;
+
+	if (D < eps) {
+		// Вырожденный случай: distanceTo_A и distanceTo_B почти параллельны
+		return {{0,0,0}, rC, false};
+	}
+
+	double pA = dot(distanceTo_A, vA);
+	double pB = dot(distanceTo_B, vB);
+
+	double lambda = (pA*R2 - pB*M) / D;
+	double mu     = (pB*R2 - pA*M) / D;
+
+	SPos vC = lambda * distanceTo_A + mu * distanceTo_B;
+
+	// Ограничение на модуль скорости: |vC| <= 1
+	double vLen = norm(vC);
+	if (vLen > 1.0) {
+		vC = (1.0 / vLen) * vC;  // нормируем
+	}
+
+	SPos rC1 = rC + dt * vC;
+
+	return {vC, rC1, true};
+}
+*/
+
+/*
+две точки A и B произвольно и равномерно движутся в пространстве. В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B. A и B влияют только на C. Рассчитать положение и скорость C в момент T1, если A и B вырабатывает значительное ускорение модулем  W,  которое стремится сместить C с расстояния R от точки A и B соответственно. Перемещение C минимизировано. Скорость не может по модулю превышать 1. W стремится к бесконечности
+
+#include <array>
+#include <cmath>
+
+using SPos = std::array<double,3>;
+
+SPos operator+(const SPos& a, const SPos& b) {
+	return {a[0]+b[0], a[1]+b[1], a[2]+b[2]};
+}
+SPos operator-(const SPos& a, const SPos& b) {
+	return {a[0]-b[0], a[1]-b[1], a[2]-b[2]};
+}
+SPos operator*(double s, const SPos& v) {
+	return {s*v[0], s*v[1], s*v[2]};
+}
+double dot(const SPos& a, const SPos& b) {
+	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+double LENPWR2(const SPos& v) { return dot(v,v); }
+double LEN(const SPos& v) { return std::sqrt(LENPWR2(v)); }
+
+struct Result {
+	SPos vC;
+	SPos rC1;
+	bool valid;
+};
+
+Result compute_C_motion_ideal_with_speed_cap(
+	const SPos& rA, const SPos& rB, const SPos& rC,
+	const SPos& vA, const SPos& vB,
+	double R, double dt
+) {
+	const double eps = 1e-12;
+
+	SPos distanceTo_A = rC - rA;
+	SPos distanceTo_B = rC - rB;
+
+	double R2 = R*R;
+	double M = dot(distanceTo_A, distanceTo_B);
+	double D = R2*R2 - M*M;
+
+	if (D < eps) {
+		// Вырожденный случай: distanceTo_A и distanceTo_B почти параллельны
+		return {{0,0,0}, rC, false};
+	}
+
+	double pA = dot(distanceTo_A, vA);
+	double pB = dot(distanceTo_B, vB);
+
+	double lambda = (pA*R2 - pB*M) / D;
+	double mu     = (pB*R2 - pA*M) / D;
+
+	SPos vC = lambda * distanceTo_A + mu * distanceTo_B;
+
+	// Ограничение на модуль скорости: |vC| <= 1
+	double vLen = LEN(vC);
+	if (vLen > 1.0) {
+		vC = (1.0 / vLen) * vC;  // нормируем
+	}
+
+	SPos rC1 = rC + dt * vC;
+
+	return {vC, rC1, true};
+}
+
+
+*/
+
+
+/*
+две точки A и B произвольно и равномерно движутся в пространстве. В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B. A и B влияют только на C. Рассчитать положение и скорость C в момент T1, если A и B вырабатывает значительное ускорение модулем  W,  которое стремится вернуть C на расстояние R от точки A и B соответственно. Перемещение C минимизировано. Скорость не может по модулю превышать 1. W стремится к бесконечности
+
+#include <array>
+#include <cmath>
+
+using SPos = std::array<double,3>;
+
+SPos operator+(const SPos& a, const SPos& b) {
+	return {a[0]+b[0], a[1]+b[1], a[2]+b[2]};
+}
+SPos operator-(const SPos& a, const SPos& b) {
+	return {a[0]-b[0], a[1]-b[1], a[2]-b[2]};
+}
+SPos operator*(double s, const SPos& v) {
+	return {s*v[0], s*v[1], s*v[2]};
+}
+double dot(const SPos& a, const SPos& b) {
+	return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+double LENPWR2(const SPos& v) { return dot(v,v); }
+double LEN(const SPos& v) { return std::sqrt(LENPWR2(v)); }
+
+struct Result {
+	SPos vC;
+	SPos rC1;
+	bool valid;
+};
+
+// Режим 1: минимизация скорости с жёстким ограничением |vC|<=1
+Result compute_C_motion_speed_cap(
+	const SPos& rA, const SPos& rB, const SPos& rC,
+	const SPos& vA, const SPos& vB,
+	double R, double dt
+) {
+	const double eps = 1e-12;
+
+	SPos distanceTo_A = rC - rA;
+	SPos distanceTo_B = rC - rB;
+
+	double R2 = R*R;
+	double M = dot(distanceTo_A, distanceTo_B);
+	double D = R2*R2 - M*M;
+
+	if (D < eps) {
+		return {{0,0,0}, rC, false}; // вырожденный случай
+	}
+
+	double pA = dot(distanceTo_A, vA);
+	double pB = dot(distanceTo_B, vB);
+
+	double lambda = (pA*R2 - pB*M) / D;
+	double mu     = (pB*R2 - pA*M) / D;
+
+	SPos vC = lambda * distanceTo_A + mu * distanceTo_B;
+
+	// Ограничение на модуль скорости: |vC| <= 1
+	double vLen = LEN(vC);
+	if (vLen > 1.0) {
+		vC = (1.0 / vLen) * vC; // нормируем
+	}
+
+	SPos rC1 = rC + dt * vC;
+
+	return {vC, rC1, true};
+}
+
+// Вспомогательная функция: проекция точки C на пересечение двух сфер |X-A|=R, |X-B|=R
+// (возвращает ближайшую точку на окружности пересечения)
+bool project_C_onto_spheres(
+	SPos& rC,
+	const SPos& rA, const SPos& rB,
+	double R
+) {
+	const double eps = 1e-9;
+	SPos AB = rB - rA;
+	double AB2 = dot(AB, AB);
+	if (AB2 < eps) return false; // A и B совпали — вырождение
+
+	double d = std::sqrt(AB2);
+	// Геометрия: пересечение двух сфер — окружность в плоскости, перпендикулярной AB
+	// Середина отрезка AB:
+	SPos mid = {0.5*(rA[0]+rB[0]), 0.5*(rA[1]+rB[1]), 0.5*(rA[2]+rB[2])};
+	// Расстояние от середины до плоскости окружности:
+	double h = (R*R - AB2/4.0);
+	if (h < 0) return false; // сферы не пересекаются
+	h = std::sqrt(h);
+
+	// Вектор от середины к центру окружности (вдоль AB):
+	SPos nAB = AB;
+	nAB = (1.0/d) * nAB; // единичный
+
+	// Проекция текущего C на плоскость серединного перпендикуляра:
+	SPos C_to_mid = rC - mid;
+	double proj_along_AB = dot(C_to_mid, nAB);
+	SPos in_plane = C_to_mid - proj_along_AB * nAB;
+
+	// Нормализуем в плоскости до радиуса h (если нужно)
+	double r2 = LENPWR2(in_plane);
+	if (r2 < eps) {
+		// C почти на оси AB — выбираем произвольное направление в плоскости
+		// например, поворот nAB вокруг оси X или Y
+		SPos axis = {1,0,0};
+		if (std::abs(dot(nAB, axis)) > 0.9) axis = {0,1,0};
+		in_plane = nAB;
+		in_plane[0] += axis[0]; in_plane[1] += axis[1]; in_plane[2] += axis[2];
+		in_plane = in_plane * (h / LEN(in_plane));
+	} else {
+		in_plane = (h / std::sqrt(r2)) * in_plane;
+	}
+
+	rC = mid + in_plane;
+	return true;
+}
+
+// Режим 2: приоритет расстояний — сначала без ограничения скорости, затем проекция
+Result compute_C_motion_distance_priority(
+	const SPos& rA, const SPos& rB, const SPos& rC_raw,
+	const SPos& vA, const SPos& vB,
+	double R, double dt
+) {
+	const double eps = 1e-12;
+
+	// Сначала считаем идеальную минимальную скорость без ограничения |v|<=1
+	SPos distanceTo_A = rC_raw - rA;
+	SPos distanceTo_B = rC_raw - rB;
+
+	double R2 = R*R;
+	double M = dot(distanceTo_A, distanceTo_B);
+	double D = R2*R2 - M*M;
+
+	if (D < eps) {
+		return {{0,0,0}, rC_raw, false};
+	}
+
+	double pA = dot(distanceTo_A, vA);
+	double pB = dot(distanceTo_B, vB);
+
+	double lambda = (pA*R2 - pB*M) / D;
+	double mu     = (pB*R2 - pA*M) / D;
+
+	SPos vC = lambda * distanceTo_A + mu * distanceTo_B;
+
+	// Шаг по времени
+	SPos rC1_raw = rC_raw + dt * vC;
+
+	// Теперь проецируем rC1_raw обратно на пересечение сфер (окружность)
+	SPos rC1 = rC1_raw;
+	bool ok = project_C_onto_spheres(rC1, rA + dt*vA, rB + dt*vB, R);
+
+	if (!ok) {
+		// Если проекция не удалась (сферы не пересекаются), возвращаем шаг без проекции
+		rC1 = rC1_raw;
+	}
+
+	// Скорость можно переопределить как (rC1 - rC_raw)/dt, если нужно
+	return {vC, rC1, true};
+}
+
+
+*/
+
+
+
+
+
+
+/*
+
+SPos cross(const SPos& a, const SPos& b) {
+	return { a.y * b.z - a.z * b.y,
+			a.z * b.x - a.x * b.z,
+			a.x * b.y - a.y * b.x };
+}
+
+double dot(const SPos& a, const SPos& b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+// Перемещение при движении по дуге с |v|=1
+SPos displacement_arc(const SPos& vi, const SPos& vf, double dt) {
+	const double eps = 1e-12;
+	double c = dot(vi, vf);
+	// Ограничиваем cos(theta) в [-1,1] из-за ошибок округления
+	if (c > 1.0) c = 1.0;
+	if (c < -1.0) c = -1.0;
+
+	double theta = std::acos(c);
+
+	// Почти параллельные векторы: движение почти прямолинейное
+	if (theta < eps) {
+		return vi * dt;
+	}
+
+	SPos n = cross(vi, vf);
+	double n_len = std::sqrt(dot(n, n));
+	if (n_len < eps) {
+		// Векторы коллинеарны и одинаково направлены (theta ~ 0 уже обработано)
+		// или противоположно направлены: тогда theta = pi, но n=0.
+		// Если theta ~ pi, то поворот на 180° вокруг любой оси в плоскости работает.
+		// Для простоты в этом редком случае вернём линейную аппроксимацию.
+		return (vi + vf) * (0.5 * dt);
+	}
+	n = n * (1.0 / n_len);
+
+	// Формула перемещения по дуге
+	double A = (dt / theta) * std::sin(theta);
+	double B = (dt / theta) * (1.0 - c);
+
+	return vi * A + cross(n, vi) * B;
+}
+
+SPos displacement_three_points_arc(const SPos& v0, const SPos& v1, const SPos& v2,
+	double t0, double t1, double t2) {
+	double dt1 = t1 - t0;
+	double dt2 = t2 - t1;
+	return displacement_arc(v0, v1, dt1) + displacement_arc(v1, v2, dt2);
+}
+
+*/
+
+
+
+
+
+/*
+
+
+
+
+
+#include <cmath>
+#include <limits>
+
+struct vec3 {
+	double x, y, z;
+	vec3 operator+(const vec3& b) const { return { x + b.x, y + b.y, z + b.z }; }
+	vec3 operator-(const vec3& b) const { return { x - b.x, y - b.y, z - b.z }; }
+	vec3 operator*(double s) const { return { x * s, y * s, z * s }; }
+};
+
+double dot(const vec3& a, const vec3& b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+vec3 cross(const vec3& a, const vec3& b) {
+	return { a.y * b.z - a.z * b.y,
+			a.z * b.x - a.x * b.z,
+			a.x * b.y - a.y * b.x };
+}
+
+double norm_sq(const vec3& v) {
+	return dot(v, v);
+}
+
+// Перемещение за время dt при движении по дуге с |v|=1, от vi к vf
+vec3 displacement_arc_step(const vec3& vi, const vec3& vf, double dt) {
+	const double eps = 1e-14;
+	const double max_acos = 1.0 - std::numeric_limits<double>::epsilon();
+	const double min_acos = -1.0 + std::numeric_limits<double>::epsilon();
+
+	double c = dot(vi, vf);
+	if (c > max_acos) c = max_acos;
+	if (c < min_acos) c = min_acos;
+
+	double theta = std::acos(c);
+
+	// Почти параллельные векторы: движение почти прямолинейное
+	if (theta < eps) {
+		return vi * dt;
+	}
+
+	vec3 n = cross(vi, vf);
+	double n_len_sq = norm_sq(n);
+	if (n_len_sq < eps) {
+		// Коллинеарные векторы: если угол ~0 — уже обработано, если ~pi —
+		// поворот на 180° вокруг любой оси в плоскости даст тот же результат.
+		// Для простоты вернём среднюю скорость.
+		return (vi + vf) * (0.5 * dt);
+	}
+	double n_len = std::sqrt(n_len_sq);
+	n = n * (1.0 / n_len);
+
+	// Формула для перемещения по дуге
+	double factor = dt / theta;
+	double A = factor * std::sin(theta);
+	double B = factor * (1.0 - c);
+
+	return vi * A + cross(n, vi) * B;
+}
+
+// Полное перемещение от T0 до T2 при равных интервалах
+vec3 displacement_three_points_equal_dt(const vec3& v0, const vec3& v1, const vec3& v2, double dt) {
+	vec3 dr1 = displacement_arc_step(v0, v1, dt);
+	vec3 dr2 = displacement_arc_step(v1, v2, dt);
+	return dr1 + dr2;
+}
+*/
+
+
+int PrepareParams___(const char* src_Params, char* dst_Params, int maxLen)
+{
+	const char* pCur = src_Params;
+	char* pDst = dst_Params;
+	int OutLen = 0;
+	int nChanges = 0;
+
+	while (*pCur)
+	{
+		while (*pCur && *pCur != 'P' && OutLen < maxLen)
+		{
+			OutLen++;
+			*(pDst++) = *(pCur++);
+		}
+
+		if (*pCur == 'P' && strncmp(pCur, "PRESET_", 7) == 0)
+		{
+			const char* pCurTpm = pCur;
+			int PresetNameLen = 0;
+			while (*pCurTpm && *pCurTpm != ' ' && *pCurTpm != '=')
+				{pCurTpm++; PresetNameLen++;}
+
+			while (*pCurTpm == ' ') 
+				pCurTpm++;
+
+			if (*pCurTpm && *pCurTpm != '=')
+			{
+				//вставка предустановки
+				char nameToFind[100];
+				strncpy_s(nameToFind, PresetNameLen, pCur, PresetNameLen);
+				nameToFind[PresetNameLen] = 0;
+
+				const char* pCurFind = src_Params;
+
+				while (pCurFind && (pCurFind = strstr(pCurFind, nameToFind)))
+				{
+					pCurFind += PresetNameLen;
+					while (*pCurFind == ' ') pCurFind++;
+					if (*pCurFind == '=')
+					{
+						pCurFind++;
+						while (*pCurFind && *pCurFind != '\r' && *pCurFind != '\n' && OutLen < maxLen)
+						{
+							*(pDst++) = *(pCurFind++);
+							OutLen++;
+						}
+
+						pCurFind = nullptr;
+						pCur += (PresetNameLen - 1);
+					}
+				}
+
+				nChanges++;
+				pCur++;
+			}
+			else
+			{
+				*(pDst++) = *(pCur++);
+				OutLen++;
+			}
+		}
+		else
+		{
+			*(pDst++) = *(pCur++);
+			OutLen++;
+		}
+
+
+	}
+	*pDst = 0;
+
+	if (nChanges > 0)
+	{
+		char* tmpSrc = new char[maxLen];
+		strcpy_s(tmpSrc, maxLen, dst_Params);
+		OutLen = PrepareParams___(tmpSrc, dst_Params, maxLen);
+		delete[] tmpSrc;
+	}
+
+	return OutLen;
+}
+
+char *PrepareParamsRecursive(NamedStringArray& Presets, const char* src_Params, char* dst_Params, int maxLen)
+{
+	int OutLen = 0;
+	char* pDst = dst_Params;
+
+	if (dst_Params == nullptr)
+		OutLen = -1;
+	else if (src_Params == nullptr)
+		*dst_Params = 0;
+	else
+	if (Presets.Count() < 1)
+		OutLen = strcpy_s(dst_Params, maxLen, src_Params);
+	else
+	{
+		const char* pCur = src_Params;
+
+		while (*pCur)
+		{
+			while (*pCur && *pCur != 'P' && OutLen < maxLen)
+			{
+				OutLen++;
+				*(pDst++) = *(pCur++);
+			}
+
+			if (*pCur == 'P' && strncmp(pCur, "PRESET_", 7) == 0)
+			{
+				const char* pCurTpm = pCur;
+				int PresetNameLen = 0;
+				while (*pCurTpm && *pCurTpm != ';' && *pCurTpm != '=' && (*pCurTpm > ' ' || *pCurTpm < 0))
+				{
+					pCurTpm++; PresetNameLen++;
+				}
+
+				while (*pCurTpm == ' ' || *pCurTpm == '\t')
+					pCurTpm++;
+
+				if (*pCurTpm == '=')
+				{
+					while (*pCur && *pCur != '\r' && *pCur != '\n')
+						pCur++;
+
+					while (*pCur == '\r' || *pCur == '\n')
+						pCur++;
+				}
+				else
+				{
+					//вставка предустановки
+					char nameToFind[100];
+					strncpy_s(nameToFind, 100, pCur, PresetNameLen);
+					nameToFind[PresetNameLen] = 0;
+
+					const char* PresetValue = Presets.GetString(nameToFind);
+					if (PresetValue == nullptr)
+					{
+						*(pDst++) = *(pCur++);
+						OutLen++;
+					}
+					else
+					{
+						pDst = PrepareParamsRecursive(Presets, PresetValue, pDst, maxLen - OutLen);
+						OutLen = (int)(pDst - dst_Params);
+						pCur += PresetNameLen;
+					}
+				}
+			}
+			else if (*pCur)
+			{
+				*(pDst++) = *(pCur++);
+				OutLen++;
+			}
+
+
+		}
+		*pDst = 0;
+	}
+	return pDst;
+}
+
+
+int PrepareParams(const char* src_Params, char* dst_Params, int maxLen)
+{
+	char* dst_ParamsRes = dst_Params;
+	if (src_Params && dst_Params)
+	{
+		NamedStringArray Presets(src_Params, "PRESET_", '=');
+		dst_ParamsRes = PrepareParamsRecursive(Presets, src_Params, dst_Params, maxLen);
+	}
+	return (int)(dst_ParamsRes - dst_Params);
+}

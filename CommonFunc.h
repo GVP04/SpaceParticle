@@ -10,6 +10,7 @@ private:
     int CurLoop;
     int Base;
     int AlighmentRes1;
+    int assert_CurStep;
 
 public:
 
@@ -32,8 +33,17 @@ public:
     {
         StepsInLoop = 1 + Base;
         LoopsCount = 1 + Base;
+        assert_CurStep = -1;
         InitLoop();
     }
+
+    int AssertCurStep()
+    {
+        ASSERT(assert_CurStep != CurStep);
+        return assert_CurStep;
+    }
+
+    void SetAssertStep(int in_assert_CurStep) { assert_CurStep = in_assert_CurStep; }
 
     int GetCurStep() { return CurStep; }
     int GetCurLoop() { return CurLoop; }
@@ -79,7 +89,7 @@ BOOL GPCopyDir(const wchar_t* sDir, const wchar_t* dDir);
 BOOL GPDeleteDir(const wchar_t* iDir);
 
 
-void SaveBitmap(char* in_FileName, HDC in_hdc, HBITMAP in_hBMP);
+int SaveBitmap(const char* in_FileName, HDC in_hdc, HBITMAP in_hBMP);
 
 char * GetDblStr(char *oStr, char *oStr2, BYTE *Arr, UINT Len);
 char * GetDecStr(char *oStr, BYTE *Arr,   UINT Len);
@@ -434,6 +444,19 @@ struct TwoDoubleRoots
     DoubleBitsUnion root1;
     DoubleBitsUnion root2;
     static double GetNaN() { return (double)0x7FF8000000000000ULL; }
+
+    void SET(double r1, double r2) { root1.Dbl = r1; root2.Dbl = r2;}
+    inline int GetExpDelta() const
+    {
+        return (int) ((((root1.Bits & 0x7FF0000000000000) << 1) - ((root2.Bits & 0x7FF0000000000000) << 1)) >> 53);
+    }
+
+    inline bool IsRoot1Positive() const { return (root1.Bits & 0x8000000000000000) == 0; }
+    inline bool IsRoot2Positive() const { return (root2.Bits & 0x8000000000000000) == 0; }
+    inline bool IsRoot1Negative() const { return (root1.Bits & 0x8000000000000000) != 0; }
+    inline bool IsRoot2Negative() const { return (root2.Bits & 0x8000000000000000) != 0; }
+    inline double GetPositive() const { return (root1.Bits & 0x8000000000000000) == 0 ? root1.Dbl : root2.Dbl; }
+
 };
 
 struct TwoComplexRoots
@@ -447,9 +470,12 @@ union QuadraticRoots {
     TwoComplexRoots ComplexRoot;
 };
 
+
+
 struct SPos;
 struct SData;
 
+double GetIntersectionRadiusOfTwoSpheresPwr2(const SPos& Sph1_Center, double Sph1_Radius, const SPos& Sph2_Center, double Sph2_Radius);
 double GetProjectionPointOnLine(SPos& retPoint, const SPos& PointOnLine, const SPos LineDirection, const SPos& PointToProjection);
 double GetLinearViewTime(const SData& BaseParticle, const SData& ViewParticle);
 TwoDoubleRoots QuadraticEequationSolution(double A, double B, double C);
@@ -459,4 +485,245 @@ void LimitedItgrl_rk4(SPos& result, SPos& resultOfFirst, SPos& FirstDerivative, 
 void LimitedItgrl_rk4(SPos& result, SPos& resultOfFirst, SPos& resultOfSecond, SPos& FirstDerivative, SPos& SecondDerivative, SPos& ThirdDerivative, double LimitValue, double dt, double* Theta);
 
 
+double SpeedByPhantomProjection(const SData& Phantom, const SPos& Particle, const SPos& ParticleDirection, SPos* ResVelocity);
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии от A и B.Рассчитать положение и скорость C в момент T1, если расстояние от C до A и B не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+int compute_2NP_master_LinearMove_R1(const SData& Phantom_Acur, const SData& Phantom_Bcur, const SData& Phantom_Anext, const SData& Phantom_Bnext, const SData& DataCur, SData& data_Out, double deltaTime);
+//две точки A и B произвольно и с произвольным постоянным ускорением движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии от A и B.Рассчитать положение и скорость C в момент T1, если расстояние от C до A и B не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+int compute_2NP_master_AccMove(const SData& Phantom_A, const SData& Phantom_B, SData& data_Out, double deltaTime);
+int compute_2NP_master_AccMove_R1(const SData& Phantom_A, const SData& Phantom_B, SData& data_Out, double deltaTime);
 
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B.A и B влияют только на C.Рассчитать положение и скорость C в момент T1, если A вырабатывает значительное ускорение модулем  W, которое стремится вернуть C на расстояние R от точки A, а B вырабатывает ускорение модулем W, которое стремится сместить C с расстояния R от точки B.Перемещение C минимизировано.Скорость не может по модулю превышать 1. W стремится к бесконечности
+int compute_NPAP_master_LinearMove(const SData& Phantom_NP, const SData& Phantom_NP_next, const SData& Phantom_AP, const SData& data_Cur, SData& data_Out, double deltaTime);
+
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B.A и B влияют только на C.Рассчитать положение и скорость C в момент T1, если A и B вырабатывают значительное ускорение модулем  W, которое стремится сместить C с расстояния R от точки B.Перемещение C минимизировано.Скорость не может по модулю превышать 1. W стремится к бесконечности
+int compute_2AP_master_Motion(const SData& Phantom_A, const SData& Phantom_B, const SData& DataCur, SData& data_Out, double deltaTime);
+
+
+
+//точка A произвольно и равноускоренно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии R от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_master_AccMove(const SData& Phantom_A, SData& data_Out, double deltaTime);
+//точка A произвольно и равноускоренно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии 1 от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_master_AccMoveR1(const SData& Phantom_A, SData& data_Out, double deltaTime);
+//точка A произвольно и равномерно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии R от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_Master_LinearMove(const SData& Phantom_A, SData& data_Out, double deltaTime);
+//точка A произвольно и равномерно движется в пространстве.В некоторый момент T0 точка C находится на расстоянии 1 от A.Рассчитать положение, ускорение и скорость C в момент T1, если расстояние от C до A не изменилось, а Т1 - Т0 мало и перемещение C минимизировано
+void compute_1_Master_LinearMovement(const SData& Phantom_A, const SData& data_Src, SPos& Out_Position, SPos& Out_Velocity, double deltaTime);
+void compute_1_Master_LinearMoveR1_Fine(const SData& Phantom_A, SData& data_Out, double deltaTime);
+//переместить заданную точку в пространстве на ближайшую точку, которая равноудалена от точек Point_A и Point_B
+void MoveToClosestEequiDistantPoint(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move);
+//переместить заданную точку в пространстве на ближайшую точку, которая равноудалена от точек Point_A и Point_B на расстояние EequiDistant
+void MoveToClosestEequiDistantPoint(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move, double EequiDistant);
+//переместить заданную точку в пространстве на ближайшую точку, которая равноудалена от точек Point_A и Point_B на расстояние 1
+void MoveToClosestEequiDistantPoint_R1(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move);
+void MoveToClosestEequiDistantPoint_R1_FAST(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move);
+void GetMoveToClosestEequiDistantPoint_R1_FAST(const SPos& Point_A, const SPos& Point_B, const SPos& Point_To_Move, SPos& Movement);
+//переместить заданную точку в пространстве на расстояние EequiDistant от точки Point_A
+void MoveToDistantPoint(const SPos& Point_A, SPos& Point_To_Move, double EequiDistant);
+//переместить заданную точку в пространстве на расстояние 1 от точки Point_A
+void MoveToDistantPoint_R1(const SPos& Point_A, const SPos& Point_B, SPos& Point_To_Move);
+
+
+
+
+//две точки A и B произвольно и равномерно движутся в пространстве. В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B. A и B влияют только на C. Рассчитать положение и скорость C в момент T1, если A вырабатывает ускорение W, которое стремится вернуть C на расстояние R от точки A, а B вырабатывает ускорение W, которое стремится сместить C с расстояния R от точки B. Перемещение C минимизировано. Скорость не может по модулю превышать 1. W стремится к бесконечности
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B.A и B влияют только на C.Рассчитать положение и скорость C в момент T1, если A вырабатывает ускорение W, которое стремится вернуть C на расстояние R от точки A.B вырабатывает динамическое воздействие с ускорением W, которое противоположно результирующему вектору относительной скорости C и B.Расстояние от C до B может изменяться. Перемещение C минимизировано. Скорость не может по модулю превышать 1. W стремится к бесконечности
+//две точки A и B произвольно и равномерно движутся в пространстве.В некоторый момент T0 точка C находится на одинаковом расстоянии R от A и B.A и B влияют только на C.Рассчитать положение и скорость C в момент T1, если A вырабатывает ускорение W, которое стремится вернуть C на расстояние R от точки A.B вырабатывает динамическое воздействие с ускорением W, которое противоположно результирующему вектору относительной скорости C и B.Расстояние от C до B может изменяться.Перемещение C минимизировано.W стремится к бесконечности
+
+
+int PrepareParams(const char* src_Params, char* dst_Params, int maxLen);
+
+
+struct NSA_Link
+{
+    int KeyPosition;
+    int StringPosition;
+};
+
+
+struct NamedStringArray
+{
+private:
+    char* Pool;
+    NSA_Link* Index;
+    int count;
+    int maxCount;
+    size_t PoolLen;
+
+    void CLEAR()
+    {
+        if (Pool)
+            delete[] Pool;
+        if (Index)
+            delete[] Index;
+        
+        INIT();
+    }
+
+    void INIT()
+    {
+        Pool = nullptr;
+        Index = nullptr;
+        count = 0;
+        PoolLen = 0;
+        maxCount = 0;
+    }
+
+    void SortByName(int left, int right)
+    {
+        if (Pool && count > 0)
+        {
+            int i, j;
+            const char* x;
+
+            i = left;
+            j = right;
+            x = Pool + Index[(left + right) / 2].KeyPosition;
+
+            do
+            {
+                while (_stricmp(Pool + Index[i].KeyPosition, x) < 0 && i < right) i++;
+                while (_stricmp(x, Pool + Index[j].KeyPosition) < 0 && j > left) j--;
+
+                if (i <= j)
+                {
+                    NSA_Link tmp;
+                    tmp = Index[i];		Index[i] = Index[j];		Index[j] = tmp;
+                    i++;			j--;
+                }
+            } while (i <= j);
+            if (left < j) SortByName(left, j);
+            if (i < right) SortByName(i, right);
+        }
+    }
+
+    int GetIndexByName(const char* target)
+    {
+        int ret = -1;
+        if (Pool && count > 0)
+        {
+            int left = 0, right = count - 1;
+
+            while (ret < 0 && left <= right)
+            {
+                int mid = left + (right - left) / 2;
+                int cmp = _stricmp(Pool + Index[mid].KeyPosition, target);
+
+                if (cmp == 0) ret = mid;
+                else
+                    if (cmp < 0)
+                        left = mid + 1;
+                    else
+                        right = mid - 1;
+            }
+        }
+        return ret;
+    }
+
+
+
+public:
+    int Count() { return count; }
+    int Parse(const char* in_Pool, const char* in_Prefix, char Delimiter)
+    {
+        CLEAR();
+        if (in_Pool && *in_Pool && in_Prefix && *in_Prefix)
+        {
+            maxCount = 8;
+            Index = new NSA_Link[maxCount];
+            const char* posName = in_Pool;
+            size_t PrefixLen = strlen(in_Prefix);
+            const char* posData = posName + PrefixLen;;
+
+            while ((posName = strstr(posName, in_Prefix)))
+            {
+                posData = posName + PrefixLen;
+                while (*posData && *posData != Delimiter && *posData != '=' && (*posData > ' ' || *posData < 0)) posData++;
+                while (*posData == ' ' || *posData == '\t') posData++;
+
+                if (*posData == '=' || *posData == Delimiter)
+                {
+                    if (count == maxCount)
+                    {
+                        maxCount *= 2;
+                        NSA_Link* tmp = new NSA_Link[maxCount];
+                        CopyMemory(tmp, Index, count * sizeof(NSA_Link));
+                        delete[]Index;
+                        Index = tmp;
+                    }
+                    posData++;
+                    Index[count].KeyPosition = (int)(posName - in_Pool);
+                    Index[count].StringPosition = (int)(posData - in_Pool);
+                    count++;
+                }
+
+                posName = posData;
+            }
+
+            if (count == 0) 
+                CLEAR();
+            else
+            {
+                int delta = Index[0].KeyPosition;
+
+                while (*posData && *posData != '\n' && *posData != '\r') 
+                    posData++;
+                PoolLen = posData - in_Pool - delta + 1;
+                Pool = new char[PoolLen + 1];
+                strncpy_s(Pool, PoolLen + 1, in_Pool + delta, PoolLen);
+                for (int i = 0; i < count; i++)
+                {
+                    Index[i].KeyPosition -= delta;
+                    Index[i].StringPosition -= delta;
+
+                    char* tmp = Pool + Index[i].StringPosition - 1;
+                    while (*tmp == '=' || (*tmp <= ' ' && *tmp >= 0) || *tmp == Delimiter)
+                        *(tmp--) = 0;
+
+                    tmp = Pool + Index[i].StringPosition;
+                    while (*tmp == ' ' || *tmp == '\t')
+                    {
+                        *(tmp++) = 0;
+                        Index[i].StringPosition++;
+                    }
+
+                    while (*tmp  && *tmp != '\r' && *tmp != '\n')
+                        tmp++;
+
+                    *tmp = 0;
+                }
+
+                SortByName(0, count - 1);
+            }
+        }
+        return count;
+    }
+
+    NamedStringArray()
+    {
+        INIT();
+    }
+
+    NamedStringArray(const char * in_Pool, const char* in_Prefix, char Delimiter)
+    {
+        INIT();
+        if (in_Pool && *in_Pool && in_Prefix && *in_Prefix)
+            Parse(in_Pool, in_Prefix, Delimiter);
+    }
+
+    ~NamedStringArray()
+    {
+        CLEAR();
+    }
+
+    const char* GetString(const char* Name)
+    {
+        const char* ret = nullptr;// = "";
+        int idx = GetIndexByName(Name);
+
+        if (idx >= 0)
+            ret = Pool + Index[idx].StringPosition;
+
+        return ret;
+    }
+
+};

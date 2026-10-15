@@ -14,6 +14,8 @@ public:
 
 	void SetMltplSliderPos();
 
+	int SaveImage(const char* in_FileName);
+
 
 	double CDrawDlg::SetViewPrc(double in_Prc);
 	double CDrawDlg::SetViewSpread(double in_Spread);
@@ -62,4 +64,5 @@ public:
 	afx_msg void OnBnClickedButtonXyz();
 	afx_msg void OnBnClickedButtoncmd();
 	afx_msg void OnBnClickedButtonGroup();
+	afx_msg void OnBnClickedButtonMse();
 };

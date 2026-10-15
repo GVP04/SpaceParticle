@@ -31,7 +31,7 @@ public:
 #endif
 
 	protected:
-	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
+//	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 
 // Implementation
 protected:
@@ -43,10 +43,10 @@ CAboutDlg::CAboutDlg() : CDialogEx(IDD_ABOUTBOX)
 {
 }
 
-void CAboutDlg::DoDataExchange(CDataExchange* pDX)
-{
-	CDialogEx::DoDataExchange(pDX);
-}
+//void CAboutDlg::DoDataExchange(CDataExchange* pDX)
+//{
+//	CDialogEx::DoDataExchange(pDX);
+//}
 
 BEGIN_MESSAGE_MAP(CAboutDlg, CDialogEx)
 	ON_WM_TIMER()
@@ -63,7 +63,10 @@ CSpaceOMDlg::CSpaceOMDlg(CWnd* pParent /*=nullptr*/)
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 
 	m_Calc_1.CalcParams = new char [SD_PARAMSLEN + 100];
-	
+	*m_Calc_1.CalcParams = 0;
+	m_Calc_1.CalcParamsDecoded = new char [SD_PARAMSLENDECODED + 100];
+	*m_Calc_1.CalcParamsDecoded = 0;
+
 	m_Calc_1.Group = new CSP_Group;
 	m_Calc_1.Group->m_pCalc = &m_Calc_1;
 	m_Calc_1.Group->m_pCalcFind = &m_CalcFind_1;
@@ -125,6 +128,9 @@ BOOL CSpaceOMDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// Set small icon
 
 	// TODO: Add extra initialization here
+
+	LoadSetting();
+	::SetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_1.CalcParams);
 
 	SetTimer(1, 1000, nullptr);
 
@@ -206,6 +212,9 @@ void CSpaceOMDlg::OnBnClicked_CalcSimple()
 	{
 		*m_Calc_1.CalcParams = 0;
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_1.CalcParams, SD_PARAMSLEN);
+		PrepareParams(m_Calc_1.CalcParams, m_Calc_1.CalcParamsDecoded, SD_PARAMSLEN);
+		SaveSettings(m_Calc_1.CalcParams, m_Calc_1.CalcParamsDecoded);
+
 		::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_CALCSIMPLE), 0);
 		::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_STOPCALC), 1);
 
@@ -242,6 +251,9 @@ void CSpaceOMDlg::DeleteAll()
 	if (m_Calc_1.CalcParams) delete[] m_Calc_1.CalcParams;
 	m_Calc_1.CalcParams = nullptr;
 
+	if (m_Calc_1.CalcParamsDecoded) delete[] m_Calc_1.CalcParamsDecoded;
+	m_Calc_1.CalcParamsDecoded = nullptr;
+
 
 	for (int i = 0; i < M_NCALCFIND; i++)
 	{
@@ -257,8 +269,13 @@ void CSpaceOMDlg::DeleteAll()
 		if (m_Calc_FIND[i].curCalc.CalcParams) delete m_Calc_FIND[i].curCalc.CalcParams;
 		m_Calc_FIND[i].curCalc.CalcParams = nullptr;
 
+		if (m_Calc_FIND[i].curCalc.CalcParamsDecoded) delete m_Calc_FIND[i].curCalc.CalcParamsDecoded;
+		m_Calc_FIND[i].curCalc.CalcParamsDecoded = nullptr;
+
 		if (m_Calc_FIND[i].FindParams) delete m_Calc_FIND[i].FindParams;
 		m_Calc_FIND[i].FindParams = nullptr;
+		if (m_Calc_FIND[i].FindParamsDecoded) delete m_Calc_FIND[i].FindParamsDecoded;
+		m_Calc_FIND[i].FindParamsDecoded = nullptr;
 	}
 }
 
@@ -276,24 +293,53 @@ void CSpaceOMDlg::OnTimer(UINT_PTR nIDEvent)
 	switch (nIDEvent)
 	{
 	case 1:
+		KillTimer(nIDEvent);
 		EnterCriticalSection(&m_Calc_1.Group->m_cs);
-
-		m_Calc_1.refresh.Cntr++;
-		if ((m_Calc_1.Group->GetCalcState() & M_STATE_CHANGED) || 
-			((m_Calc_1.Group->GetCalcState() & M_STATE_CALC) == M_STATE_CALC
-				&& !(m_Calc_1.Group->GetCalcState() & M_STATE_BREAK)
-				&& m_Calc_1.refresh.Delta > 0 && (m_Calc_1.refresh.Cntr % m_Calc_1.refresh.Delta) == 0))
+		if (m_Calc_1.Group->CheckMe())
 		{
-			m_Calc_1.Group->ClearCalcState(M_STATE_CHANGED);
-			::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_STOPCALC), (m_Calc_1.Group->GetCalcState() & M_STATE_CALC));
-			::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_CALCSIMPLE), !(m_Calc_1.Group->GetCalcState() & M_STATE_CALC));
-			*m_Calc_1.CalcParams = 0;
-			::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_1.CalcParams, SD_PARAMSLEN);
+			m_Calc_1.ShotRefresh.Cntr++;
+			m_Calc_1.refresh.Cntr++;
 
-			m_Calc_1.DlgTrace->ShowWindow(SW_SHOW);
-			m_Calc_1.DlgTrace->RedrawMe();
+			if ((m_Calc_1.Group->GetCalcState() & M_STATE_CHANGED) ||
+				((m_Calc_1.Group->GetCalcState() & M_STATE_CALC) == M_STATE_CALC
+					&& !(m_Calc_1.Group->GetCalcState() & M_STATE_BREAK)
+					&& m_Calc_1.refresh.Delta > 0 && (m_Calc_1.refresh.Cntr % m_Calc_1.refresh.Delta) == 0))
+			{
+				m_Calc_1.Group->ClearCalcState(M_STATE_CHANGED);
+				::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_STOPCALC), (m_Calc_1.Group->GetCalcState() & M_STATE_CALC));
+				::EnableWindow(::GetDlgItem(m_hWnd, IDC_BUTTON_CALCSIMPLE), !(m_Calc_1.Group->GetCalcState() & M_STATE_CALC));
+				*m_Calc_1.CalcParams = 0;
+				::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_1.CalcParams, SD_PARAMSLEN);
+				PrepareParams(m_Calc_1.CalcParams, m_Calc_1.CalcParamsDecoded, SD_PARAMSLEN);
+				m_Calc_1.Group->ReadParticleLook(m_Calc_1.Group->m_pCalc->CalcParamsDecoded, -1);
+
+				SaveSettings(m_Calc_1.CalcParams, m_Calc_1.CalcParamsDecoded);
+
+				m_Calc_1.DlgTrace->ShowWindow(SW_SHOW);
+				m_Calc_1.DlgTrace->RedrawMe();
+			}
+
+			if (((m_Calc_1.Group->GetCalcState() & M_STATE_CALC) == M_STATE_CALC
+				&& !(m_Calc_1.Group->GetCalcState() & M_STATE_BREAK)
+				&& m_Calc_1.ShotRefresh.Delta > 0 && (m_Calc_1.ShotRefresh.Cntr % m_Calc_1.ShotRefresh.Delta) == 0) && IsDlgButtonChecked(IDC_CHECKVIDEO))
+			{
+				char fileMane[500];
+
+				sprintf_s(fileMane, "BMP\\VIDEO_SRC\\VSRC_Thr%d_%I64d__PCnt0.3%d_NP%d_AP%d__%08X_%09d.bmp",
+					m_Calc_1.Group->GetThreadsCur(), GetTickCount64(),
+					m_Calc_1.Group->GetCount(), m_Calc_1.Group->GetPtrCurrent().GetCount(SP_TYPE_POSITIVE), m_Calc_1.Group->GetPtrCurrent().GetCount(SP_TYPE_NEGATIVE),
+				
+					m_Calc_1.Time.GetStartTime(), m_Calc_1.ShotRefresh.Cntr);
+
+
+
+
+				m_Calc_1.DlgTrace->SaveImage(fileMane);
+			}
 		}
 		LeaveCriticalSection(&m_Calc_1.Group->m_cs);
+		SetTimer(nIDEvent, 100, nullptr);
+
 		break;
 	default:
 		break;
@@ -301,6 +347,36 @@ void CSpaceOMDlg::OnTimer(UINT_PTR nIDEvent)
 
 	CDialogEx::OnTimer(nIDEvent);
 }
+
+void CSpaceOMDlg::LoadSetting()
+{
+	FILE* ptrFile = nullptr;
+
+	if (!fopen_s(&ptrFile, "LAST_SETTINGS.txt", "rt"))
+	{
+		*m_Calc_1.CalcParams = 0;
+		size_t nRead = fread(m_Calc_1.CalcParams, 1, SD_PARAMSLEN, ptrFile);
+		if (nRead >= 0) m_Calc_1.CalcParams[nRead] = 0;
+		fclose(ptrFile);
+	}
+}
+
+void CSpaceOMDlg::SaveSettings(const char* inStr, const char* inStrDecoded)
+{
+	FILE* ptrFile = nullptr;
+
+	if (!fopen_s(&ptrFile, "LAST_SETTINGS.txt", "wt"))
+	{
+		fputs(inStr, ptrFile);
+		fclose(ptrFile);
+	}
+	if (!fopen_s(&ptrFile, "LAST_SETTINGS_D.txt", "wt"))
+	{
+		fputs(inStrDecoded, ptrFile);
+		fclose(ptrFile);
+	}
+}
+
 
 void CSpaceOMDlg::OnBnClicked_RefreshTrace()
 {
@@ -311,7 +387,13 @@ void CSpaceOMDlg::OnBnClicked_RefreshTrace()
 		*m_Calc_1.CalcParams = 0;
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_1.CalcParams, SD_PARAMSLEN);
 
-		m_Calc_1.Group->ReadSettingsGroup(m_Calc_1.CalcParams, /*SGROUP_STEP |*/ SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
+		PrepareParams(m_Calc_1.CalcParams, m_Calc_1.CalcParamsDecoded, SD_PARAMSLEN);
+		SaveSettings(m_Calc_1.CalcParams, m_Calc_1.CalcParams);
+		m_Calc_1.Group->ReadParticleLook(m_Calc_1.Group->m_pCalc->CalcParamsDecoded, -1);
+
+
+		if (m_Calc_1.Group->GetCount() > 0)
+			m_Calc_1.Group->ReadSettingsGroup(m_Calc_1.CalcParamsDecoded, /*SGROUP_STEP |*/ SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
 
 		LeaveCriticalSection(&m_Calc_1.Group->m_cs);
 
@@ -331,8 +413,14 @@ void CSpaceOMDlg::OnBnClicked_StartFind()
 			if (m_Calc_FIND[i].FindParams) delete[] m_Calc_FIND[i].FindParams;
 			m_Calc_FIND[i].FindParams = nullptr;
 
+			if (m_Calc_FIND[i].FindParamsDecoded) delete[] m_Calc_FIND[i].FindParamsDecoded;
+			m_Calc_FIND[i].FindParamsDecoded = nullptr;
+
 			if (m_Calc_FIND[i].curCalc.CalcParams) delete[] m_Calc_FIND[i].curCalc.CalcParams;
 			m_Calc_FIND[i].curCalc.CalcParams = nullptr;
+
+			if (m_Calc_FIND[i].curCalc.CalcParamsDecoded) delete[] m_Calc_FIND[i].curCalc.CalcParamsDecoded;
+			m_Calc_FIND[i].curCalc.CalcParamsDecoded = nullptr;
 
 			if (m_Calc_FIND[i].DlgFind) delete m_Calc_FIND[i].DlgFind;
 			m_Calc_FIND[i].DlgFind = nullptr;
@@ -352,17 +440,24 @@ void CSpaceOMDlg::OnBnClicked_StartFind()
 	{
 		m_Calc_FIND[i].FindParams = new char[SD_PARAMSLEN + 100];
 		*m_Calc_FIND[i].FindParams = 0;
+		m_Calc_FIND[i].FindParamsDecoded = new char[SD_PARAMSLENDECODED + 100];
+		*m_Calc_FIND[i].FindParamsDecoded = 0;
+
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_FIND[i].FindParams, SD_PARAMSLEN);
+		PrepareParams(m_Calc_FIND[i].FindParams, m_Calc_FIND[i].FindParamsDecoded, SD_PARAMSLEN);
+		SaveSettings(m_Calc_FIND[i].FindParams, m_Calc_FIND[i].FindParamsDecoded);
 
 		m_Calc_FIND[i].curCalc.CalcParams = new char[SD_PARAMSLEN + 100];
-		*m_Calc_FIND[i].curCalc.CalcParams = 0;
-		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDIT1), m_Calc_FIND[i].curCalc.CalcParams, SD_PARAMSLEN);
+		strcpy_s(m_Calc_FIND[i].curCalc.CalcParams, SD_PARAMSLEN, m_Calc_FIND[i].FindParams);
+
+		m_Calc_FIND[i].curCalc.CalcParamsDecoded = new char[SD_PARAMSLENDECODED + 100];
+		strcpy_s(m_Calc_FIND[i].curCalc.CalcParamsDecoded, SD_PARAMSLENDECODED, m_Calc_FIND[i].FindParamsDecoded);
 
 		m_Calc_FIND[i].curCalc.Group = new CSP_Group;
 		m_Calc_FIND[i].curCalc.Group->m_pCalc = &m_Calc_FIND[i].curCalc;
 		m_Calc_FIND[i].curCalc.Group->m_pCalcFind = &m_Calc_FIND[i];
 
-		m_Calc_FIND[i].curCalc.Group->ReadSettingsGroup(m_Calc_FIND[i].curCalc.CalcParams, SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
+		m_Calc_FIND[i].curCalc.Group->ReadSettingsGroup(m_Calc_FIND[i].curCalc.CalcParamsDecoded, SGROUP_TRACE, READPARAMS_NOT_USE_DEFS);
 
 		m_Calc_FIND[i].curCalc.DrawSet.iShowFlags |= SP_DRAW_TEXT | SP_DRAW_CLEARBKG | SP_DRAW_GROUPINFO;
 

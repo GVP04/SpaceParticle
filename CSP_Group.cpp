@@ -29,7 +29,6 @@ CSP_Group::CSP_Group()
 	m_innerState = M_INNER_STATE_STARTING;
 	AfxBeginThread(DoCommandThread, (LPVOID)this);
 
-	m_DelayMS = 0;
 	m_CalcState = M_STATE_OFF;
 	m_name = new char[SPG_TEMPSTRING_LEN +1000];
 	sprintf_s(m_name, 1000, "GROUP_0");
@@ -107,8 +106,8 @@ CSP_Group::~CSP_Group()
 
 	if (m_Array)
 	{
-		int m_Count = PartCntr.GetCount();
-		for (int i = 0; i < m_Count; i++)
+		int tmpCount = PartCntr.GetCount();
+		for (int i = 0; i < tmpCount; i++)
 			if (m_Array[i])
 			{
 				delete m_Array[i]; 
@@ -146,9 +145,9 @@ void CSP_Group::CheckThreads()
 {
 	if (m_Thr_Calc)
 	{
-		int m_Count = PartCntr.GetCount();
+		int tmpCount = PartCntr.GetCount();
 
-		if (m_Count < m_ThreadsMax) m_ThreadsMax = m_Count;
+		if (tmpCount < m_ThreadsMax) m_ThreadsMax = tmpCount;
 
 		if (m_ThreadsMax >= GR_MAX_THREADS_COUNT) m_ThreadsMax = GR_MAX_THREADS_COUNT;
 		if (m_ThreadsMax < 2) m_ThreadsMax = 0;
@@ -198,9 +197,9 @@ void CSP_Group::Reset()
 
 	if (m_Array)
 	{
-		int m_Count = PartCntr.GetCount();
+		int tmpCount = PartCntr.GetCount();
 
-		for (int i = 0; i < m_Count; i++)
+		for (int i = 0; i < tmpCount; i++)
 			if (m_Array[i])
 			{
 				delete m_Array[i];
@@ -226,8 +225,6 @@ void CSP_Group::Reset()
 
 	m_Relations.INIT(m_maxCount);
 
-	m_DelayMS = 0;
-
 	if (m_pCalc)
 	{
 		m_pCalc->Time.RESET();
@@ -248,10 +245,10 @@ void CSP_Group::Reset()
 void CSP_Group::Clear()
 {
 	m_ParticlesState = GR_PS_NORM;
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
 	if (m_Array)
-		for (int i = 0; i < m_Count; i++)
+		for (int i = 0; i < tmpCount; i++)
 			if (m_Array[i])
 				m_Array[i]->Clear(SP_CLEAR_SOFT);
 
@@ -269,18 +266,18 @@ void CSP_Group::CalcCountDevider()
 
 int CSP_Group::AddSpParticle(int in_Type, const SData& in_Ptr, SP_Calc* pCalc)
 {
-	int m_Count = PartCntr.GetCount();
-	int ret = m_Count;
+	int tmpCount = PartCntr.GetCount();
+	int ret = tmpCount;
 	
-	if (m_Array && m_Count + 1 < SPG_MAX_COUNT)
+	if (m_Array && tmpCount + 1 < SPG_MAX_COUNT)
 	{
-		if (m_Count + 1 > m_maxCount)
+		if (tmpCount + 1 > m_maxCount)
 		{
 			int newCount = m_maxCount + m_maxCount;
 			if (newCount > SPG_MAX_COUNT) newCount = SPG_MAX_COUNT;
 
 			CSpParticle ** tmp = new CSpParticle* [newCount + 10];
-			CopyMemory(tmp, m_Array, m_Count * sizeof(CSpParticle*));
+			CopyMemory(tmp, m_Array, tmpCount * sizeof(CSpParticle*));
 			delete[] m_Array;
 			m_Array = tmp;
 
@@ -289,11 +286,12 @@ int CSP_Group::AddSpParticle(int in_Type, const SData& in_Ptr, SP_Calc* pCalc)
 			m_maxCount = newCount;
 		}
 
-		if ((m_Array[m_Count] = new CSpParticle(*m_pCalc, in_Type)))
+		if ((m_Array[tmpCount] = new CSpParticle(*m_pCalc, in_Type)))
 		{
 			PartCntr.AddCurrent(in_Type);
-			m_Array[m_Count]->m_pCalc = pCalc;
-			m_Array[m_Count]->SetParticleData(SP_DATA_ALL, in_Ptr);
+			m_Array[tmpCount]->m_pCalc = pCalc;
+			m_Array[tmpCount]->SetParticleData(SP_DATA_ALL, in_Ptr);
+			m_Array[tmpCount]->m_TraceSettings.SET(tmpCount);
 		}
 		CalcCountDevider();
 	}
@@ -303,10 +301,10 @@ int CSP_Group::AddSpParticle(int in_Type, const SData& in_Ptr, SP_Calc* pCalc)
 int CSP_Group::GetMaxTraceId()
 {
 	int ret = 0;
-	int m_Count = PartCntr.GetCount();
-	if (m_Array && m_Count)
+	int tmpCount = PartCntr.GetCount();
+	if (m_Array && tmpCount)
 	{
-		for(int i = 0; i < m_Count; i++)
+		for(int i = 0; i < tmpCount; i++)
 		{
 				int tmp = m_Array[i]->GetCurPos();
 				if (tmp > ret) ret = tmp;
@@ -318,9 +316,9 @@ int CSP_Group::GetMaxTraceId()
 
 int CSP_Group::RemoveSpParticle(int in_Idx)
 {
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
-	if (m_Array && in_Idx >= 0 && in_Idx < m_Count)
+	if (m_Array && in_Idx >= 0 && in_Idx < tmpCount)
 	{
 		int ParticleType = 0;
 		if (m_Array[in_Idx])
@@ -331,7 +329,7 @@ int CSP_Group::RemoveSpParticle(int in_Idx)
 
 		m_Array[in_Idx] = nullptr;
 
-		int MoveCount = m_Count - in_Idx - 1;
+		int MoveCount = tmpCount - in_Idx - 1;
 
 		if (MoveCount > 0)
 		{
@@ -342,7 +340,7 @@ int CSP_Group::RemoveSpParticle(int in_Idx)
 		PartCntr.AddCurrent(ParticleType, -1);
 
 		CheckThreads();
-		pBS_Corrected = m_Relations.GetBeStuck(GR_PS_RELATION_CORRECTED);
+		//pBS_Corrected = m_Relations.GetRelated(GR_PS_RELATION_CORRECTED);
 		CalcCountDevider();
 	}
 
@@ -372,79 +370,19 @@ double CSP_Group::GetCurTime()
 {
 	return 	m_pCalc->Time.GetCurTime();
 }
-/*
-int CSP_Group::GetMinMaxData(SData* out_Min, SData* out_Max, SData_SD* out_MinSD, SData_SD* out_MaxSD, int in_NextFlag)
-{
-	int ret = SP_STATE_ERROR_MAIN;
-	SData* pData;
-
-	if (out_Min && out_Max && out_MinSD && out_MaxSD && m_Count && m_Array[0] && (pData = in_NextFlag == 0 ? m_Array[0]->GetCurData() : &m_Array[0]->m_NextData) && pData)
-	{
-		double* pDoubleMin, * pDoubleMax;
-		*out_Min = *pData;
-		*out_Max = *pData;
-		// с 1 потому что проинициализировано выше значением idx = 0
-		for (int i = 1; i < m_Count; i++)
-		{
-			if ((pData = in_NextFlag == 0 ? m_Array[i]->GetCurData() : &m_Array[i]->m_NextData))
-			{
-				pDoubleMin = (double*)out_Min;
-				pDoubleMax = (double*)out_Max;
-
-				double* pCmp = (double*)pData;
-
-				for (int j = 0; j < 13; j++, pDoubleMax++, pDoubleMin++, pCmp++)
-				{
-					double value = fabs(*pCmp);
-					if (value > *pDoubleMax)  *pDoubleMax = value; 
-					if (value < *pDoubleMin)  *pDoubleMin = value; 
-				}
-			}
-		}
-
-		double* pDoubleMinSD, * pDoubleMaxSD;
-		pDoubleMinSD = (double*)out_MinSD;
-		pDoubleMaxSD = (double*)out_MaxSD;
-
-		for (int i = 0; i < 6; i++)
-		{
-			*(pDoubleMinSD++) = 1.0e30;
-			*(pDoubleMaxSD++) = -1.0e30;
-		}
-
-		pDoubleMin = (double*)out_Min;
-		pDoubleMax = (double*)out_Max;
-		pDoubleMinSD = (double*)out_MinSD;
-		pDoubleMaxSD = (double*)out_MaxSD;
-
-		for (int j = 0; j < 4; j++, pDoubleMaxSD++, pDoubleMinSD++)
-			for (int k = 0; k < 3; k++, pDoubleMax++, pDoubleMin++)
-			{
-				if (*pDoubleMax > *pDoubleMaxSD)  *pDoubleMaxSD = *pDoubleMax;
-				if (*pDoubleMin < *pDoubleMinSD)  *pDoubleMinSD = *pDoubleMin;
-			}
-		if (*pDoubleMax > *pDoubleMaxSD)  *pDoubleMaxSD = *pDoubleMax;
-		if (*pDoubleMin < *pDoubleMinSD)  *pDoubleMinSD = *pDoubleMin;
-		pDoubleMax++; pDoubleMin++; pDoubleMaxSD++; pDoubleMinSD++;
-		if (*pDoubleMax > *pDoubleMaxSD)  *pDoubleMaxSD = *pDoubleMax;
-		if (*pDoubleMin < *pDoubleMinSD)  *pDoubleMinSD = *pDoubleMin;
-	}
-
-	return ret;
-}
-*/
 
 void CSP_Group::CollectStat(SP_CalcStat& out_Stat, int in_StatType)
 {
 	if (m_Array)
 	{
-		int m_Count = PartCntr.GetCount();
+		int tmpCount = PartCntr.GetCount();
 
 		if ((in_StatType & STAT_TYPE_ALL_DATA))
 		{
 			if ((in_StatType & STAT_TYPE_MAX_RELATION))
 			{
 				out_Stat.v_Max.Velocity.Z = out_Stat.v_Max.Velocity.Y = out_Stat.v_Max.Velocity.X = -SP_MAX_TIME_DISTANCE;
+				out_Stat.v_Max.Velocity_Linear.Z = out_Stat.v_Max.Velocity_Linear.Y = out_Stat.v_Max.Velocity_Linear.X = -SP_MAX_TIME_DISTANCE;
 				out_Stat.v_Max.Position.Z = out_Stat.v_Max.Position.Y = out_Stat.v_Max.Position.X = -SP_MAX_TIME_DISTANCE;
 				out_Stat.v_Max.Accel_2_3D.Z = out_Stat.v_Max.Accel_2_3D.Y = out_Stat.v_Max.Accel_2_3D.X = -SP_MAX_TIME_DISTANCE;
 				out_Stat.v_Max.Jerk_3_3D.Z = out_Stat.v_Max.Jerk_3_3D.Y = out_Stat.v_Max.Jerk_3_3D.X = -SP_MAX_TIME_DISTANCE;
@@ -456,6 +394,7 @@ void CSP_Group::CollectStat(SP_CalcStat& out_Stat, int in_StatType)
 			if ((in_StatType & STAT_TYPE_MIN_RELATION))
 			{
 				out_Stat.v_Min.Velocity.Z = out_Stat.v_Min.Velocity.Y = out_Stat.v_Min.Velocity.X = SP_MAX_TIME_DISTANCE;
+				out_Stat.v_Min.Velocity_Linear.Z = out_Stat.v_Min.Velocity_Linear.Y = out_Stat.v_Min.Velocity_Linear.X = SP_MAX_TIME_DISTANCE;
 				out_Stat.v_Min.Position.Z = out_Stat.v_Min.Position.Y = out_Stat.v_Min.Position.X = SP_MAX_TIME_DISTANCE;
 				out_Stat.v_Min.Accel_2_3D.Z = out_Stat.v_Min.Accel_2_3D.Y = out_Stat.v_Min.Accel_2_3D.X = SP_MAX_TIME_DISTANCE;
 				out_Stat.v_Min.Jerk_3_3D.Z = out_Stat.v_Min.Jerk_3_3D.Y = out_Stat.v_Min.Jerk_3_3D.X = SP_MAX_TIME_DISTANCE;
@@ -464,7 +403,7 @@ void CSP_Group::CollectStat(SP_CalcStat& out_Stat, int in_StatType)
 				out_Stat.v_Min.TimePoint = SP_MAX_TIME_DISTANCE;
 			}
 
-			for (int i = 0; i < m_Count; i++)
+			for (int i = 0; i < tmpCount; i++)
 			{
 				const SData* pData;
 				switch ((in_StatType & STAT_TYPE_TIMEMASK))
@@ -559,36 +498,36 @@ void CSP_Group::CollectStat(SP_CalcStat& out_Stat, int in_StatType)
 				ZeroMemory(&out_Stat.Rel_Min, sizeof(SMinMaxRelation));
 				out_Stat.Rel_Min.Real_Distance.MMValue = 1.0e30;
 				out_Stat.Rel_Min.Phantom_Distance.MMValue = 1.0e30;
-				out_Stat.Rel_Min.Velocity.MMValue = 1.0e30;
+				out_Stat.Rel_Min.RelVelocity.MMValue = 1.0e30;
 			}
 			if ((in_StatType & STAT_TYPE_MAX_RELATION))
 			{
 				ZeroMemory(&out_Stat.Rel_Max, sizeof(SMinMaxRelation));
 				out_Stat.Rel_Max.Real_Distance.MMValue = -1.0e30;
 				out_Stat.Rel_Max.Phantom_Distance.MMValue = -1.0e30;
-				out_Stat.Rel_Max.Velocity.MMValue = -1.0e30;
+				out_Stat.Rel_Max.RelVelocity.MMValue = -1.0e30;
 			}
 
 			if ((in_StatType & STAT_TYPE_SETPARTICLE))
-				for (int idx1 = 0; idx1 < m_Count; idx1++)
-					m_Array[idx1]->m_CountBeStuck = 0;
+				for (int idx1 = 0; idx1 < tmpCount; idx1++)
+					m_Array[idx1]->m_CountRelated = 0;
 
-			for (int idx1 = 0; idx1 < m_Count; idx1++)
+			for (int idx1 = 0; idx1 < tmpCount; idx1++)
 			{
 				SPRelation* curRel = calcRelations + idx1;
-				for (int idx2 = 0; idx2 < m_Count; idx2++, curRel += m_maxCount)
+				for (int idx2 = 0; idx2 < tmpCount; idx2++, curRel += m_maxCount)
 					if (idx1 != idx2)
 					{
-						if ((curRel->State & GR_PS_COLLISION_BESTUCK) && (in_StatType & STAT_TYPE_SETPARTICLE))
-								m_Array[idx1]->m_CountBeStuck++;
+						if ((curRel->State & GR_PS_COLLISION_IS_ULTIMATE) && (in_StatType & STAT_TYPE_SETPARTICLE))
+								m_Array[idx1]->m_CountRelated++;
 
 						if ((in_StatType & STAT_TYPE_MIN_RELATION))
 						{
-							if (out_Stat.Rel_Min.Velocity.MMValue > curRel->RelativeSpeedAbs)
+							if (out_Stat.Rel_Min.RelVelocity.MMValue > curRel->RelativeSpeedAbs)
 							{
-								out_Stat.Rel_Min.Velocity.MMValue = curRel->RelativeSpeedAbs;
-								out_Stat.Rel_Min.Velocity.idxParticle1 = idx1;
-								out_Stat.Rel_Min.Velocity.idxParticle2 = idx2;
+								out_Stat.Rel_Min.RelVelocity.MMValue = curRel->RelativeSpeedAbs;
+								out_Stat.Rel_Min.RelVelocity.idxParticle1 = idx1;
+								out_Stat.Rel_Min.RelVelocity.idxParticle2 = idx2;
 							}
 							if (out_Stat.Rel_Min.Phantom_Distance.MMValue > curRel->DistancePwr1)
 							{
@@ -607,11 +546,11 @@ void CSP_Group::CollectStat(SP_CalcStat& out_Stat, int in_StatType)
 						}
 						if ((in_StatType & STAT_TYPE_MAX_RELATION))
 						{
-							if (out_Stat.Rel_Max.Velocity.MMValue < curRel->RelativeSpeedAbs)
+							if (out_Stat.Rel_Max.RelVelocity.MMValue < curRel->RelativeSpeedAbs)
 							{
-								out_Stat.Rel_Max.Velocity.MMValue = curRel->RelativeSpeedAbs;
-								out_Stat.Rel_Max.Velocity.idxParticle1 = idx1;
-								out_Stat.Rel_Max.Velocity.idxParticle2 = idx2;
+								out_Stat.Rel_Max.RelVelocity.MMValue = curRel->RelativeSpeedAbs;
+								out_Stat.Rel_Max.RelVelocity.idxParticle1 = idx1;
+								out_Stat.Rel_Max.RelVelocity.idxParticle2 = idx2;
 							}
 							if (out_Stat.Rel_Max.Phantom_Distance.MMValue < curRel->DistancePwr1)
 							{
@@ -633,15 +572,15 @@ void CSP_Group::CollectStat(SP_CalcStat& out_Stat, int in_StatType)
 			if ((in_StatType & STAT_TYPE_ALL_RELATION) == STAT_TYPE_CURRENT)
 			{
 				SData* tmpPtr;
-				SData tmpVal = { 0 };
+				SData tmpVal; tmpVal.CLEAR();
 
 				if ((in_StatType & STAT_TYPE_MIN_RELATION))
 				{
-					tmpPtr = m_Array[out_Stat.Rel_Min.Velocity.idxParticle1]->GetCurData();
-					out_Stat.Rel_Min.Velocity.Part1 = tmpPtr ? *tmpPtr : tmpVal;
-					tmpPtr = m_Array[out_Stat.Rel_Min.Velocity.idxParticle2]->GetCurData();
-					out_Stat.Rel_Min.Velocity.Part2 = tmpPtr ? *tmpPtr : tmpVal;
-					out_Stat.Rel_Min.Velocity.relation = calcRelations[out_Stat.Rel_Min.Velocity.idxParticle1 + m_maxCount * out_Stat.Rel_Min.Velocity.idxParticle2];
+					tmpPtr = m_Array[out_Stat.Rel_Min.RelVelocity.idxParticle1]->GetCurData();
+					out_Stat.Rel_Min.RelVelocity.Part1 = tmpPtr ? *tmpPtr : tmpVal;
+					tmpPtr = m_Array[out_Stat.Rel_Min.RelVelocity.idxParticle2]->GetCurData();
+					out_Stat.Rel_Min.RelVelocity.Part2 = tmpPtr ? *tmpPtr : tmpVal;
+					out_Stat.Rel_Min.RelVelocity.relation = calcRelations[out_Stat.Rel_Min.RelVelocity.idxParticle1 + m_maxCount * out_Stat.Rel_Min.RelVelocity.idxParticle2];
 
 					tmpPtr = m_Array[out_Stat.Rel_Min.Phantom_Distance.idxParticle1]->GetCurData();
 					out_Stat.Rel_Min.Phantom_Distance.Part1 = tmpPtr ? *tmpPtr : tmpVal;
@@ -652,11 +591,11 @@ void CSP_Group::CollectStat(SP_CalcStat& out_Stat, int in_StatType)
 
 				if ((in_StatType & STAT_TYPE_MAX_RELATION))
 				{
-					tmpPtr = m_Array[out_Stat.Rel_Max.Velocity.idxParticle1]->GetCurData();
-					out_Stat.Rel_Max.Velocity.Part1 = tmpPtr ? *tmpPtr : tmpVal;
-					tmpPtr = m_Array[out_Stat.Rel_Max.Velocity.idxParticle2]->GetCurData();
-					out_Stat.Rel_Max.Velocity.Part2 = tmpPtr ? *tmpPtr : tmpVal;
-					out_Stat.Rel_Max.Velocity.relation = calcRelations[out_Stat.Rel_Max.Velocity.idxParticle1 + m_maxCount * out_Stat.Rel_Max.Velocity.idxParticle2];
+					tmpPtr = m_Array[out_Stat.Rel_Max.RelVelocity.idxParticle1]->GetCurData();
+					out_Stat.Rel_Max.RelVelocity.Part1 = tmpPtr ? *tmpPtr : tmpVal;
+					tmpPtr = m_Array[out_Stat.Rel_Max.RelVelocity.idxParticle2]->GetCurData();
+					out_Stat.Rel_Max.RelVelocity.Part2 = tmpPtr ? *tmpPtr : tmpVal;
+					out_Stat.Rel_Max.RelVelocity.relation = calcRelations[out_Stat.Rel_Max.RelVelocity.idxParticle1 + m_maxCount * out_Stat.Rel_Max.RelVelocity.idxParticle2];
 
 					tmpPtr = m_Array[out_Stat.Rel_Max.Phantom_Distance.idxParticle1]->GetCurData();
 					out_Stat.Rel_Max.Phantom_Distance.Part1 = tmpPtr ? *tmpPtr : tmpVal;
@@ -678,20 +617,20 @@ void CSP_Group::WriteState(FILE* in_Ptr, double in_StateTime)
 {
 	if (in_Ptr)
 	{
-		int m_Count = PartCntr.GetCount();
+		int tmpCount = PartCntr.GetCount();
 
-		if (m_Array && m_Count > 0)
+		if (m_Array && tmpCount > 0)
 		{
-			fprintf(in_Ptr, "\nGroup %s\tCount=\t%d\tTime=\t%g\n", m_name, m_Count, m_pCalc->Time.GetCurTime());
+			fprintf(in_Ptr, "\nGroup %s\tCount=\t%d\tTime=\t%g\n", m_name, tmpCount, m_pCalc->Time.GetCurTime());
 
-			for (int i = 0; i < m_Count; i++)
+			for (int i = 0; i < tmpCount; i++)
 			{
 				m_Array[i]->GetStateDescription(m_tmpString, SPG_TEMPSTRING_LEN, in_StateTime);
 				fprintf(in_Ptr, "\t\tSParticle\t%d\t%s\n", i, m_tmpString);
 			}
 		}
 		else
-			fprintf(in_Ptr, "m_Array %p\tCSP_Group.m_Count = %d\n", m_Array, m_Count);
+			fprintf(in_Ptr, "m_Array %p\tCSP_Group.m_Count = %d\n", m_Array, tmpCount);
 	}
 }
 
@@ -699,27 +638,27 @@ void CSP_Group::WriteState(FILE* in_Ptr, int OutputType, int in_nPoints)
 {
 	if (in_Ptr)
 	{
-		int m_Count = PartCntr.GetCount();
+		int tmpCount = PartCntr.GetCount();
 
-		if (m_Array  && m_pCalc && m_pCalcFind && m_Count > 0)
+		if (m_Array  && m_pCalc && m_pCalcFind && tmpCount > 0)
 		{
-			fprintf(in_Ptr, "\nGroup %s\tCount=\t%d\tTime=\t%10.10g\tsRandSeed=\t%d\tsStat.Count=\t%d\n", m_name, m_Count, m_pCalc->Time.GetCurTime(), m_pCalcFind->sRandSeed, m_pCalcFind->stat.Count);
+			fprintf(in_Ptr, "\nGroup %s\tCount=\t%d\tTime=\t%10.10g\tsRandSeed=\t%d\tsStat.Count=\t%d\n", m_name, tmpCount, m_pCalc->Time.GetCurTime(), m_pCalcFind->sRandSeed, m_pCalcFind->stat.Count);
 			switch (OutputType)
 			{
 			case 0:
-				for (int i = 0; i < m_Count; i++)
+				for (int i = 0; i < tmpCount; i++)
 				{
 					m_Array[i]->GetStateDescription(m_tmpString, SPG_TEMPSTRING_LEN, in_nPoints);
 					fprintf(in_Ptr, "\tSParticle\t%d\t%s\n", i, m_tmpString);
 				}
 				break;
 			case 1:
-				for (int i = 0; i < m_Count; i++)
+				for (int i = 0; i < tmpCount; i++)
 				{
 					m_Array[i]->GetStateDescription(m_tmpString, SPG_TEMPSTRING_LEN, 1);
 					fprintf(in_Ptr, "\tSParticle\t%d\t%s\n", i, m_tmpString);
 
-					for (int j = 0; j < m_Count; j++)
+					for (int j = 0; j < tmpCount; j++)
 						if (i != j)
 						{
 							SPRelation* tmpRel = m_Relations.GetCurentRelation( i, j );
@@ -736,11 +675,11 @@ void CSP_Group::WriteState(FILE* in_Ptr, int OutputType, int in_nPoints)
 			}
 		}
 		else
-			fprintf(in_Ptr, "m_Array %p\tCSP_Group.m_Count = %d\n", m_Array, m_Count);
+			fprintf(in_Ptr, "m_Array %p\tCSP_Group.m_Count = %d\n", m_Array, tmpCount);
 	}
 }
 
-void CSP_Group::SetViewPoint(double in_Percents, double in_Spread)
+void CSP_Group::SetViewPoint(double in_Percents, double in_Spread, int ArrTypes)
 {
 	if (in_Percents > 100.0) in_Percents = 100.0;
 	if (in_Percents < 0.0) in_Percents = 100.0;
@@ -750,12 +689,55 @@ void CSP_Group::SetViewPoint(double in_Percents, double in_Spread)
 
 	if (m_pCalc && m_ParticleInfoArray)
 	{
-		STracePosInfo* PInfoStart = m_ParticleInfoArray->GetDataById(0);
-		STracePosInfo* PInfoEnd = m_ParticleInfoArray->GetCurData();
+		STracePosInfo* PInfoStart;
+		STracePosInfo* PInfoEnd;
+
+		int idxStartSecondary = m_ParticleInfoArray->GetStartIdSecondary();
+		int idxStartMain = m_ParticleInfoArray->GetStartIdMain();
+		int idxEndMain = m_ParticleInfoArray->GetCurPos();
+
+		int resIdStart, resIdEnd;
+
+		switch ((ArrTypes & SP_DRAW_PART_ALL))
+		{
+		case SP_DRAW_PART_MAIN:
+			resIdStart = idxStartMain;
+			resIdEnd = idxEndMain;
+			break;
+		case SP_DRAW_PART_SECONDARY:
+			resIdStart = idxStartSecondary;
+			resIdEnd = idxStartMain;
+			break;
+		case SP_DRAW_PART_ETERNAL:
+			resIdStart = 0;
+			resIdEnd = idxStartSecondary;
+			break;
+		case SP_DRAW_PART_MS:
+			resIdStart = idxStartSecondary;
+			resIdEnd = idxEndMain;
+			break;
+		case (SP_DRAW_PART_ETERNAL| SP_DRAW_PART_SECONDARY):
+			resIdStart = 0;
+			resIdEnd = idxStartMain;
+			break;
+		case SP_DRAW_PART_ALL:
+		default:
+			resIdStart = 0;
+			resIdEnd = idxEndMain;
+			break;
+			break;
+		}
+
+		if (resIdStart < 0) resIdStart = 0;
+		if (resIdEnd <= 0) resIdEnd = idxEndMain;
+
+		PInfoStart = m_ParticleInfoArray->GetDataById(resIdStart);
+		PInfoEnd = m_ParticleInfoArray->GetDataById(resIdEnd);
+
 		m_pCalc->DrawSet.ViewPoint.TimeInPc = -1.0;
 		m_pCalc->DrawSet.ViewPoint.Spread = 100.0;
 
-		if (PInfoEnd && PInfoStart && (GetCalcState()& (M_STATE_READY| M_STATE_CALC | M_STATE_PAUSE | M_STATE_BREAK)))
+		if (PInfoEnd && PInfoStart) //&& (GetCalcState()& (M_STATE_READY| M_STATE_CALC | M_STATE_PAUSE | M_STATE_BREAK)) != 123456)
 		{
 			double vpSpread = (PInfoEnd->TimePoint - PInfoStart->TimePoint) * 0.01; // == 1%
 			double vpTime = PInfoStart->TimePoint + vpSpread * in_Percents; //  vpTime +- vpSpread
@@ -765,10 +747,10 @@ void CSP_Group::SetViewPoint(double in_Percents, double in_Spread)
 			// , id_Mid;
 			//id_Mid = m_ParticleInfoArray->GetLowIdxByTime(vpTime);
 
-			if (vpTime + vpSpread > PInfoEnd->TimePoint) id_End = SP_DRAW_MAX_ID;
+			if (vpTime + vpSpread > PInfoEnd->TimePoint) id_End = m_ParticleInfoArray->GetLowIdxByTime(PInfoEnd->TimePoint);
 			else	id_End = m_ParticleInfoArray->GetLowIdxByTime(vpTime + vpSpread);
 
-			if (vpTime - vpSpread <= PInfoStart->TimePoint) id_Start = 0;
+			if (vpTime - vpSpread <= PInfoStart->TimePoint) id_Start = m_ParticleInfoArray->GetLowIdxByTime(PInfoStart->TimePoint);
 			else	id_Start = m_ParticleInfoArray->GetLowIdxByTime(vpTime - vpSpread);
 
 			SetViewPointRange(id_Start, id_End);
@@ -792,29 +774,29 @@ void CSP_Group::SetViewPointRange(int in_Start, int in_End)
 }
 
 
-void CSP_Group::GetMinMaxTracePos(SPos& min_Pos, SPos& max_Pos, int idx_Start, int idx_End)
+void CSP_Group::GetMinMaxTracePos(SPos& min_Pos, SPos& max_Pos, const ViewPointData& VPData)
 {
 	min_Pos.X = min_Pos.Y = min_Pos.Z = 1.0e30;
 	max_Pos.X = max_Pos.Y = max_Pos.Z = -1.0e30;
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
-	for (int i = 0; i < m_Count; i++) 
-		m_Array[i]->GetMinMaxTracePos(min_Pos, max_Pos, idx_Start, idx_End);
+	for (int i = 0; i < tmpCount; i++) 
+		m_Array[i]->GetMinMaxTracePos(min_Pos, max_Pos, VPData.StartIdx, VPData.EndIdx);
 }
 
 int CSP_Group::GetIdByMaxDistance(double in_RelDist)
 {
 	int ret = -1;
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
-	if (m_Array && m_Count > 2 && m_Array[0] && m_Array[1])
+	if (m_Array && tmpCount > 2 && m_Array[0] && m_Array[1])
 	{
-		for (int i = 0; i < m_Count && ret < 0; i++)
+		for (int i = 0; i < tmpCount && ret < 0; i++)
 		{
 			int j;
-			for (j = 0; j < m_Count && (i == j || m_Relations.GetCurentRelation( i, j)->DistancePwr1 > in_RelDist); j++);
+			for (j = 0; j < tmpCount && (i == j || m_Relations.GetCurentRelation( i, j)->DistancePwr1 > in_RelDist); j++);
 
-			if (j >= m_Count) 
+			if (j >= tmpCount) 
 				ret = i; 
 		}
 	}
@@ -830,9 +812,9 @@ int CSP_Group::GetGroupSummaryInfo(GroupSummaryInfo* out_Info, int in_IdPos)
 		out_Info->CLEAR();
 		if (m_Array)
 		{
-			int m_Count = PartCntr.GetCount();
-			SData tmpData = {0};
-			for (int i = 0; i < m_Count; i++)
+			int tmpCount = PartCntr.GetCount();
+			SData tmpData;
+			for (int i = 0; i < tmpCount; i++)
 			{
 				int IdIten = in_IdPos;
 				if (IdIten < 0) IdIten = m_Array[i]->GetCurPos();
@@ -870,20 +852,19 @@ int CSP_Group::GetGroupSummaryInfo(GroupSummaryInfo* out_Info)
 	return GetGroupSummaryInfo(out_Info, -1);
 }
 
-
 double CSP_Group::CalcStepUpLimit()
 {
 	double ret = 1.0;
 	int i;
 	//поиск точки перехода с предельной скорости на допредельную
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 	if (m_pCalc->Time.GetCurTime() > 0.0)
-		for (i = 0; i < m_Count; i++)
+		for (i = 0; i < tmpCount; i++)
 		{
 			const SData *cpCurdata = m_Array[i]->GetCurData_C();
 			const SData* cpPrevData = m_Array[i]->GetPrevData_C();
 
-			if (cpCurdata->AbsSpeed >= m_pCalc->maxAbsSpeed)
+			if (cpCurdata->AbsSpeed >= m_pCalc->Critical.Speed)
 			{
 				SPos DeltaAcc;
 				DeltaAcc.SET_AS_DELTA(cpCurdata->Accel_2_3D, cpPrevData->Accel_2_3D); //m_Array[i]->GetLastDeltaAcc(DeltaAcc); 
@@ -904,16 +885,16 @@ double CSP_Group::CalcStepUpLimit()
 int CSP_Group::CheckTimes()
 {
 	int ret = 0;
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
 
-	for (int i = 1; i < m_Count; i++)
+	for (int i = 1; i < tmpCount; i++)
 	{
 		if (m_Array[i]->GetCurTime() != m_Array[0]->GetCurTime())
 			ASSERT(0);
 	}
 
-	for (int i = 1; i < m_Count; i++)
+	for (int i = 1; i < tmpCount; i++)
 	{
 		if (m_Array[i]->GetNextData().TimePoint != m_Array[0]->GetNextData().TimePoint)
 			ASSERT(0);
@@ -922,293 +903,581 @@ int CSP_Group::CheckTimes()
 	return ret;
 }
 
-int CSP_Group::CorrectBeStuckParticles(int in_Flags, double& KeyPoint)
+void CSP_Group::SetRelationByUltimate(SData& NextData, const SData& CurData, RelatedInfo& R_Info)
 {
-	int ret = GR_PS_NORM;
-
-	const BeStuckParticles* pBSP = (in_Flags& GR_PS_RELATION_NEEDRECALC) ? m_Relations.FillNBeStuck(in_Flags, 0, GetCount()) : m_Relations.GetBeStuck(in_Flags);
-
-	if (pBS_Corrected->GetCount())	pBS_Corrected->clear();
-
-	if (pBSP)
+	//расчет relation для каждого из nMastersCur (цикл снаружи)
 	{
+		R_Info.RelationNext->Distance_3D.SET_AS_DELTA(NextData.Position, R_Info.RelationNext->ViewPointData.Position);
 
-		for (int StuckNum = 0; StuckNum < pBSP->GetCount(); StuckNum++)
+		R_Info.RelationNext->DistancePwr2 = R_Info.RelationNext->Distance_3D.LENPWR2();
+		R_Info.RelationNext->DistancePwr1 = sqrt(R_Info.RelationNext->DistancePwr2);
+
+		R_Info.RelationNext->RelativeSpeed = SData::GetRelativeSpeedFromVelocity_Linear(R_Info.RelationNext->ViewPointData, NextData, &R_Info.RelationNext->RelativeVelocity_3D);
+		R_Info.RelationNext->RelativeSpeedAbs = fabs(R_Info.RelationNext->RelativeSpeed);
+		R_Info.RelationNext->Wind_3D = { 0 };
+		R_Info.RelationNext->LastViewPointTime = R_Info.RelationCurent->ViewPointData.TimePoint;
+
+		R_Info.RelationNext->RealDistancePwr1 = CurData.Position.GetDistance(R_Info.RelationNext->ViewParticlePtr->GetCurPosition());
+		R_Info.RelationNext->RealRelativeSpeed = SData::GetRelativeSpeedFromVelocity_Linear(CurData, *R_Info.RelationNext->ViewParticlePtr->GetCurData_C(), NULL);
+
+
+		if ((R_Info.RelationNext->State & GR_PS_COLLISION_IS_ULTIMATE))
 		{
-			const BeStuckList* BSList = pBSP->GetBeStuckListByNum(StuckNum);
-			if (BSList)
-			{
-
-				switch (BSList->nMasters)//коррекция позиции по связке
-				{
-				case 0:
-					break;
-				case 1:
-				{
-					int VP_ID = BSList->List[0].IdMaster;
-					if (VP_ID >= 0)
-					{
-						double PrecDist = m_pCalc->Time.GetPrecDistance();
-						SPRelation* NextRelation = m_Relations.GetRelation(GR_PS_RELATION_NEXT, BSList->IdParticle, VP_ID);
-						SPRelation* curRelation = m_Relations.GetRelation( GR_PS_RELATION_CURRENT, BSList->IdParticle, VP_ID);
-						double CriticalDelta = 0.0, DistPwr1 = 0.0;
-						SData VP, * pm_NextData = &m_Array[BSList->IdParticle]->m_NextData;
-						double NewViewPointTime = curRelation->ViewPointData.TimePoint + m_pCalc->Time.GetStep();
-
-						m_Array[VP_ID]->GetPrevDataByTimeLinear(VP, NextRelation->LowIdxOfViewPont_Near, curRelation->LowIdxOfViewPont_Near, NewViewPointTime);
-
-
-						DistPwr1 = VP.Position.GetDistance(pm_NextData->Position); ///!!!!!!!!!!Убрать лишние операции и итерацию, есл
-						CriticalDelta = fabs(DistPwr1 - m_pCalc->CriticalDistance);
-						//if (DistPwr1 < m_pCalc->CriticalDistance)
-						ASSERT(DistPwr1 < 1000.0 && DistPwr1 > 0.50);
-						if (CriticalDelta > 5.0e-14)
-						{
-							//пока простое выправниевание
-							if (CriticalDelta > PrecDist)
-							{
-								ret |= GR_PS_POSITION_CHANGED;
-								pm_NextData->Position.MINUS(VP.Position);
-								pm_NextData->Position.SET_LENGHT(m_pCalc->CriticalDistance);
-								pm_NextData->Position.ADD(VP.Position);
-								pBS_Corrected->AddItem(BSList->IdParticle, VP_ID, GR_PS_POSITION_CHANGED);
-							}
-							else
-								ret |= GR_PS_POSITION_LOW_PREC;
-						}
-						if (CriticalDelta > 0.0)
-							ret |= GR_PS_POSITION_LOW_PREC;
-
-						SPos normal = pm_NextData->Position;
-						normal.MINUS(VP.Position);
-						//!!!!normal.SET_LENGHT(m_pCalc->CriticalDistance); //Уже !!!!!!!
-
-						//корректировка скорости
-						//!!!!скорость равна проекции VP на нормаль (прямая [ViewPoint,Particle])
-						pm_NextData->Velocity = normal;
-						pm_NextData->Velocity.SET_AS_PROJECTION_OF(VP.Velocity);
-
-						if (in_Flags & GR_PS_RELATION_NEXT)
-						{
-							NextRelation->DistancePwr1 = m_pCalc->CriticalDistance;
-							NextRelation->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-							NextRelation->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
-							NextRelation->DensityAtBasePoint = 0.0;
-							NextRelation->RelativeSpeedAbs = 0.0;
-							NextRelation->RelativeVelocity_3D.SET_AS_DELTA(pm_NextData->Velocity, VP.Velocity);
-						}
-
-						//!!!!корректировка ускорения на уровне расчета данных по относительным данным
-					}
-					else
-					{
-						ASSERT(0);
-					}
-				}
-				break;
-				case 2:
-				{
-					/*			int RelationPos_0 = ID_CollissionRel[0].RelationPos;
-								int RelationPos_1 = ID_CollissionRel[1].RelationPos;
-								ASSERT(0);
-								SPos PointVPMiddle;
-								PointVPMiddle.SET_AS_MIDDLE_POINT(in_CalcRelations[RelationPos_0].ViewPointData.Position, in_CalcRelations[RelationPos_1].ViewPointData.Position);
-
-								SPos NormalVP = in_CalcRelations[RelationPos_0].ViewPointData.Position;
-								NormalVP.MINUS(in_CalcRelations[RelationPos_1].ViewPointData.Position);
-
-								double DistanceVP_PWR2 = NormalVP.LENPWR2();
-								double DistParticleToMVP = sqrt(m_pCalc->CriticalDistancePwr2 - DistanceVP_PWR2 * 0.25);
-
-								SPos PartPprojToPlane;
-								PartPprojToPlane.SET_AS_PROJECTION_ON_PLANE(pCalcData->Position, PointVPMiddle, in_CalcRelations[RelationPos_0].ViewPointData.Position);///!!!!!!!!!!!!!!!!!!   NormalVP
-								PartPprojToPlane.MINUS(PointVPMiddle);
-								PartPprojToPlane.SET_LENGHT(DistParticleToMVP);
-								PartPprojToPlane.ADD(PointVPMiddle);
-
-								//корректировка позиции
-								////////pCalcData->Position = PartPprojToPlane;
-
-								//корректировка скорости
-								//скорость равна проекции VP на нормаль (прямая [ViewPoint,Particle])
-								SPos Norm0 = in_CalcRelations[RelationPos_0].ViewPointData.Position;
-								Norm0.MINUS(pCalcData->Position);
-								SPos Norm1 = in_CalcRelations[RelationPos_1].ViewPointData.Position;
-								Norm1.MINUS(pCalcData->Position);
-
-								/////SPos CrossLine = Norm0;
-								/////CrossLine.CROSS(Norm1);
-								//////CrossLine.MULT((pCalcData->Velocity.DOT(CrossLine) / CrossLine.LENPWR2()));
-								/////pCalcData->Velocity = CrossLine;
-
-								////////SPos tmpSpeed = Norm0;
-								/////tmpSpeed.SET_AS_PROJECTION_OF(in_CalcRelations[RelationPos_1].ViewPointData.Velocity);
-								/////pCalcData->Velocity.ADD(tmpSpeed);
-
-								//////tmpSpeed = Norm1;
-								///////tmpSpeed.SET_AS_PROJECTION_OF(in_CalcRelations[RelationPos_0].ViewPointData.Velocity);
-								///////pCalcData->Velocity.ADD(tmpSpeed);
-
-
-
-								//корректировка ускорения
-								//ускорение равно проекции ускорения VP на нормаль (прямая [ViewPoint,Particle]) + проекция остальных на плоскость
-
-								SPos CrossLine = Norm0;
-								CrossLine.CROSS(Norm1);
-								CrossLine.MULT((pCalcData->Accel_2_3D.DOT(CrossLine) / CrossLine.LENPWR2()));
-								pCalcData->Accel_2_3D = CrossLine;
-
-								SPos tmpAccel3D = Norm0;
-								tmpAccel3D.SET_AS_PROJECTION_OF(in_CalcRelations[RelationPos_1].ViewPointData.Accel_2_3D);
-								pCalcData->Accel_2_3D.ADD(tmpAccel3D);
-
-								tmpAccel3D = Norm1;
-								tmpAccel3D.SET_AS_PROJECTION_OF(in_CalcRelations[RelationPos_0].ViewPointData.Accel_2_3D);
-								pCalcData->Accel_2_3D.ADD(tmpAccel3D);
-
-								if (m_pCalc->DensityDerivLevel >= 3)
-								{
-									CrossLine = Norm0;
-									CrossLine.CROSS(Norm1);
-									CrossLine.MULT((pCalcData->Jerk_3_3D.DOT(CrossLine) / CrossLine.LENPWR2()));
-									pCalcData->Jerk_3_3D = CrossLine;
-
-									SPos tmpAccelDeriv3D = Norm0;
-									tmpAccelDeriv3D.SET_AS_PROJECTION_OF(in_CalcRelations[RelationPos_1].ViewPointData.Jerk_3_3D);
-									pCalcData->Jerk_3_3D.ADD(tmpAccelDeriv3D);
-
-									tmpAccelDeriv3D = Norm1;
-									tmpAccelDeriv3D.SET_AS_PROJECTION_OF(in_CalcRelations[RelationPos_0].ViewPointData.Jerk_3_3D);
-									pCalcData->Jerk_3_3D.ADD(tmpAccelDeriv3D);
-								}
-					*/
-				}
-				ASSERT(0);
-				break;
-				default:
-					ASSERT(0);
-					break;
-				}
-			}
+			ASSERT(R_Info.RelationNext->DistancePwr1 >= m_pCalc->Critical.DistanceMinusEps -1.0e-12 && R_Info.RelationNext->DistancePwr1 <= m_pCalc->Critical.DistancePlusEps + 1.0e-12);
+			R_Info.RelationNext->DensityAtBasePoint = 0.0;
+			R_Info.RelationNext->DistancePwr1 = m_pCalc->Critical.Distance;
+			R_Info.RelationNext->DistancePwr2 = m_pCalc->Critical.DistancePwr2;
+			R_Info.RelationNext->DistancePwr3 = m_pCalc->Critical.DistancePwr3;
 		}
+		else
+		{
+			R_Info.RelationNext->State &= ~GR_PS_COLLISION_PRESENT;
+
+			if (R_Info.RelationNext->DistancePwr1 < m_pCalc->Critical.Distance)
+			{
+				R_Info.RelationNext->State |= (GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_IS_INSIDE);
+				R_Info.RelationNext->State |= (R_Info.RelationCurent->State & (GR_PS_COLLISION_BESTUCK | GR_PS_COLLISION_EXPELLED));//просто копирование предыдущего типа 
+			}
+			/////////////РАСЧЕТ ПЛОТНОСТИ
+			R_Info.RelationNext->Calc_RelativeDensity(m_pCalc->DensityCalcType);
+			//расчет ускорения
+			R_Info.RelationNext->Calc_RelativeAcceleration(m_pCalc->AccCalcType);
+
+			////switch (m_pCalc->WindType) // Fantasy !!!!!
+		}
+		R_Info.RelationNext->DistancePwr3 = R_Info.RelationNext->DistancePwr1 * R_Info.RelationNext->DistancePwr2;
 	}
-	return ret;
+
 }
 
-int CSP_Group::CalcBeStuckNextPos(SData& out_Data, int in_IdParticle, double in_NextTime, double* const out_KeyPoint)
+
+int CSP_Group::ComputeParticleDataAtPhantomBarrier(SData& out_Data, int in_IdParticle, double in_NextTime, double* const out_KeyPoint)
 {
-	int ret = SP_STATE_ERROR_MAIN;
+	int ret = 0;
 
-	const BeStuckParticles* pBSP;
-	const BeStuckList* pBSList;
-	int m_Count = PartCntr.GetCount();
+	RelatedParticles* pBSP;
+	const RelatedList* pBSList;
+	int tmpCount = PartCntr.GetCount();
+	out_Data.CLEAR();
+	out_Data.TimePoint = in_NextTime;
 	
-	if (in_IdParticle < m_Count && (pBSP = m_Relations.GetBeStuck_Current()) && (pBSList = pBSP->GetBeStuckListById(in_IdParticle)))
+	if (in_IdParticle < tmpCount && (pBSP = m_Relations.GetRelated_Current()) && (pBSList = pBSP->GetRelatedListById(in_IdParticle)))
 	{
-		const SData *pCurData = m_Array[in_IdParticle]->GetCurData_C();
-		double DeltaT = in_NextTime - pCurData->TimePoint;
-		double tmp_KP = in_NextTime;
-		double* const out_KeyPointTmp = out_KeyPoint ? out_KeyPoint : &tmp_KP;
+		const double CriticalSpeedPlusEps = m_pCalc->Critical.SpeedPlusEps;
+		const SData* pCurData = m_Array[in_IdParticle]->GetCurData_C();
 
-		switch (pBSList->nMasters)
-		{
-		case 1:
-		{
-			int IdMaster = pBSList->List[0].IdMaster;
-			SPRelation* curRelation = m_Relations.GetCurentRelation(in_IdParticle, IdMaster);
-			SPRelation* nextRelation = m_Relations.GetNextRelation(in_IdParticle, IdMaster);
-			RelationAndBeStuck* SelfRel = (RelationAndBeStuck*)curRelation + in_IdParticle + in_IdParticle * m_Count;
+		double DeltaT = in_NextTime - pCurData->TimePoint;
+		double DeltaTPwr2 = DeltaT * DeltaT;
+		double TimeOfView = in_NextTime - m_pCalc->Critical.Distance;
+		int nMastersCur = pBSList->nMasters;
+		ASSERT(nMastersCur > 0);
+		if (in_IdParticle < 0)
+			ASSERT(0);
+		
+		if (nMastersCur == 1) //раздельно значительно иыстрее 	//пока предположительно не может быть единственного хозяина AP
+		{//////////(nMastersCur == 1)///////////////////////////////////////////////////////////////////////////////////////////
+			RelatedInfo* R_Info = pBSList->List;
+			SPRelation* pRelationNext = R_Info->RelationNext;
+			SPRelation* pRelationCurent = R_Info->RelationCurent;
+
+			pRelationNext->State = (R_Info->State | GR_PS_RELATION_NONEEDRECALC | GR_PS_COLLISION_IS_ULTIMATE);
+			out_Data.State |= pRelationNext->State;
 
 			// Новое положение центра сферы фантома
+			pRelationNext->ViewParticlePtr = m_Array[R_Info->IdMaster];
+			pRelationNext->ViewParticlePtr->GetPrevDataByTimeLinear(pRelationNext->ViewPointData, pRelationNext->LowIdxOfViewPont_Near, pRelationCurent->LowIdxOfViewPont_Near, TimeOfView);
+			pRelationNext->LastViewPointTime = pRelationCurent->ViewPointData.TimePoint;
 
-			m_Array[IdMaster]->GetPrevDataByTimeLinear(nextRelation->ViewPointData, nextRelation->LowIdxOfViewPont_Near, curRelation->LowIdxOfViewPont_Near, in_NextTime - m_pCalc->maxAbsSpeed);
-//			m_Array[IdMaster]->GetPrevDataByTimeFast(nextRelation->ViewPointData, nextRelation->LowIdxOfViewPont_Near, curRelation->LowIdxOfViewPont_Near, in_NextTime - m_pCalc->maxAbsSpeed, out_KeyPoint);
-//			m_Array[IdMaster]->GetMovement(nextRelation->ViewPointData, curRelation->ViewPointData, curRelation->ViewPointData.TimePoint + DeltaT, out_KeyPoint);
-//			nextRelation->LowIdxOfViewPont_Near = m_Array[IdMaster]->GetLowIdxByTime(nextRelation->ViewPointData.TimePoint, curRelation->LowIdxOfViewPont_Near);
+			if ((R_Info->State & GR_PS_COLLISION_EXPELLED))
+			{ //AP
+				out_Data.Velocity.SET_AS_DELTA(pCurData->Position, pRelationCurent->ViewPointData.Position);
 
-			SData ByNormal = { 0 };
-			ByNormal.Accel_2_3D = SelfRel->AsSelf.ByNormalData.Accel_2_3D;
-			ASSERT(fabs(ByNormal.Accel_2_3D.X) < SP_MAX_TIME_DISTANCE);
+				//Velocity_Linear == 0 ????????
+				if (out_Data.Velocity.DOT(pRelationCurent->ViewPointData.Velocity_Linear) < 0) out_Data.Velocity.INVERT();
 
-			ByNormal.TimePoint = pCurData->TimePoint;
-			/////Accel3D_DERIV !!!!!!!
+				out_Data.Velocity.SET_LENGHT(m_pCalc->Critical.Speed);
 
-			// Изменение положения точки только за счет ускорения от не мастера (в виде проекции на плоскость нормали)
-			ret = CSpParticle::ItgrlFull(out_Data, ByNormal, in_NextTime, *m_pCalc, out_KeyPoint);
-			out_Data.Position.ADD(pCurData->Position);
+				out_Data.Accel_2_3D = { 0 };
+				out_Data.Jerk_3_3D = { 0 };
+				out_Data.AbsSpeed = 1.0;
+				out_Data.Velocity_Linear = out_Data.Velocity;
+				out_Data.Position.SET_AS_IntegralOf(pCurData->Position, out_Data.Velocity_Linear, DeltaT);
 
-			//новое положение точки относительно центра сферы
-			out_Data.Position.SET_AS_NORMAL(nextRelation->ViewPointData.Position, m_pCalc->CriticalDistance);
+				if (!m_pCalc->Time.IsMinimalStep())
+					*out_KeyPoint = pCurData->TimePoint + m_pCalc->Time.GetMinStep();
 
-			//новое абсолютное положение точки
-			out_Data.Position.ADD(nextRelation->ViewPointData.Position);
+				pRelationNext->State &= ~GR_PS_COLLISION_IS_ULTIMATE;//исключение из хозяев 
+				out_Data.TimePoint = in_NextTime;
 
-			//далее все показатели кроме позиции с отставанием на шаг, так как имеют только информативный характер и не учитываются в расчетах
-			//скорость как изменение позиции S = T * (V1 + V2) / 2  >> 2*S / T - V1 = V2 = (S+S)/T - V1
-			out_Data.Velocity = out_Data.Position;
-			out_Data.Velocity -= pCurData->Position;
-			out_Data.AbsSpeed = out_Data.Velocity.LEN() / DeltaT;
+				SetRelationByUltimate(out_Data, *pCurData, *R_Info);
+				out_Data.State |= pRelationNext->State;
+			}
+			else
+			{//NP
+				//предварительное перемещение только за счет мастера
+				compute_1_Master_LinearMovement(pRelationCurent->ViewPointData, *pCurData, out_Data.Position, out_Data.Velocity, DeltaT);		//перемещение и скорость от мастера
 
-			if (out_Data.AbsSpeed >= m_pCalc->maxAbsSpeed)
-			{
-				ret |= SP_STATE_ABS_SPEED_AL;
-				if (out_Data.AbsSpeed > m_pCalc->maxAbsSpeed)
-					*out_KeyPointTmp = pCurData->TimePoint + DeltaT * 0.75;
-				out_Data.AbsSpeed = m_pCalc->maxAbsSpeed;
-				if (pCurData->AbsSpeed < m_pCalc->maxAbsSpeed)
+				double MoveLenPwr2 = out_Data.Position.LENPWR2();
+
+				if (MoveLenPwr2 < DeltaTPwr2)
+				{//ниже предельной. Должно быть учтено влияние иных
+					SPos FrgnAcc = ((RelationAndRelated*)m_Relations.GetCurentRelation(in_IdParticle, in_IdParticle))->AsSelf.ByNormalData.Accel_2_3D;
+					FrgnAcc.SET_AS_PROJECTION_ONTO_PLANE(out_Data.Velocity);
+					SPos FrgnVelocity = pCurData->Velocity_Linear;
+					FrgnVelocity.SET_AS_PROJECTION_ONTO_PLANE(out_Data.Velocity);
+
+					//с учетом СТО итоговый вектор нормируется к 1 при неизменном векторе от мастера
+					SPos FrgnNewPos = { 0 };
+					FrgnNewPos.ADDIntegralStep(FrgnVelocity, FrgnAcc, DeltaT);
+
+					SPos tmp; tmp.SET_AS_SUMM(out_Data.Position, FrgnNewPos);
+					if (tmp.LENPWR2() > DeltaTPwr2)
+						FrgnNewPos.SET_LENGHT(sqrt(DeltaTPwr2 - MoveLenPwr2));
+
+					out_Data.Position += FrgnNewPos;
+					//это конечно усредненно и с опозданием на полшага
+					out_Data.Velocity.SET_AS_MULT(out_Data.Position, 1.0 / DeltaT);
+					out_Data.Accel_2_3D = { 0 };
+				}
+
+				out_Data.Position += pCurData->Position;
+				///позицию жестко на критическом расстоянии 
+				out_Data.Position -= pRelationNext->ViewPointData.Position;
+				//установка вектора дистанции
+				out_Data.Position.SET_LENGHT_TO_1();
+				//			pRelationNext->Distance_3D = out_Data.Position;
+
+				out_Data.Position += pRelationNext->ViewPointData.Position;
+
+				out_Data.AbsSpeed = out_Data.Velocity.LEN();
+				if (out_Data.AbsSpeed > m_pCalc->Critical.Speed)
 				{
-					ret |= SP_STATE_ABS_CHANGE_LS;
-					*out_KeyPointTmp = pCurData->TimePoint + DeltaT * 0.75;
+					out_Data.AbsSpeed = m_pCalc->Critical.Speed;
+					out_Data.Velocity.SET_LENGHT_TO_1();
+				}
+				out_Data.Velocity_Linear = out_Data.Velocity;
+
+				SetRelationByUltimate(out_Data, *pCurData, pBSList->List[0]);
+				out_Data.State |= pRelationNext->State;
+			}
+		}//////////////(nMastersCur == 1)///////////////////////////////////////////////////////////////////////////////////////
+		else if (nMastersCur == 2) 
+		{//////////////(nMastersCur == 2)///////////////////////////////////////////////////////////////////////////////////////
+			double tmp_KP = in_NextTime;
+			double* const out_KeyPointTmp = out_KeyPoint ? out_KeyPoint : &tmp_KP;
+			RelatedInfo* pR_Info0 = &pBSList->List[0];
+			RelatedInfo* pR_Info1 = &pBSList->List[1];
+
+			int typeOfCombination = 0;
+			if ((pR_Info0->State & GR_PS_COLLISION_EXPELLED))
+			{
+				typeOfCombination++;
+				if ((pR_Info1->State & GR_PS_COLLISION_EXPELLED)) typeOfCombination++;
+				else
+				{ //Если есть AP, то pR_Info1 всегда AP
+					pR_Info0 = &pBSList->List[1];
+					pR_Info1 = &pBSList->List[0];
 				}
 			}
 			else
+				if ((pR_Info1->State & GR_PS_COLLISION_EXPELLED)) typeOfCombination++;
+
+			SPRelation* pRelationCurent0 = pR_Info0->RelationCurent;
+			SPRelation* pRelationCurent1 = pR_Info1->RelationCurent;
+			SPRelation* pRelationNext0 = pR_Info0->RelationNext;
+			SPRelation* pRelationNext1 = pR_Info1->RelationNext;
+
+			pRelationNext0->State = (pR_Info0->State | GR_PS_RELATION_NONEEDRECALC | GR_PS_COLLISION_IS_ULTIMATE);
+			pRelationNext1->State = (pR_Info1->State | GR_PS_RELATION_NONEEDRECALC | GR_PS_COLLISION_IS_ULTIMATE);
+
+			out_Data.State |= pRelationNext0->State;
+
+			// Новое положение центра сферы фантома 0
+			pRelationNext0->ViewParticlePtr = m_Array[pR_Info0->IdMaster];
+			pRelationNext0->ViewParticlePtr->GetPrevDataByTimeLinear(pRelationNext0->ViewPointData, pRelationNext0->LowIdxOfViewPont_Near, pRelationCurent0->LowIdxOfViewPont_Near, TimeOfView);
+			pRelationNext0->LastViewPointTime = pRelationCurent0->ViewPointData.TimePoint;
+
+			// Новое положение центра сферы фантома 1
+			pRelationNext1->ViewParticlePtr = m_Array[pR_Info1->IdMaster];
+			pRelationNext1->ViewParticlePtr->GetPrevDataByTimeLinear(pRelationNext1->ViewPointData, pRelationNext1->LowIdxOfViewPont_Near, pRelationCurent1->LowIdxOfViewPont_Near, TimeOfView);
+			pRelationNext1->LastViewPointTime = pRelationCurent1->ViewPointData.TimePoint;
+
+			int ComputeResult;
+
+			switch (typeOfCombination)
 			{
-				if (pCurData->AbsSpeed >= m_pCalc->maxAbsSpeed)
+			case 0://2NP
+				ComputeResult = compute_2NP_master_LinearMove_R1(pRelationCurent0->ViewPointData, pRelationCurent1->ViewPointData, pRelationNext0->ViewPointData, pRelationNext1->ViewPointData, *pCurData, out_Data, DeltaT);
+				if (out_Data.AbsSpeed < m_pCalc->Critical.SpeedMinusEps)
+				{//учет стремлений от не хозяев. Для двух хозяев одна степень свободы. Вырожденные случаи с двумя степенями свободы можно игнорировать
+					// Строим два вектора в плоскости
+					SPos Movement; Movement.SET_AS_DELTA(out_Data.Position, pCurData->Position);
+					double MoveLenPwr2 = Movement.LENPWR2();
+					if (MoveLenPwr2 < DeltaTPwr2)
+					{
+						SPos AB; AB.SET_AS_DELTA(pRelationNext0->ViewPointData.Position, out_Data.Position);
+						SPos MoveLine; MoveLine.SET_AS_DELTA(pRelationNext1->ViewPointData.Position, out_Data.Position);
+						MoveLine.CROSS(AB);
+
+
+						SPos FrgnAcc = ((RelationAndRelated*)m_Relations.GetCurentRelation(in_IdParticle, in_IdParticle))->AsSelf.ByNormalData.Accel_2_3D;
+						FrgnAcc.SET_AS_PROJECTION_ONTO_LINE(MoveLine);
+						SPos FrgnVelocity = pCurData->Velocity_Linear;
+						FrgnVelocity.SET_AS_PROJECTION_ONTO_LINE(MoveLine);
+
+						//с учетом СТО итоговый вектор нормируется к 1 при неизменном векторе от мастера
+						SPos FrgnNewPos = { 0 };
+						FrgnNewPos.ADDIntegralStep(FrgnVelocity, FrgnAcc, DeltaT);
+
+						SPos tmp; tmp.SET_AS_SUMM(Movement, FrgnNewPos);
+						if (tmp.LENPWR2() > DeltaTPwr2)
+							FrgnNewPos.SET_LENGHT(sqrt(DeltaTPwr2 - Movement.LENPWR2()));
+
+						out_Data.Position += FrgnNewPos;
+						MoveToClosestEequiDistantPoint_R1_FAST(pRelationNext0->ViewPointData.Position, pRelationNext1->ViewPointData.Position, out_Data.Position);
+
+						Movement.SET_AS_DELTA(out_Data.Position, pCurData->Position);
+
+						//это конечно усредненно и с опозданием на полшага
+						out_Data.Velocity.SET_AS_MULT(Movement, 1.0 / DeltaT);
+						out_Data.Velocity_Linear = out_Data.Velocity;
+						out_Data.Accel_2_3D = { 0 };
+						out_Data.AbsSpeed = out_Data.Velocity.LEN();
+					}
+				}
+				break;
+			case 1://NP+AP
+				ComputeResult = compute_NPAP_master_LinearMove(pRelationCurent0->ViewPointData, pRelationNext0->ViewPointData, pRelationCurent1->ViewPointData, *pCurData, out_Data, DeltaT);
+				break;
+			case 2://2AP
+				ComputeResult = compute_2AP_master_Motion(pRelationCurent0->ViewPointData, pRelationCurent1->ViewPointData, *pCurData, out_Data, DeltaT);
+				if (out_Data.AbsSpeed == 0.0)
 				{
-					ret |= SP_STATE_ABS_CHANGE_LS;
-					*out_KeyPointTmp = pCurData->TimePoint + DeltaT * 0.75;
+					//настолько невероятно, что не имеет смысла реализовывать учет внешнего стремления
+					;
+				}
+				break;
+			}
+
+			if ((ComputeResult & 0x11))
+			{
+				if (!m_pCalc->Time.IsMinimalStep())
+					*out_KeyPointTmp = pCurData->TimePoint + m_pCalc->Time.GetMinStep();
+
+				if ((ComputeResult & 0x01))
+					pRelationNext0->State &= ~GR_PS_COLLISION_IS_ULTIMATE;//исключение из хозяев 
+				if ((ComputeResult & 0x10))
+					pRelationNext1->State &= ~GR_PS_COLLISION_IS_ULTIMATE;//исключение из хозяев 
+			}
+
+			if (out_Data.AbsSpeed > m_pCalc->Critical.Speed)
+			{
+				if (out_Data.AbsSpeed < CriticalSpeedPlusEps)
+					out_Data.AbsSpeed = m_pCalc->Critical.Speed;
+				else
+				{
+					//ASSERT(0);
+					out_Data.AbsSpeed = m_pCalc->Critical.Speed;
+					out_Data.Velocity.NORMALIZE();
+				}
+				out_Data.Velocity_Linear = out_Data.Velocity;
+			}
+
+			out_Data.TimePoint = in_NextTime;
+
+			SetRelationByUltimate(out_Data, *pCurData, *pR_Info0);
+			out_Data.State |= pRelationNext0->State;
+
+			SetRelationByUltimate(out_Data, *pCurData, *pR_Info1);
+			out_Data.State |= pRelationNext1->State;
+
+		}
+		else
+		{//////////////(nMastersCur > 2)///////////////////////////////////////////////////////////////////////////////////////
+			ASSERT(nMastersCur < 3);
+			double SpedOnDirection[10];
+			double tmp_KP = in_NextTime;
+			double* const out_KeyPointTmp = out_KeyPoint ? out_KeyPoint : &tmp_KP;
+			SPos DIrectionStartVector = { 0 };
+			int DoBy0 = 0;
+
+			//определение начальных условий
+			for (int i = 0; i < nMastersCur; i++)
+			{
+				RelatedInfo& R_Info = pBSList->List[i];
+				SPRelation* pRelationNext = R_Info.RelationNext;
+				SPRelation* pRelationCurent = R_Info.RelationCurent;
+
+				// Новые положения центра сферы фантомов
+				pRelationNext->ViewParticlePtr = m_Array[R_Info.IdMaster];
+				pRelationNext->ViewParticlePtr->GetPrevDataByTimeLinear(pRelationNext->ViewPointData, pRelationNext->LowIdxOfViewPont_Near, pRelationCurent->LowIdxOfViewPont_Near, TimeOfView);
+
+				//временное использование переменных для данных по направлению и величине относительной скорости
+				pRelationNext->RelativeSpeed = SData::GetRelativeSpeedFromVelocity_Linear(pRelationCurent->ViewPointData, pCurData->Position, &pRelationNext->RelativeVelocity_3D);
+				pRelationNext->Acceleration_3D = { 0 };
+				pRelationNext->Jerk_3_3D = { 0 };
+				pRelationNext->Wind_3D.SET_AS_DELTA(pCurData->Position, pRelationCurent->ViewPointData.Position); //направление от VP к частице
+				pRelationNext->State = R_Info.State | GR_PS_RELATION_NONEEDRECALC | GR_PS_COLLISION_IS_ULTIMATE;
+
+				//определение направления движения
+				if (R_Info.RelationNext->RelativeSpeed > 1.0e-14)//убегает !!!!!!!!!!! заменить 0 на минимальное значение???
+				{
+					if ((R_Info.State & GR_PS_COLLISION_EXPELLED) == 0)//притягивает
+						DIrectionStartVector += R_Info.RelationNext->Wind_3D;
+					else //отталкивает
+						DIrectionStartVector -= R_Info.RelationNext->Wind_3D;
+				}
+				else if (R_Info.RelationNext->RelativeSpeed < -1.0e-14)//приближается 
+				{
+					if ((R_Info.State & GR_PS_COLLISION_EXPELLED) == 0)	//отталкивает
+						DIrectionStartVector -= R_Info.RelationNext->Wind_3D;
+					else //притягивает
+						DIrectionStartVector += R_Info.RelationNext->Wind_3D;
+				}
+				else DoBy0++;
+			}
+
+			if (DoBy0)//сопротивление движению. гасит вектор по проекции
+				for (int i = 0; i < nMastersCur; i++)
+				{
+					ASSERT(0);
+					RelatedInfo& R_Info = pBSList->List[i];
+					if (R_Info.RelationNext->RelativeSpeed <= 1.0e-14 && R_Info.RelationNext->RelativeSpeed >= -1.0e-14)
+					{
+						SPos sss = DIrectionStartVector;
+						sss.SET_AS_PROJECTION_OF(R_Info.RelationNext->Wind_3D);
+						double direction = sss.DOT(DIrectionStartVector);
+						double dirLen = DIrectionStartVector.LEN();
+						double sssLen = sss.LEN();
+
+						if (direction > 0.0)
+						{//убегает 
+							if ((R_Info.State & GR_PS_COLLISION_EXPELLED))//AP
+								DIrectionStartVector += sss;
+							else
+								if (sssLen >= dirLen) DIrectionStartVector = { 0 };
+								else DIrectionStartVector -= sss;
+						}
+						else if (direction < 0.0)
+						{//приближается 
+							if ((pBSList->List[i].State & GR_PS_COLLISION_EXPELLED) == 0)//NP
+								DIrectionStartVector += sss;
+							else
+								if (sssLen >= dirLen) DIrectionStartVector = { 0 };
+								else DIrectionStartVector -= sss;
+						}
+					}
+				}
+
+			//определение начальной скорости движения
+			double maxSpeed = 0.0;
+			int nMoveMasters = 0;
+
+			for (int i = 0; i < nMastersCur; i++)
+			{
+				double curSpeed = 0;// SpeedByPhantom(pBSList->List[i].RelationCurent->ViewPointData, pCurData->Position, DIrectionStartVector, nullptr);
+
+				if (curSpeed > -1.0e-14)
+				{
+					if (curSpeed < 1.0e-14) SpedOnDirection[i] = 0.0;
+					else
+					{
+						nMoveMasters++;
+						if (curSpeed > maxSpeed) maxSpeed = curSpeed;
+						SpedOnDirection[i] = curSpeed;
+					}
+				}
+				else
+					SpedOnDirection[i] = 0.0;
+			}
+
+
+			int nSize = 2;
+
+			for (int i = 0; i < nMastersCur; i++)
+			{
+				const double curSpeed = SpedOnDirection[i];
+				if (curSpeed > 1.0e-14)
+				{
+					if (curSpeed > CriticalSpeedPlusEps)
+					{
+						pBSList->List[i].RelationNext->State &= ~GR_PS_COLLISION_IS_ULTIMATE;//исключение из хозяев
+					}
+				}
+				else if (curSpeed < -1.0e-14)
+				{
+					pBSList->List[i].RelationNext->State &= ~GR_PS_COLLISION_IS_ULTIMATE;//исключение из хозяев
 				}
 			}
 
-			out_Data.Velocity.SET_LENGHT(out_Data.AbsSpeed);
-			out_Data.Density = 0.0;
-			nextRelation->State |= SP_STATE_PHANTOM_BESTUCK;
-			
-			//ускорение и тд не здесь
-		}
-			break;
-		case 2:
-			ASSERT(0);
-			{
-				SPos midPoint1, midPoint2;
-				SPos sphCenter11, sphCenter12, sphCenter21, sphCenter22;
-				int IdMaster1 = pBSList->List[0].IdMaster;
-				int IdMaster2 = pBSList->List[1].IdMaster;
 
-				SPRelation* curRelation1 = m_Relations.GetCurentRelation(in_IdParticle, IdMaster1);
-				SPRelation* curRelation2 = m_Relations.GetCurentRelation(in_IdParticle, IdMaster2);
-				
-				sphCenter11 = curRelation1->ViewPointData.Position;
-				sphCenter21 = curRelation2->ViewPointData.Position;
-
-				SData SD_Sphere12, SD_Sphere22;
-				m_Array[IdMaster1]->GetMovement(SD_Sphere12, curRelation1->ViewPointData, in_NextTime, out_KeyPoint);
-				m_Array[IdMaster2]->GetMovement(SD_Sphere22, curRelation2->ViewPointData, in_NextTime, out_KeyPoint);
+			if (maxSpeed > m_pCalc->Critical.SpeedMinusEps)
+				maxSpeed = m_pCalc->Critical.Speed;
 
 
-				midPoint1.SET_AS_MIDDLE_POINT(sphCenter11, sphCenter21);
-				midPoint2.SET_AS_MIDDLE_POINT(sphCenter12, sphCenter22);
+			out_Data.Position = DIrectionStartVector;
+			double moveLenghtTmp = maxSpeed * DeltaT;
+			out_Data.Position.SET_LENGHT(moveLenghtTmp);
 
-				SPos midPointMovement = midPoint2; midPointMovement.MINUS(midPoint1);
+			if (maxSpeed < m_pCalc->Critical.Speed && tmpCount > nMastersCur + 1)
+			{//учет стремлений от не хозяев
+				RelationAndRelated* SelfRel = (RelationAndRelated*)m_Relations.GetCurentRelation(in_IdParticle, in_IdParticle);
+				SData ByNormal;
+				ByNormal.CLEAR();
+				ByNormal.Accel_2_3D = SelfRel->AsSelf.ByNormalData.Accel_2_3D;
+				ASSERT(fabs(ByNormal.Accel_2_3D.X) < SP_MAX_TIME_DISTANCE);
+
+				SData SelfMove;
+				CSpParticle::ItgrlFull(SelfMove, ByNormal, DeltaT, *m_pCalc, nullptr, ITGL_CALC_USELINEAR);
+				if (SelfMove.Position.LEN() > moveLenghtTmp * 1.0e-14)
+				{
+
+					//определение количества степеней свободы
+					//pBSList->List[nn].RelationNext->Wind_3D  >> //направление от VP к частице
+					SPos normFree = pBSList->List[0].RelationNext->Wind_3D;
+
+					if (nMastersCur == 2)
+					{
+						if (!pBSList->List[0].RelationNext->Wind_3D.IsCollinear(pBSList->List[1].RelationNext->Wind_3D))
+						{// не на одной прямой
+							nSize = 1;
+							normFree.SET_AS_CROSS(pBSList->List[0].RelationNext->Wind_3D, pBSList->List[1].RelationNext->Wind_3D);
+						}
+					}
+					else if (nMastersCur > 2)
+					{
+						int i;
+						for (i = 1; i < nMastersCur && pBSList->List[i].RelationNext->Wind_3D.IsCollinear(pBSList->List[i - 1].RelationNext->Wind_3D); i++);
+
+						if (i < nMastersCur)
+						{//не все коллинеарны
+							nSize = 1;
+							normFree.CROSS(pBSList->List[i].RelationNext->Wind_3D);
+
+							while (++i < nMastersCur && normFree.GETCROSS(pBSList->List[i].RelationNext->Wind_3D).IsZero());
+
+							if (i < nMastersCur)
+								nSize = 0;
+						}
+					}
+
+					if (nSize)
+					{
+						SPos SelfMovePos;
+						if (nSize == 1)
+						{
+							SelfMovePos = normFree;
+							SelfMovePos.SET_AS_PROJECTION_OF(SelfMove.Position);
+						}
+						else
+						{
+							SelfMovePos = SelfMove.Position;
+							SelfMovePos.SET_AS_PROJECTION_ONTO_PLANE(normFree);
+						}
+
+						double maxSelfPwr2 = out_Data.Position.LENPWR2() + m_pCalc->Critical.SpeedPwr2 * DeltaT * DeltaT;
+
+						if (SelfMovePos.LENPWR2() > maxSelfPwr2)
+							SelfMovePos.SET_LENGHT(sqrt(maxSelfPwr2));
+
+						out_Data.Position += SelfMovePos;
+						ASSERT(out_Data.Position.LENPWR2() <= m_pCalc->Critical.SpeedPwr2);
+					}
+				}
 			}
-			break;
 
-		default:
-			ASSERT(0);
-			break;
+			out_Data.Velocity = out_Data.Position;
+			out_Data.Velocity /= DeltaT;
+			out_Data.AbsSpeed = out_Data.Velocity.LEN();
+
+			if (out_Data.AbsSpeed > m_pCalc->Critical.Speed)
+			{
+				if (out_Data.AbsSpeed < CriticalSpeedPlusEps)
+					out_Data.AbsSpeed = m_pCalc->Critical.Speed;
+				else
+				{
+					ASSERT(0);
+					out_Data.AbsSpeed = m_pCalc->Critical.Speed;
+				}
+				out_Data.Velocity.SET_LENGHT(m_pCalc->Critical.Speed);
+			}
+
+			out_Data.Velocity_Linear = out_Data.Velocity;
+
+
+			out_Data.Position += pCurData->Position;
+			out_Data.TimePoint = in_NextTime;
+
+			//расчет relation для каждого из nMastersCur
+			for (int i = 0; i < nMastersCur; i++)
+			{
+				RelatedInfo& R_Info = pBSList->List[i];
+
+				R_Info.RelationNext->Distance_3D.SET_AS_DELTA(out_Data.Position, R_Info.RelationNext->ViewPointData.Position);
+
+
+				///!!!!!!подумать как иначе уточнить позицию
+				if ((R_Info.RelationNext->State & GR_PS_COLLISION_IS_ULTIMATE))
+				{
+					if (nMastersCur > 1)
+					{
+						if (fabs(R_Info.RelationNext->DistancePwr1 - m_pCalc->Critical.Distance) > m_pCalc->Time.GetPrecDistance())
+							R_Info.RelationNext->State ^= GR_PS_COLLISION_IS_ULTIMATE;
+					}
+					else
+					{///!!!!!!подумать как иначе уточнить позицию
+						out_Data.Position -= R_Info.RelationNext->ViewPointData.Position;
+						out_Data.Position.SET_LENGHT(m_pCalc->Critical.Distance);
+						out_Data.Position += R_Info.RelationNext->ViewPointData.Position;
+						R_Info.RelationNext->Distance_3D.SET_AS_DELTA(out_Data.Position, R_Info.RelationNext->ViewPointData.Position);
+						R_Info.RelationNext->DistancePwr1 = m_pCalc->Critical.Distance;
+						R_Info.RelationNext->DistancePwr2 = m_pCalc->Critical.DistancePwr2;
+					}
+				}
+				else
+				{
+					R_Info.RelationNext->DistancePwr2 = R_Info.RelationNext->Distance_3D.LENPWR2();
+					R_Info.RelationNext->DistancePwr1 = sqrt(R_Info.RelationNext->DistancePwr2);
+				}
+
+				R_Info.RelationNext->RelativeSpeed = SData::GetRelativeSpeedFromVelocity_Linear(R_Info.RelationNext->ViewPointData, out_Data, &R_Info.RelationNext->RelativeVelocity_3D);
+				R_Info.RelationNext->RelativeSpeedAbs = fabs(R_Info.RelationNext->RelativeSpeed);
+				R_Info.RelationNext->Wind_3D = { 0 };
+				R_Info.RelationNext->LastViewPointTime = R_Info.RelationCurent->ViewPointData.TimePoint;
+
+				R_Info.RelationNext->RealDistancePwr1 = pCurData->Position.GetDistance(R_Info.RelationNext->ViewParticlePtr->GetCurPosition());
+				R_Info.RelationNext->RealRelativeSpeed = SData::GetRelativeSpeedFromVelocity_Linear(*pCurData, *R_Info.RelationNext->ViewParticlePtr->GetCurData_C(), NULL);
+
+
+				if ((R_Info.RelationNext->State & GR_PS_COLLISION_IS_ULTIMATE))
+				{
+					ASSERT(R_Info.RelationNext->DistancePwr1 == m_pCalc->Critical.Distance);
+					R_Info.RelationNext->DensityAtBasePoint = 0.0;
+					out_Data.Accel_2_3D = { 0 };
+					out_Data.Jerk_3_3D = { 0 };
+					out_Data.Density = 0;
+				}
+				else
+				{
+					R_Info.RelationNext->State &= (0xFFFFFFFF ^ GR_PS_COLLISION_PRESENT);
+
+					if (R_Info.RelationNext->DistancePwr1 < m_pCalc->Critical.Distance)
+					{
+						R_Info.RelationNext->State |= (GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_IS_INSIDE);
+						R_Info.RelationNext->State |= (R_Info.RelationCurent->State & (GR_PS_COLLISION_BESTUCK | GR_PS_COLLISION_EXPELLED));
+					}
+					*out_KeyPointTmp = pCurData->TimePoint + m_pCalc->Time.GetMinStep();
+					/////////////РАСЧЕТ ПЛОТНОСТИ
+					R_Info.RelationNext->Calc_RelativeDensity(m_pCalc->DensityCalcType);
+					//расчет ускорения
+					R_Info.RelationNext->Calc_RelativeAcceleration(m_pCalc->AccCalcType);
+
+					////switch (m_pCalc->WindType) // Fantasy !!!!!
+				}
+				R_Info.RelationNext->DistancePwr3 = R_Info.RelationNext->DistancePwr1 * R_Info.RelationNext->DistancePwr2;
+				out_Data.State |= R_Info.RelationNext->State;
+			}
 		}
-
 	}
 	return ret;
 }
@@ -1216,14 +1485,19 @@ int CSP_Group::CalcBeStuckNextPos(SData& out_Data, int in_IdParticle, double in_
 int CSP_Group::NextStep()
 {
 	int ret = SP_STATE_ERROR_MAIN;
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
-	if (m_Array && m_Count > 1 && m_Array[0] && m_Array[1])
+	if (m_Array && tmpCount > 1 && m_Array[0] && m_Array[1])
 	{
 		int prev_ParticlesState = m_ParticlesState;
 		m_pCalc->Time.PrepareNextStep(m_pCalc->Stat);
-		if ((prev_ParticlesState & GR_PS_COLLISION_BESTUCK))
-			m_pCalc->Time.CheckByBeStuckStep();
+
+		if ((prev_ParticlesState & GR_PS_COLLISION_IS_ULTIMATE))
+			m_pCalc->Time.CheckByRelatedStep();
+
+		m_Relations.FillNRelated(GR_PS_RELATION_CURRENT, 0, tmpCount, GR_PS_COLLISION_IS_ULTIMATE);
+		if (0)
+			ASSERT(0);
 
 		if ((prev_ParticlesState & GR_PS_MAXABSSPEED) != GR_PS_NORM &&  m_pCalc->Time.GetStep() > m_pCalc->Time.GetMinStep() + m_pCalc->Time.GetMinStep())
 		{
@@ -1235,116 +1509,99 @@ int CSP_Group::NextStep()
 		int doByKeyPoint;
 		double KeyPoint, NextTime;
 
-		const BeStuckParticles* pBSP = m_Relations.GetBeStuck_Current();
+		const RelatedParticles* pBSP = m_Relations.GetRelated_Current();
 
 		do
 		{
-			if (pBS_Corrected->GetCount())	pBS_Corrected->clear();
-			doByKeyPoint = 0;
+			m_pCalc->Time.DelFlag(SPTIME_NEXT_STEP_MIN);
 
 			do	//расчет новой позиции
 			{
-				m_Relations.ClearNextState(0, m_Count - 1, SP_STATE_RELATION_MASK_CLR_ALL);
+				m_Relations.ClearNextState(0, tmpCount - 1, SP_STATE_RELATION_MASK_CLR_ALL);
 				NextTime = KeyPoint = m_pCalc->Time.GetNextTime();
 				m_ParticlesState = GR_PS_NORM;
 
-				for (int i = 0; i < m_Count && KeyPoint == NextTime; i++)
+				for (int i = 0; i < tmpCount && KeyPoint == NextTime; i++)
 				{
 					m_Array[i]->NewPoint_Begin(NextTime);
 
+					int tmpRet;
 					int BS_num = pBSP->GetNumById(i);
 
 					if (BS_num >= 0)
-					{
-						CalcBeStuckNextPos(m_Array[i]->m_NextData, i, NextTime, &KeyPoint);
-						//ASSERT(KeyPoint == NextTime);
-						if ((CSP_Group::AssertionVar & 1))
-						{//проверка на непревышение предельной скорости
-							double cmpDist = m_Array[i]->m_Data->GetCurData()->Position.GetDistance(m_Array[i]->m_NextData.Position);
-
-							double cmpSpeed = cmpDist / m_pCalc->Time.GetStep();
-
-							ASSERT(!(CSP_Group::AssertionVar & 1) || cmpSpeed < 1.000000001);
-							ASSERT(!(CSP_Group::AssertionVar & 1) || cmpDist < m_pCalc->Time.GetStep() + 1.0e-15);
-						}
-					}
+						tmpRet = ComputeParticleDataAtPhantomBarrier(m_Array[i]->m_NextData, i, NextTime, &KeyPoint);
 					else
-					{
-						m_Array[i]->GetNextDataByTime(m_Array[i]->m_NextData, NextTime, &KeyPoint);
-						//ASSERT(KeyPoint == NextTime);
-					}
+						tmpRet = m_Array[i]->GetNextDataByTime(m_Array[i]->m_NextData, NextTime, &KeyPoint);
 
-					if (m_Array[i]->m_NextData.AbsSpeed >= m_pCalc->maxAbsSpeed)
+					if ((tmpRet& SP_STATE_NEXT_STEP_MIN))
+						m_pCalc->Time.AddFlag(SPTIME_NEXT_STEP_MIN);
+
+					if (m_Array[i]->m_NextData.AbsSpeed >= m_pCalc->Critical.Speed)
 						m_ParticlesState |= GR_PS_MAXABSSPEED;
 
+					ASSERT(m_pCalc->Time.GetCurTime() != KeyPoint);
 					if (NextTime != KeyPoint)
 						KeyPoint = m_pCalc->Time.SetNextTimeEx(KeyPoint);
 				}
-
-				if (NextTime == KeyPoint && (prev_ParticlesState & GR_PS_COLLISION_BESTUCK))
-				{//коррекция BeStuck частиц с возможным изменением времени
-					CorrectBeStuckParticles(GR_PS_RELATION_NEXT, KeyPoint);
-				}
-
 			} while (NextTime != KeyPoint);
 
-			int CicleCntr = 0;
+			m_Relations.ClearNextState(0, tmpCount - 1, (GR_PS_COLLISION_PRESENT | GR_PS_RELATION_NONEEDRECALC));
 
-			do
+			//уточнение времени, пока есть предупреждения
+			doByKeyPoint = CalcRelations(NextTime, m_Relations.GetNext(), m_Relations.GetCurent(), m_pCalc->Time.IsMinimalStep() ? SP_CALCRELATION_FIND_VIEWPOINT : SP_CALCRELATION_BREAK_ON_MINOR_ERROR | SP_CALCRELATION_FIND_VIEWPOINT, KeyPoint);
+			//ASSERT(fabs(m_Relations.GetNext()[1].Acceleration_3D.X) < 1.0e80);
+			ASSERT(NextTime >= KeyPoint);
+			if (NextTime != KeyPoint)
 			{
-				CicleCntr++;
-				ASSERT(CicleCntr < 100);
-				m_Relations.ClearNextState(0, m_Count - 1, SP_STATE_PHANTOM_BESTUCK);
-
-				//уточнение времени, пока есть предупреждения
-				doByKeyPoint = CalcRelations(NextTime, m_Relations.GetNext(), m_Relations.GetCurent(), SP_CALCRELATION_BREAK_ON_MINOR_ERROR | SP_CALCRELATION_FIND_VIEWPOINT, KeyPoint);
-				//ASSERT(fabs(m_Relations.GetNext()[1].Acceleration_3D.X) < 1.0e80);
-				ASSERT(NextTime >= KeyPoint);
-				if (NextTime != KeyPoint)
-				{
+				if ((doByKeyPoint & SP_STATE_PHANTOM_CRITICAL_CHANGED) && NextTime - KeyPoint < 1.0e-15)//m_pCalc->Time.GetMinStep())
+					KeyPoint = NextTime;
+				else
 					KeyPoint = m_pCalc->Time.SetNextTimeEx(KeyPoint);
+				if (NextTime != KeyPoint)
 					doByKeyPoint |= SP_STATE_NEED_RECALC;
-				}
-				if (NextTime == KeyPoint && (doByKeyPoint & SP_STATE_PHANTOM_CRITICAL_CHANGED))
-				{
-
-					m_Relations.clear_BeStuck(GR_PS_RELATION_CORRECTED);
-					doByKeyPoint |= CorrectBeStuckParticles(GR_PS_RELATION_NEXT| GR_PS_RELATION_NEEDRECALC, KeyPoint);
-					if (NextTime != KeyPoint) KeyPoint = m_pCalc->Time.SetNextTimeEx(KeyPoint);
-					if ((doByKeyPoint & GR_PS_POSITION_CHANGED))
-						doByKeyPoint |= SP_STATE_NEED_RECALC;
-				} 
-			} while (NextTime == KeyPoint && (doByKeyPoint & GR_PS_POSITION_CHANGED) && m_pCalc->Time.IsMinimalStep() == false && (CicleCntr <50 || m_pCalc->Time.GetCurTime() < 1000.0));
+			}
 
 		} while (NextTime != KeyPoint);
 
 		if ((doByKeyPoint & SP_STATE_NEED_RECALC))// FINAL if need
 		{
-			m_Relations.ClearNextState(0, m_Count - 1, SP_STATE_PHANTOM_BESTUCK);
+			m_Relations.ClearNextState(0, tmpCount - 1, (GR_PS_COLLISION_PRESENT | GR_PS_RELATION_NONEEDRECALC));
 			doByKeyPoint = CalcRelations(NextTime, m_Relations.GetNext(), m_Relations.GetCurent(), SP_CALCRELATION_FIND_VIEWPOINT, KeyPoint);
 		}
 
 		if ((doByKeyPoint & (SP_STATE_PHANTOM_DIST_LE_CRITICAL| SP_STATE_PHANTOM_DENSITY_LE_0)))
-			m_Relations.FillNBeStuck(GR_PS_RELATION_NEXT, 0, m_Count);
+			m_Relations.FillNRelated(GR_PS_RELATION_NEXT, 0, tmpCount, GR_PS_COLLISION_IS_ULTIMATE);
 		else
-			m_Relations.clear_BeStuck(GR_PS_RELATION_NEXT);
+			m_Relations.clear_Related(GR_PS_RELATION_NEXT);
+
+
 
 		CalcDataByRelations(GR_PS_RELATION_NEXT);
-
-
 		ASSERT(m_Array[0]->m_NextData.TimePoint == m_Array[1]->m_NextData.TimePoint);
 		ASSERT(m_Array[0]->m_NextData.TimePoint != m_Array[0]->GetCurData_C()->TimePoint);
+		double dTime =  m_pCalc->Time.GetStep();
+		for (int i = 0; i < tmpCount; i++)
+		{
+			//ASSERT(m_Array[i]->m_NextData.Velocity.Z== 0.0 && m_Array[i]->m_NextData.Position.Z == 0.0 && m_Array[i]->m_NextData.Accel_2_3D.Z == 0.0 && m_Array[i]->m_NextData.Jerk_3_3D.Z == 0.0 && m_Array[i]->m_NextData.Velocity_Linear.Z == 0.0);
+			ASSERT(m_Array[i]->m_NextData.Velocity.LEN() <= 1.00000000000001);
+			SPos tmp; 
+			tmp.SET_AS_DELTA(m_Array[i]->m_NextData.Position, m_Array[i]->GetCurData_C()->Position);
+			ASSERT(dTime > 0.0);
+
+			tmp /= dTime;
+			double tmplen = tmp.LEN();
+			ASSERT(tmplen - sqrt(dTime) <= 1.0e20 + 1000000.90000000000);
+		}
 
 		double cmpDist = m_Array[0]->m_Data->GetCurData()->Position.GetDistance(m_Array[0]->m_NextData.Position);
 
 		ASSERT(!(CSP_Group::AssertionVar & 1) || cmpDist < m_pCalc->Time.GetStep() + 1.0e-15);
 
-		STracePosInfo nextStepInfo = { 0 };
-
+		nextStepInfo = { 0 };
 		nextStepInfo.TimePoint = NextTime;
-		nextStepInfo.ParticlesState = m_ParticlesState;
 		nextStepInfo.RelationsS_Prev = m_ParticleInfoArray->GetCurData()->RelationsState_Cur;
-		nextStepInfo.RelationsState_Cur = doByKeyPoint;
+
+		FiilParticlesState();
 
 		EnterCriticalSection(&m_cs);
 
@@ -1352,7 +1609,7 @@ int CSP_Group::NextStep()
 
 		ret = SP_STATE_ОК;
 		//фиксация результата и переход на следующую итерацию
-		for (int i = 0; i < m_Count; i++)
+		for (int i = 0; i < tmpCount; i++)
 		{
 			m_Array[i]->MoveToNewPoint(AddType);
 			ASSERT(m_Array[i]->GetCurPos() == m_ParticleInfoArray->GetCurPos());
@@ -1376,62 +1633,67 @@ int CSP_Group::NextStep()
 
 int CSP_Group::CalcSingleRelation(CalceRelationParams& Params)
 {
-	Params.Ret_Flags = SP_STATE_ERROR_MAIN;
+	Params.Ret_Flags = SP_STATE_ОК;
+	Params.out_KeyPoint = Params.ViewTime;
 	
-	if (Params.PtrViewParticle && Params.NewRelations)
+	if (!Params.PtrViewParticle || !Params.NewRelations)
+	{
+		Params.Ret_Flags = SP_STATE_ERROR_MAIN;
+	}
+	else if ((Params.NewRelations->State & GR_PS_RELATION_NONEEDRECALC))
+	{
+		if ((Params.NewRelations->State & GR_PS_COLLISION_IS_ULTIMATE))
+		{
+			Params.Ret_Flags |= SP_STATE_PHANTOM_DIST_LE_CRITICAL;
+			m_ParticlesState |= GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_IS_ULTIMATE;
+		}
+	}
+	else
 	{
 		const SData* curParticleData = Params.PtrParticle->GetCurData_C();
 		const SData* curViewParticleData = Params.PtrViewParticle->GetCurData_C();
 
+		Params.NewRelations->ViewParticlePtr = Params.PtrViewParticle;
 		Params.NewRelations->RealDistancePwr1 = curParticleData->Position.GetDistance(curViewParticleData->Position);
-		Params.NewRelations->RealRelativeSpeed = SData::GetRelativeSpeed(*curParticleData, *curViewParticleData, NULL);
+		Params.NewRelations->RealRelativeSpeed = SData::GetRelativeSpeedFromVelocity_Linear(*curParticleData, *curViewParticleData, NULL);
 
 		int tmpRet = 0;
-		int prevState = 0;
+		int prevState = Params.PrevRelations->State;
 		ASSERT(Params.PrevRelations);
-
-		prevState = Params.PrevRelations->State;
 
 		if ((Params.CalcType & SP_CALCRELATION_FIND_VIEWPOINT))
 		{
-			if ((Params.NewRelations->State & SP_STATE_PHANTOM_BESTUCK))
-			{
-				;
-			}
-			else
-			{
-				double in_StartTime = -99999.0, EndTime;
+			double in_StartTime = -99999.0, EndTime;
 
-				EndTime = Params.PtrViewParticle->GetCurTime();
-				in_StartTime = Params.NewRelations->LastViewPointTime = Params.PrevRelations->LastViewPointTime;
+			EndTime = Params.PtrViewParticle->GetCurTime();
+			in_StartTime = Params.NewRelations->LastViewPointTime = Params.PrevRelations->LastViewPointTime;
 
-				if (EndTime > Params.ViewTime) EndTime = Params.ViewTime;
+			if (EndTime > Params.ViewTime) EndTime = Params.ViewTime;
 
-				ASSERT(EndTime >= 0.0);
+			ASSERT(EndTime >= 0.0);
 
-				Params.out_KeyPoint = Params.ViewTime;
-				ASSERT(Params.ViewTime - m_pCalc->Time.GetCurTime() > 0.0);
+			ASSERT(Params.ViewTime - m_pCalc->Time.GetCurTime() > 0.0);
 
-				tmpRet = Params.PtrViewParticle->FindViewPointByTime(Params.NewRelations->ViewPointData, Params.DataParticle, Params.out_KeyPoint, in_StartTime, EndTime, &Params.NewRelations->LowIdxOfViewPont_Near);
+			tmpRet = Params.PtrViewParticle->FindViewPointByTime(Params.NewRelations->ViewPointData, Params.DataParticle, Params.out_KeyPoint, in_StartTime, EndTime, &Params.NewRelations->LowIdxOfViewPont_Near);
 
-				if ((tmpRet & SP_STATE_FAR_AWAY) == SP_STATE_FAR_AWAY && ((tmpRet ^ prevState) & SP_STATE_FAR_AWAY) == 0 && Params.NewRelations->RealDistancePwr1 < m_pCalc->CriticalDistance) ///&& m_pCalc->Time.IsMinimalStep()
-				{ //возможно немного оптимизировать по расстоянию и скорости
-					SData dataM1;
-					Params.PtrViewParticle->GetPrevDataByTime(dataM1, Params.out_KeyPoint - m_pCalc->CriticalDistance, NULL);
+			if ((tmpRet & SP_STATE_FAR_AWAY) == SP_STATE_FAR_AWAY && ((tmpRet ^ prevState) & SP_STATE_FAR_AWAY) == 0 && Params.NewRelations->RealDistancePwr1 < m_pCalc->Critical.Distance) ///&& m_pCalc->Time.IsMinimalStep()
+			{ //возможно немного оптимизировать по расстоянию и скорости
+				SData dataM1;
+				int IdxTmp = 0;
+				//Params.PtrViewParticle->GetPrevDataByTime(dataM1, Params.out_KeyPoint - m_pCalc->Critical.Distance, NULL);
+				Params.PtrViewParticle->GetPrevDataByTimeLinear(dataM1, IdxTmp, 0, Params.out_KeyPoint - m_pCalc->Critical.Distance);
 
-					double dist = dataM1.Position.GetDistance(Params.PtrParticle->GetCurPosition()) - m_pCalc->CriticalDistance;
-					if (dist < m_pCalc->Time.GetStep() + m_pCalc->Time.GetMinStep())
-					{
-						if (m_pCalc->Time.IsMinimalStep())
-						{ //На предыдущем шаге была невидимость и шаг минимальный
-							Params.NewRelations->ViewPointData = dataM1;
-							tmpRet = SP_STATE_ОК;
-						}
-						else
-						{ //возможно немного оптимизировать за счет интерполяции
-							Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep4321());
-							if (Params.pInterruptionFlag) *Params.pInterruptionFlag = 1;
-						}
+				double dist = dataM1.Position.GetDistance(Params.PtrParticle->GetCurPosition()) - m_pCalc->Critical.Distance;
+				if (dist < m_pCalc->Time.GetStep() + m_pCalc->Time.GetMinStep())
+				{
+					if (m_pCalc->Time.IsMinimalStep())
+					{ //На предыдущем шаге была невидимость и шаг минимальный
+						Params.NewRelations->ViewPointData = dataM1;
+						tmpRet = SP_STATE_ОК;
+					}
+					else
+					{ //возможно немного оптимизировать за счет интерполяции
+						Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep4321());
 					}
 				}
 			}
@@ -1456,12 +1718,12 @@ int CSP_Group::CalcSingleRelation(CalceRelationParams& Params)
 			m_ParticlesState |= GR_PS_FAR_AWAY_PRESENT;
 
 			if (((tmpRet ^ prevState) & SP_STATE_FAR_AWAY))
-			{ // Переход в невидимость
+			{ // ПЕРЕХОД В НЕВИДИМОСТЬ
+				//ASSERT((Params.PrevRelations->State & GR_PS_COLLISION_DISTANCE) == 0 );
 				if (!m_pCalc->Time.IsMinimalStep())
 				{
 					m_pCalc->Time.SetUpLimit(m_pCalc->Time.GetNextTime());
 					Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep4321());
-					if (Params.pInterruptionFlag) *Params.pInterruptionFlag = 1;
 				}
 				m_ParticlesState |= GR_PS_FAR_AWAY_PRESENT_ON;
 			}
@@ -1474,12 +1736,11 @@ int CSP_Group::CalcSingleRelation(CalceRelationParams& Params)
 		}
 		else
 		{
-			Params.Ret_Flags = SP_STATE_ОК;
 			int RelParticleType = (Params.PtrViewParticle->m_TypeFlags & SP_TYPE_FORM_MASK);
 
 
 			if (((tmpRet ^ prevState) & SP_STATE_FAR_AWAY))
-			{//выход из невидимости
+			{//ВЫХОД ИЗ НЕВИДИМОСТИ
 				Params.Ret_Flags = tmpRet;
 				Params.Ret_Flags |= SP_STATE_AFTER_FAR_AWAY;
 				m_ParticlesState |= GR_PS_FAR_AWAY_PRESENT_OFF;
@@ -1488,279 +1749,162 @@ int CSP_Group::CalcSingleRelation(CalceRelationParams& Params)
 				{
 					m_pCalc->Time.SetUpLimit(m_pCalc->Time.GetNextTime());
 					Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.5);
-					if (Params.pInterruptionFlag) *Params.pInterruptionFlag = 1;
 				}
 			}
 
 			Params.NewRelations->LastViewPointTime = Params.NewRelations->ViewPointData.TimePoint;
 
 			/////////SPEED
-			if ((Params.NewRelations->State & SP_STATE_PHANTOM_BESTUCK))
-			{
-				Params.NewRelations->RelativeSpeedAbs = Params.NewRelations->RelativeSpeed = 0.0;
-				Params.NewRelations->RelativeVelocity_3D = { 0 };
-			}
-			else
-			{
-				Params.NewRelations->RelativeSpeed = SData::GetRelativeSpeed(Params.DataParticle, Params.NewRelations->ViewPointData, &Params.NewRelations->RelativeVelocity_3D);
-				Params.NewRelations->RelativeSpeedAbs = fabs(Params.NewRelations->RelativeSpeed);
-			}
-			Params.NewRelations->Distance_3D.X = Params.DataParticle.Position.X - Params.NewRelations->ViewPointData.Position.X;
-			Params.NewRelations->Distance_3D.Y = Params.DataParticle.Position.Y - Params.NewRelations->ViewPointData.Position.Y;
-			Params.NewRelations->Distance_3D.Z = Params.DataParticle.Position.Z - Params.NewRelations->ViewPointData.Position.Z;
+			Params.NewRelations->RelativeSpeed = SData::GetRelativeSpeedFromVelocity_Linear(Params.DataParticle, Params.NewRelations->ViewPointData, &Params.NewRelations->RelativeVelocity_3D);
+			Params.NewRelations->RelativeSpeedAbs = fabs(Params.NewRelations->RelativeSpeed);
 
+			/////////DISTANCE
+			Params.NewRelations->Distance_3D.SET_AS_DELTA(Params.DataParticle.Position, Params.NewRelations->ViewPointData.Position);
+
+			double DistancePwr1tmp = Params.NewRelations->Distance_3D.LEN();
+
+			if (m_pCalc->ParentSpaceThickness != 0.0)
 			{
-				double DistancePwr1tmp = Params.NewRelations->Distance_3D.LEN();
-
-				if (m_pCalc->ParentSpaceThickness != 0.0)
-				{
-					double tmpMltplr = (DistancePwr1tmp + m_pCalc->ParentSpaceThickness) / DistancePwr1tmp;
-					Params.NewRelations->Distance_3D.X *= tmpMltplr;
-					Params.NewRelations->Distance_3D.Y *= tmpMltplr;
-					Params.NewRelations->Distance_3D.Z *= tmpMltplr;
-					DistancePwr1tmp += m_pCalc->ParentSpaceThickness;
-				}
-
-				Params.NewRelations->DistancePwr1 = DistancePwr1tmp;
-				Params.NewRelations->DistancePwr2 = DistancePwr1tmp * DistancePwr1tmp;
-				Params.NewRelations->DistancePwr3 = Params.NewRelations->DistancePwr2 * DistancePwr1tmp;
+				Params.NewRelations->Distance_3D *= (DistancePwr1tmp + m_pCalc->ParentSpaceThickness) / DistancePwr1tmp;
+				DistancePwr1tmp += m_pCalc->ParentSpaceThickness;
 			}
 
-			if (RelParticleType == SP_TYPE_NEGATIVE)
-			{
-				ASSERT(!(Params.NewRelations->State& SP_STATE_PHANTOM_BESTUCK));
+			Params.NewRelations->DistancePwr1 = DistancePwr1tmp;
+			Params.NewRelations->DistancePwr2 = DistancePwr1tmp * DistancePwr1tmp;
+			Params.NewRelations->DistancePwr3 = Params.NewRelations->DistancePwr2 * DistancePwr1tmp;
 
-				if (Params.NewRelations->DistancePwr1 <= m_pCalc->CriticalDistance)
-				{
-					Params.Ret_Flags |= SP_STATE_ERROR_MINOR | SP_STATE_PHANTOM_DIST_LE_CRITICAL;
-					Params.NewRelations->State |= GR_PS_COLLISION_DISTANCE;
-					m_ParticlesState |= GR_PS_COLLISION_DISTANCE;
-					Params.NewRelations->DistancePwr1 = m_pCalc->CriticalDistance;
-					Params.NewRelations->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-					Params.NewRelations->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
-					Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.231);
-				}
-			}
-			else
-			{
-				if ((Params.NewRelations->State & SP_STATE_PHANTOM_BESTUCK) || fabs(Params.NewRelations->DistancePwr1 - m_pCalc->CriticalDistance) <= 5.0e-14)
-				{
-					Params.NewRelations->DistancePwr1 = m_pCalc->CriticalDistance;
-					Params.NewRelations->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-					Params.NewRelations->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
-				}
+			double DeltaDistPB = Params.NewRelations->DistancePwr1 - m_pCalc->Critical.Distance;
 
-				if (Params.NewRelations->DistancePwr1 <= m_pCalc->CriticalDistance)
-				{
-					Params.Ret_Flags |= SP_STATE_ERROR_MINOR | SP_STATE_PHANTOM_DIST_LE_CRITICAL;
-					Params.NewRelations->State |= (GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_BESTUCK);
-					m_ParticlesState |= (GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_BESTUCK);
-				}
-			}
-			
-			if (((Params.NewRelations->State ^ Params.PrevRelations->State) & GR_PS_COLLISION_DISTANCE))
-			{	/////////// расчет точки достижения критической дистанции
-				if (RelParticleType == SP_TYPE_NEGATIVE)
-				{
-					Params.Ret_Flags |= SP_STATE_ANTIPHANTOM_DIST_CRITICAL_CHG;
-					Params.NewRelations->State |= SP_STATE_ANTIPHANTOM_DIST_CRITICAL_CHG;
-				}
+			int tmpFlags = 0x0;
+			Params.NewRelations->State &= ~GR_PS_COLLISION_PRESENT;
+
+			if (fabs(DeltaDistPB) <= 1.0e-14)//////////////!!!!!!ввести параметр - толщина барьера
+			{ //в зоне барьера . Выход из зоны в другой процедуре
+				if ((Params.PrevRelations->State & GR_PS_COLLISION_PRESENT) == 0) 
+					tmpFlags = 0x11; //попал в зону барьера снаружи. сброс шага 4321
 				else
-				{
-					Params.Ret_Flags |= SP_STATE_PHANTOM_DIST_CRITICAL_CHG;
-					Params.NewRelations->State |= SP_STATE_PHANTOM_DIST_CRITICAL_CHG;
-				}
+					tmpFlags = 0x11;//попал в зону барьера изнутри. сброс шага 4321
+			}
+			else if (DeltaDistPB < 0)
+			{//внутри барьера  0x2;
+				if ((Params.PrevRelations->State & GR_PS_COLLISION_PRESENT) == 0)
+					tmpFlags = 0x11;//проскочили барьер снаружи и возврат на него, сброс шага 4321
+				else 
+					tmpFlags = 0x02; //остается во внутренней области
+			}
+			else
+			{//вне барьера
+				if ((Params.PrevRelations->State & GR_PS_COLLISION_IS_INSIDE))
+					tmpFlags = 0x11;//проскочили барьер изнутри и возврат на него, сброс шага 4321
+				else
+					tmpFlags = 0x04;// свободен 
+			}
 
-				if (!m_pCalc->Time.IsMinimalStep())
-				{
-					if (Params.pInterruptionFlag) *Params.pInterruptionFlag = 1;
+			if ((tmpFlags & 0x01))
+			{// перешел на фантомный барьер. Пока не соскочит будет рассчитываться не здесь
+				Params.Ret_Flags |= SP_STATE_PHANTOM_DIST_LE_CRITICAL;
+				Params.NewRelations->State |= GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_IS_ULTIMATE;
+				m_ParticlesState |= GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_IS_ULTIMATE;
+				//явное определение
+				Params.NewRelations->DistancePwr1 = m_pCalc->Critical.Distance;
+				Params.NewRelations->DistancePwr2 = m_pCalc->Critical.DistancePwr2;
+				Params.NewRelations->DistancePwr3 = m_pCalc->Critical.DistancePwr3;
 
+				if (!m_pCalc->Time.IsMinimalStep() && (tmpFlags & 0x10))
+				{/////////// РАСЧЕТ ТОЧКИ ДОСТИЖЕНИЯ КРИТИЧЕСКОЙ ДИСТАНЦИИ
 					if (!Params.PrevRelations->RelativeVelocity_3D.IsZero() || !Params.PrevRelations->Acceleration_3D.IsZero())
 					{
-						TwoDoubleRoots result;
-						SPos dV = Params.PrevRelations->Distance_3D;
-						dV.SET_AS_PROJECTION_OF(Params.PrevRelations->RelativeVelocity_3D);
-						SPos dA = Params.PrevRelations->Distance_3D;
-						dA.SET_AS_PROJECTION_OF(Params.PrevRelations->Acceleration_3D);
-						dA.MULT(0.5);
-
-						result = QuadraticEequationSolution(dA.LEN(), dV.LEN(), m_pCalc->CriticalDistance - Params.PrevRelations->DistancePwr1);
-						double newDeltaTime = result.root1.Dbl;
-						if ((isnan(newDeltaTime) || newDeltaTime < 0.0) && (isnan(newDeltaTime = result.root2.Dbl) || newDeltaTime < 0.0))
-						{
-							//ASSERT(0);
-							Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.15);
-						}
-						else if (newDeltaTime == 0.0)
-						{
-							Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep()) - m_pCalc->Time.GetMinStep() * 0.1;
-							Params.NewRelations->DistancePwr1 = m_pCalc->CriticalDistance;
-							Params.NewRelations->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-							Params.NewRelations->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
-						}
-						else if (m_pCalc->Time.GetCurTime() + newDeltaTime <= Params.out_KeyPoint)
-						{
-							Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(newDeltaTime);
-							if (Params.out_KeyPoint >= m_pCalc->Time.GetNextTime())
-							{
-								Params.NewRelations->DistancePwr1 = m_pCalc->CriticalDistance;
-								Params.NewRelations->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-								Params.NewRelations->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
-							}
-						}
-						else
-						{
-							//ASSERT(0);
-							Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.4321);
-						}
+						double prev = Params.out_KeyPoint;
+						Params.out_KeyPoint = CalcCriticalDistTime(*Params.PrevRelations, Params.out_KeyPoint);
+						if (prev <= Params.out_KeyPoint)
+							Params.out_KeyPoint = (m_pCalc->Time.GetCurTime() + Params.out_KeyPoint) * 0.5;
 					}
 					else
 						Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.4321);
 				}
+
+				if ((Params.PrevRelations->State & GR_PS_COLLISION_PRESENT) == 0)
+					Params.Ret_Flags |= SP_STATE_PHANTOM_DIST_CRITICAL_CHG;
+
+				if (RelParticleType == SP_TYPE_NEGATIVE)
+				{
+					Params.Ret_Flags |= SP_STATE_PHANTOM_EXPELLED;
+					Params.NewRelations->State |= GR_PS_COLLISION_EXPELLED;
+					m_ParticlesState |= GR_PS_COLLISION_EXPELLED;
+				}
 				else
 				{
-					Params.NewRelations->DistancePwr1 = m_pCalc->CriticalDistance;
-					Params.NewRelations->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-					Params.NewRelations->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
+					Params.Ret_Flags |= SP_STATE_PHANTOM_BESTUCK;
+					Params.NewRelations->State |= GR_PS_COLLISION_BESTUCK;
+					m_ParticlesState |= GR_PS_COLLISION_BESTUCK;
 				}
 			}
-			//расчет плотности
-			Params.NewRelations->DensityAtBasePoint = Calc_RelativeDensity(RelParticleType, m_pCalc->DensityCalcType, Params.NewRelations->DistancePwr1, Params.NewRelations->DistancePwr2);
+
+			if ((tmpFlags & 0x02))
+			{//внутри барьера
+				Params.Ret_Flags |= SP_STATE_PHANTOM_DIST_LE_CRITICAL;
+				Params.NewRelations->State |= (GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_IS_INSIDE);
+				m_ParticlesState |= (GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_IS_INSIDE);
+
+				if (RelParticleType == SP_TYPE_NEGATIVE)
+				{
+					Params.Ret_Flags |= SP_STATE_PHANTOM_EXPELLED;
+					Params.NewRelations->State |= GR_PS_COLLISION_EXPELLED;
+					m_ParticlesState |= GR_PS_COLLISION_EXPELLED;
+				}
+				else
+				{
+					Params.Ret_Flags |= SP_STATE_PHANTOM_BESTUCK;
+					Params.NewRelations->State |= GR_PS_COLLISION_BESTUCK;
+					m_ParticlesState |= GR_PS_COLLISION_BESTUCK;
+				}
+			}
+			//else //снаружи. Вся обработка колизий и времени в другом месте
+
+			/////////////РАСЧЕТ ПЛОТНОСТИ
+			Params.NewRelations->Calc_RelativeDensity(m_pCalc->DensityCalcType);
 
 			if (Params.NewRelations->DensityAtBasePoint <= 0.0 && RelParticleType != SP_TYPE_NEGATIVE)
 			{
 				Params.NewRelations->State |= (GR_PS_COLLISION_DENSITY | GR_PS_COLLISION_BESTUCK);
-				Params.Ret_Flags |= SP_STATE_ERROR_MINOR | SP_STATE_PHANTOM_DENSITY_LE_0;
+				Params.Ret_Flags |= SP_STATE_PHANTOM_DENSITY_LE_0 | SP_STATE_PHANTOM_BESTUCK;
 				m_ParticlesState |= (GR_PS_COLLISION_DENSITY| GR_PS_COLLISION_BESTUCK);
 			}
-			//else
-			//	if (Params.NewRelations->DensityAtBasePoint >= 1.0 && RelParticleType == SP_TYPE_NEGATIVE)
-			//	{
-			//		Params.NewRelations->State |= (GR_PS_COLLISION_DENSITY );
-			//		Params.Ret_Flags |= SP_STATE_ERROR_MINOR | SP_STATE_PHANTOM_DENSITY_LE_0;
-			//		m_ParticlesState |= (GR_PS_COLLISION_DENSITY);
-			//	}
-
+			else if (Params.NewRelations->DensityAtBasePoint >= 1.0 && RelParticleType == SP_TYPE_NEGATIVE)
+			{
+				Params.NewRelations->State |= (GR_PS_COLLISION_DENSITY | GR_PS_COLLISION_EXPELLED);
+				Params.Ret_Flags |= SP_STATE_PHANTOM_DENSITY_LE_0 | SP_STATE_PHANTOM_EXPELLED;
+				m_ParticlesState |= (GR_PS_COLLISION_DENSITY | GR_PS_COLLISION_EXPELLED);
+			}
 
 			if (((Params.NewRelations->State ^ Params.PrevRelations->State) & GR_PS_COLLISION_DENSITY))
 			{/////////// расчет точки достижения критической дистанции
-				if (RelParticleType == SP_TYPE_NEGATIVE)
-				{
-					Params.Ret_Flags |= SP_STATE_ANTIPHANTOM_DENSITY_LE_CHG;
-					Params.NewRelations->State |= SP_STATE_ANTIPHANTOM_DENSITY_LE_CHG;
-				}
-				else
-				{
-					Params.Ret_Flags |= SP_STATE_PHANTOM_DENSITY_LE_CHG;
-					Params.NewRelations->State |= SP_STATE_PHANTOM_DENSITY_LE_CHG;
-				}
+				Params.Ret_Flags |= SP_STATE_PHANTOM_DENSITY_LE_CHG;
 
-				if (!m_pCalc->Time.IsMinimalStep())
+				if (!m_pCalc->Time.IsMinimalStep() && Params.out_KeyPoint - m_pCalc->Time.GetCurTime() > m_pCalc->Time.GetMinStep())
 				{
-					if (Params.pInterruptionFlag) *Params.pInterruptionFlag = 1;
-
 					if (!((Params.NewRelations->State ^ Params.PrevRelations->State) & GR_PS_COLLISION_DISTANCE)) //!!!! идентично, если было
+					{
 						if (!Params.PrevRelations->RelativeVelocity_3D.IsZero() || !Params.PrevRelations->Acceleration_3D.IsZero())
 						{	/////////// расчет точки достижения нулевой плотности 
-							TwoDoubleRoots result;
-							SPos dV = Params.PrevRelations->Distance_3D;
-							dV.SET_AS_PROJECTION_OF(Params.PrevRelations->RelativeVelocity_3D);
-							SPos dA = Params.PrevRelations->Distance_3D;
-							dA.SET_AS_PROJECTION_OF(Params.PrevRelations->Acceleration_3D);
-							dA.MULT(0.5);
-
-							result = QuadraticEequationSolution(dA.LEN(), dV.LEN(), m_pCalc->CriticalDistance - Params.PrevRelations->DistancePwr1);
-							double newDeltaTime = result.root1.Dbl;
-							if ((isnan(newDeltaTime) || newDeltaTime < 0.0) && (isnan(newDeltaTime = result.root2.Dbl) || newDeltaTime < 0.0))
-							{
-								//ASSERT(0);
-								Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.15);
-							}
-							else if (newDeltaTime == 0.0)
-							{
-								Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep()) - m_pCalc->Time.GetMinStep() * 0.1;
-								Params.NewRelations->DistancePwr1 = m_pCalc->CriticalDistance;
-								Params.NewRelations->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-								Params.NewRelations->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
-							}
-							else if (m_pCalc->Time.GetCurTime() + newDeltaTime <= Params.out_KeyPoint)
-							{
-								Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(newDeltaTime);
-								if (Params.out_KeyPoint >= m_pCalc->Time.GetNextTime())
-								{
-									Params.NewRelations->DistancePwr1 = m_pCalc->CriticalDistance;
-									Params.NewRelations->DistancePwr2 = m_pCalc->CriticalDistancePwr2;
-									Params.NewRelations->DistancePwr3 = m_pCalc->CriticalDistancePwr3;
-								}
-							}
-							else
-							{
-								//ASSERT(0);
-								Params.out_KeyPoint = m_pCalc->Time.GetNextTime() - m_pCalc->Time.GetMinStep() * 0.1;
-							}
+							Params.out_KeyPoint = CalcCriticalDistTime(*Params.PrevRelations, Params.out_KeyPoint);
 						}
 						else
 						{
 							if (Params.out_KeyPoint - m_pCalc->Time.GetCurTime() > 0.00001)
 								Params.out_KeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(0.00001);
 						}
+					}
 				}
 			}
 
 			//расчет ускорения
-			Params.NewRelations->AccelerationValue = Calc_RelativeAcceleration(RelParticleType, m_pCalc->AccCalcType, Params.NewRelations->DensityAtBasePoint);
-
-			if (Params.NewRelations->AccelerationValue < 0.0)
-			{
-				if (RelParticleType != SP_TYPE_NEGATIVE)
-				{
-					//это если DensityAtBasePoint > 1 или < 0.0, что пока не рассматривается
-					Params.Ret_Flags |= SP_STATE_ERROR_MINOR | SP_STATE_REL_ACCELERATION_INF;
-					Params.NewRelations->State |= SP_STATE_REL_ACCELERATION_INF;
-
-					if (!(Params.NewRelations->State & GR_PS_COLLISION_DENSITY) && Params.pInterruptionFlag && !Params.pInterruptionFlag)
-					{
-						ASSERT(0);
-					}
-				}
-				else
-				{
-					Params.NewRelations->Acceleration_3D = Params.NewRelations->Distance_3D;
-					Params.NewRelations->Acceleration_3D.SET_LENGHT(-Params.NewRelations->AccelerationValue);
-				}
-
-			}
-			else
-			{
-				if ((Params.PtrViewParticle->m_TypeFlags & SP_TYPE_FORM_MASK) != SP_TYPE_NEGATIVE)
-				{
-
-					if ((Params.NewRelations->State & (GR_PS_COLLISION_DISTANCE | GR_PS_COLLISION_BESTUCK)))
-					{
-						Params.NewRelations->Acceleration_3D = { 0 };
-					}
-					else
-					{
-						Params.NewRelations->Acceleration_3D = Params.NewRelations->Distance_3D;
-						Params.NewRelations->Acceleration_3D.SET_LENGHT(-Params.NewRelations->AccelerationValue);
-					}
-				}
-				else
-				{
-					Params.Ret_Flags |= SP_STATE_ERROR_MINOR | SP_STATE_REL_ACCELERATION_INF;
-					Params.NewRelations->State |= SP_STATE_REL_ACCELERATION_INF;
-
-					if (!(Params.NewRelations->State & GR_PS_COLLISION_DENSITY) && Params.pInterruptionFlag && !Params.pInterruptionFlag)
-					{
-						ASSERT(0);
-					}
-				}
-			}
-
+			Params.NewRelations->Calc_RelativeAcceleration(m_pCalc->AccCalcType);
 			ASSERT(fabs(Params.NewRelations->Acceleration_3D.X) < 1.0e80);
 
+
 			if (m_pCalc->WindType && Params.NewRelations->RelativeSpeedAbs > 0.0000000000001)
-			{
+			{///???????????????? продумать при переходах и движении прилипших
 				switch (m_pCalc->WindType) // Fantasy !!!!!
 				{
 				case 0://OFF
@@ -1786,13 +1930,15 @@ int CSP_Group::CalcSingleRelation(CalceRelationParams& Params)
 		}
 		Params.PtrParticle->m_StateNext |= Params.Ret_Flags;
 	}
+	if (Params.pInterruptionFlag && Params.out_KeyPoint != Params.ViewTime)
+		*Params.pInterruptionFlag = 1;
 	return Params.Ret_Flags;
 }
 
 int CSP_Group::CalcRelationsSingle(double in_TimePoint, SPRelation* const in_CalcRelations, SPRelation* const in_PrevRelations, int in_CalcType, int in_TimeType, double & out_KeyPoint)
 {
 	CalceRelationParams curParams;
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
 	curParams.DataParticle = {0};
 	out_KeyPoint = curParams.out_KeyPoint = curParams.ViewTime = in_TimePoint;
@@ -1811,45 +1957,70 @@ int CSP_Group::CalcRelationsSingle(double in_TimePoint, SPRelation* const in_Cal
 	if (m_Array)
 	{
 		double tmpDbl = curParams.ViewTime;
-		int maskBreak = (in_CalcType & SP_CALCRELATION_BREAK_ON_MINOR_ERROR ) ? SP_STATE_PHANTOM_CRITICAL_CHANGED : 0;
+		int maskBreak = (in_CalcType & SP_CALCRELATION_BREAK_ON_MINOR_ERROR);
 		volatile INT64 InterruptionFlag = 0;
 		if (maskBreak) curParams.pInterruptionFlag = &InterruptionFlag;
-		int i;
-		for (i = 0; i < m_Count && !(curRet_Flags & maskBreak) && !InterruptionFlag; i++)
-			if ((in_CalcType == -1 || !(in_CalcType & SP_CALCRELATION_NEED_UPDATE_ONLY)) || (in_CalcRelations[i].State & SP_STATE_NEED_UPDATE))
+		int BP_Id;
+		for (BP_Id = 0; BP_Id < tmpCount && !(curRet_Flags & maskBreak) && !InterruptionFlag; BP_Id++)
+			if ((in_CalcType == -1 || !(in_CalcType & SP_CALCRELATION_NEED_UPDATE_ONLY)) || (in_CalcRelations[BP_Id].State & SP_STATE_NEED_UPDATE))
 			{
-				curParams.PtrParticle = m_Array[i];
-				curParams.Particle_ID = i;
+				curParams.PtrParticle = m_Array[BP_Id];
+				curParams.Particle_ID = BP_Id;
 				if (in_TimeType == 0) 
-					curParams.DataParticle = m_Array[i]->m_NextData;
+					curParams.DataParticle = m_Array[BP_Id]->m_NextData;
 				else if (curParams.ViewTime > m_Array[0]->GetCurTime())
-					m_Array[i]->GetNextDataByTime(curParams.DataParticle, curParams.ViewTime, &tmpDbl);
+					m_Array[BP_Id]->GetNextDataByTime(curParams.DataParticle, curParams.ViewTime, &tmpDbl);
 				else
-					m_Array[i]->GetPrevDataByTime(curParams.DataParticle, curParams.ViewTime, &tmpDbl);
-				int j, RelationPos = i;
-				for (j = 0; j < m_Count && !(curRet_Flags & maskBreak) && !InterruptionFlag; j++, RelationPos += m_maxCount)
-					if (i != j)
+				{
+					//m_Array[BP_Id]->GetPrevDataByTime(curParams.DataParticle, curParams.ViewTime, &tmpDbl);
+					int IdxTmp = 0;
+					m_Array[BP_Id]->GetPrevDataByTimeLinear(curParams.DataParticle, IdxTmp, 0, curParams.ViewTime);
+				}
+				int VP_Id, RelationPos = BP_Id;
+				for (VP_Id = 0; VP_Id < tmpCount && !(curRet_Flags & maskBreak) && !InterruptionFlag; VP_Id++, RelationPos += m_maxCount)
+					if (BP_Id != VP_Id)
 					{
-						curParams.PtrViewParticle = m_Array[j];
-						curParams.ViewParticle_ID = j;
-						curParams.PrevRelations = in_PrevRelations + RelationPos;
 						curParams.NewRelations = in_CalcRelations + RelationPos;
 
+						curParams.PtrViewParticle = m_Array[VP_Id];
+						curParams.ViewParticle_ID = VP_Id;
+						curParams.PrevRelations = in_PrevRelations + RelationPos;
 						curRet_Flags |= CalcSingleRelation(curParams);
 
 						if (curParams.out_KeyPoint < out_KeyPoint)
 							out_KeyPoint = curParams.out_KeyPoint;
 					}
 
-				if (j < m_Count)
+				if (VP_Id < tmpCount)
 					curRet_Flags |=SP_STATE_NEED_RECALC;
 			}
-		if (i < m_Count)
+		if (BP_Id < tmpCount)
 			curRet_Flags |=SP_STATE_NEED_RECALC;
 	}
 	else curRet_Flags = SP_STATE_ERROR_MAIN;
 
 	return curRet_Flags;
+}
+void CSP_Group::FiilParticlesState()
+{
+	if (m_Array)
+	{
+		//Params.DataParticle.State |= Params.NewRelations->State;
+		int tmpCount = PartCntr.GetCount();
+		SPRelation * Reation = m_Relations.GetNext();
+
+		for (int BP_Id = 0; BP_Id < tmpCount ; BP_Id++)
+		{
+			SData& ParticleData = m_Array[BP_Id]->m_NextData;
+			int VP_Id, RelationPos = BP_Id;
+			for (VP_Id = 0; VP_Id < tmpCount; VP_Id++, RelationPos += m_maxCount)
+				if (BP_Id != VP_Id)
+					ParticleData.State |= Reation[RelationPos].State;
+
+			nextStepInfo.RelationsState_Cur |= ParticleData.State;
+			nextStepInfo.ParticlesState |= m_Array[BP_Id]->m_StateNext;
+		}
+	}
 }
 
 UINT Do_RelationThread(LPVOID pParam)
@@ -1894,7 +2065,7 @@ UINT Do_RelationThread(LPVOID pParam)
 					int maskBreak;
 					if ((m_Thread->CalcType & SP_CALCRELATION_BREAK_ON_MINOR_ERROR))
 					{
-						maskBreak = SP_STATE_WARNING_MASK;
+						maskBreak = SP_STATE_ERROR_MINOR;
 						curParams.pInterruptionFlag = &m_Thread->Group->InterruptionFlag;
 					}
 					else
@@ -1923,9 +2094,9 @@ UINT Do_RelationThread(LPVOID pParam)
 							for (j = 0; !m_Thread->StopFlag && j < PtCount && !m_Thread->Group->InterruptionFlag && !(m_Thread->Result & maskBreak); j++, RelationPos += m_maxCount)
 								if (ParticleID != j && (curParams.PtrViewParticle = m_Thread->Group->GetParticleById(j)))
 								{
+									curParams.NewRelations = m_Thread->pCalcRelations + RelationPos;
 									curParams.ViewParticle_ID = j;
 									curParams.PrevRelations = m_Thread->pPrevRelations ? m_Thread->pPrevRelations + RelationPos : nullptr;
-									curParams.NewRelations = m_Thread->pCalcRelations + RelationPos;
 									curParams.out_KeyPoint = m_Thread->TimePoint;
 									m_Thread->Result |= m_Thread->Group->CalcSingleRelation(curParams);
 									if (m_Thread->KeyPointTime > curParams.out_KeyPoint) m_Thread->KeyPointTime = curParams.out_KeyPoint;
@@ -1956,7 +2127,7 @@ int CSP_Group::CalcRelationsMulti(double in_TimePoint, SPRelation* const in_Calc
 
 	if (m_Array && !(m_CalcState & M_STATE_BREAK))
 	{
-		int m_Count = GetCount();
+		int tmpCount = GetCount();
 		int nDone = 0;
 
 		std::atomic_thread_fence(std::memory_order_acquire);
@@ -1984,9 +2155,9 @@ int CSP_Group::CalcRelationsMulti(double in_TimePoint, SPRelation* const in_Calc
 		CSP_Group::InterruptionFlag = 0;
 
 		out_KeyPoint = in_TimePoint;
-		for (int i = 0, Delta = m_Count % m_ThreadsCur, iStep = (m_Count - 1) / m_ThreadsCur + 1, curPtrId = 0; i < m_ThreadsCur && curPtrId < m_Count; i++)
+		for (int i = 0, Delta = tmpCount % m_ThreadsCur, iStep = (tmpCount - 1) / m_ThreadsCur + 1, curPtrId = 0; i < m_ThreadsCur && curPtrId < tmpCount; i++)
 		{
-			if (Delta > 0 && Delta < m_Count && i == Delta) iStep--;
+			if (Delta > 0 && Delta < tmpCount && i == Delta) iStep--;
 			m_Thr_Calc[i]->MasterSetCalc(in_TimePoint, curPtrId, curPtrId + iStep - 1, in_CalcType, in_PrevRelations, in_CalcRelations);
 			curPtrId += iStep;
 		}
@@ -2057,7 +2228,8 @@ int CSP_Group::CalcRelationsMulti(double in_TimePoint, SPRelation* const in_Calc
 
 void CSP_Group::InitItems(int in_Flags)
 {
-	SData tmpData = { 0 };
+	SData tmpData;
+	tmpData.CLEAR();
 
 	for (int i = 0; i < GetCount(); i++)
 	if (m_Array[i])
@@ -2075,64 +2247,85 @@ void CSP_Group::InitItems(int in_Flags)
 
 void CSP_Group::CalcRelationsInit()
 {
-	int m_Count = PartCntr.GetCount();
+	int tmpCount = PartCntr.GetCount();
 
-	if (m_Array && *m_Array)
-		for (int i = 0; i < m_Count; i++)
-		{
-			SData PtrData = *(m_Array[i]->GetDataById(0));
-			//PtrData.Velocity = { 0 };//???????????????????????????
+	for (int i = 0; i < tmpCount; i++)
+	{
+		SData PtrData = *(m_Array[i]->GetDataById(0));
+		//PtrData.Velocity = { 0 };//???????????????????????????
 
-			for (int j = 0; j < m_Count; j++)
-				if (i != j)
+		for (int j = 0; j < tmpCount; j++)
+			if (i != j)
+			{
+				SPRelation* pRelation = m_Relations.GetPrevRelation(i, j);
+				pRelation->ViewParticlePtr = m_Array[j];
+				SPRelation *pRelationCur = m_Relations.GetCurentRelation(i, j);
+				pRelationCur->ViewParticlePtr = m_Array[j];
+				pRelation->ViewPointData = *(pRelation->ViewParticlePtr->GetDataById(0));
+
+
+				double  LinearViewTime = GetLinearViewTime(PtrData, pRelation->ViewPointData);
+
+				double newVP = PtrData.TimePoint + LinearViewTime;
+
+				if (fabs(LinearViewTime) != SP_MAX_TIME_DISTANCE) //&& newVP <= UpBorder.TimePoint)
 				{
-					SPRelation* pRelation = m_Relations.GetPrevRelation(i, j);
-					SPRelation *pRelationCur = m_Relations.GetCurentRelation(i, j);
-					pRelation->ViewPointData = *(m_Array[j]->GetDataById(0));
+					pRelation->ViewPointData.LinearMove(newVP - pRelation->ViewPointData.TimePoint);
 
-					double  LinearViewTime = GetLinearViewTime(PtrData, pRelation->ViewPointData);
-					pRelation->LastViewPointTime = PtrData.TimePoint + LinearViewTime;
-					if (fabs(pRelation->LastViewPointTime) >= SP_MAX_TIME_DISTANCE)
-					{
-						pRelation->LastViewPointTime = -10000.0;
-						pRelation->SET_AS_FARAWAY(m_Array[j]->m_TypeFlags);
-					}
-					else
-					{
-						pRelation->ViewPointData.LinearMove(pRelation->LastViewPointTime, LINEARMOVECLEARFLAG_ACCEL3D| LINEARMOVECLEARFLAG_ACCELDERIV3D);
-						pRelation->State = 0;
+					double dDelta, dDeltaPrev = 1.0e90, prev_newVP = 0.0;
+					int AssertCntr = 0;
 
-						pRelation->Distance_3D = PtrData.Position;
-						pRelation->Distance_3D.MINUS(pRelation->ViewPointData.Position);
-						pRelation->DistancePwr2 = pRelation->Distance_3D.LENPWR2();
-						pRelation->DistancePwr1 = sqrt(pRelation->DistancePwr2);
-						pRelation->DistancePwr3 = pRelation->DistancePwr1 * pRelation->DistancePwr2;
+					while ((dDelta = fabs(- newVP - PtrData.Position.GetDistance(pRelation->ViewPointData.Position))) > 1.0e-14 && dDelta < dDeltaPrev)
+					{//коррекция результатов сжатия траектории (здесь лишнее)
+						ASSERT(AssertCntr++ < 20);
+						dDeltaPrev = dDelta;
+						prev_newVP = newVP;
 
-						pRelation->RelativeSpeed = SData::GetRelativeSpeed(PtrData, pRelation->ViewPointData, &pRelation->RelativeVelocity_3D);
-						pRelation->RelativeSpeedAbs = fabs(pRelation->RelativeSpeed);
-
-
-						pRelation->DensityAtBasePoint = Calc_RelativeDensity(m_Array[j]->m_TypeFlags, m_pCalc->DensityCalcType, pRelation->DistancePwr1, pRelation->DistancePwr2);
-						pRelation->AccelerationValue = Calc_RelativeAcceleration(m_Array[j]->m_TypeFlags, m_pCalc->AccCalcType, pRelation->DensityAtBasePoint);
-
-						double tmpAddMlpl = pRelation->AccelerationValue / pRelation->DistancePwr1;
-						pRelation->Acceleration_3D = pRelation->Distance_3D;
-						pRelation->Acceleration_3D.MULT(-tmpAddMlpl);
-						ASSERT(fabs(pRelation->Acceleration_3D.X) < 1.0e80);
+						newVP = PtrData.TimePoint + GetLinearViewTime(PtrData, pRelation->ViewPointData);
+						pRelation->ViewPointData.LinearMove(newVP - pRelation->ViewPointData.TimePoint);
 					}
 
-					pRelation->RealDistancePwr1 = PtrData.Position.GetDistance(pRelation->ViewPointData.Position);
-					pRelation->RealRelativeSpeed = SData::GetRelativeSpeed(PtrData, pRelation->ViewPointData, NULL);
-
-					*pRelationCur = *pRelation;
+					if (dDelta > 1.0e-14 && dDelta != dDeltaPrev)
+						pRelation->ViewPointData.LinearMove(prev_newVP - pRelation->ViewPointData.TimePoint);
 				}
-		}
+
+				pRelation->LastViewPointTime = PtrData.TimePoint + LinearViewTime;
+				if (fabs(pRelation->LastViewPointTime) >= SP_MAX_TIME_DISTANCE)
+				{
+					pRelation->LastViewPointTime = -10000.0;
+					pRelation->SET_AS_FARAWAY(pRelation->ViewParticlePtr->m_TypeFlags);
+				}
+				else
+				{
+					pRelation->ViewPointData.LinearMove(pRelation->LastViewPointTime, LINEARMOVECLEARFLAG_ACCEL3D| LINEARMOVECLEARFLAG_ACCELDERIV3D);
+					pRelation->State = 0;
+
+					pRelation->Distance_3D = PtrData.Position;
+					pRelation->Distance_3D.MINUS(pRelation->ViewPointData.Position);
+					pRelation->DistancePwr2 = pRelation->Distance_3D.LENPWR2();
+					pRelation->DistancePwr1 = sqrt(pRelation->DistancePwr2);
+					pRelation->DistancePwr3 = pRelation->DistancePwr1 * pRelation->DistancePwr2;
+
+					pRelation->RelativeSpeed = SData::GetRelativeSpeedFromVelocity(PtrData, pRelation->ViewPointData, &pRelation->RelativeVelocity_3D);
+					pRelation->RelativeSpeedAbs = fabs(pRelation->RelativeSpeed);
+
+
+					pRelation->Calc_RelativeDensity(m_pCalc->DensityCalcType);
+					pRelation->Calc_RelativeAcceleration(m_pCalc->AccCalcType);
+				}
+
+				pRelation->RealDistancePwr1 = PtrData.Position.GetDistance(pRelation->ViewPointData.Position);
+				pRelation->RealRelativeSpeed = SData::GetRelativeSpeedFromVelocity(PtrData, pRelation->ViewPointData, nullptr);
+
+				*pRelationCur = *pRelation;
+			}
+	}
 }
 
 int CSP_Group::CalcRelations(double in_TimePoint, SPRelation* const in_CalcRelations, SPRelation* const in_PrevRelations, int in_CalcType, double& out_KeyPoint)
 {
 	int AddResult = 0;
-	int m_Count = GetCount();
+	int tmpCount = GetCount();
 
 	if (m_Array && *m_Array)
 	{
@@ -2144,13 +2337,13 @@ int CSP_Group::CalcRelations(double in_TimePoint, SPRelation* const in_CalcRelat
 			if (in_TimePoint == m_Array[0]->m_NextData.TimePoint) TimeType = 0;
 
 		if ((in_CalcType & SP_CALCRELATION_NEED_UPDATE_ONLY))
-			for (int i = 0; i < m_Count; i++)
-				for (int j = 0, RelationPos = i; j < m_Count; j++, RelationPos += m_maxCount)
+			for (int i = 0; i < tmpCount; i++)
+				for (int j = 0, RelationPos = i; j < tmpCount; j++, RelationPos += m_maxCount)
 					if ((in_CalcRelations[RelationPos].State & SP_STATE_NEED_UPDATE))
 					{
 						j = 0;
 						RelationPos = i;
-						for (; j < m_Count; j++, RelationPos += m_maxCount)
+						for (; j < tmpCount; j++, RelationPos += m_maxCount)
 							in_CalcRelations[RelationPos].State |= SP_STATE_NEED_UPDATE;
 					}
 
@@ -2177,7 +2370,7 @@ void CSP_Group::RepairPositions()
 		CalcRelationsInit();
 		CollectStat(temp_Stat, STAT_TYPE_MIN_RELATION | STAT_TYPE_CURRENT | STAT_TYPE_SETPARTICLE);
 
-		if (temp_Stat.Rel_Min.Phantom_Distance.MMValue <= m_pCalc->CriticalDistance)
+		if (temp_Stat.Rel_Min.Phantom_Distance.MMValue <= m_pCalc->Critical.Distance)
 		{
 			SData* cmpData1 = GetItem(temp_Stat.Rel_Min.Phantom_Distance.idxParticle1)->GetCurData();
 			SData* cmpData2 = GetItem(temp_Stat.Rel_Min.Phantom_Distance.idxParticle2)->GetCurData();
@@ -2202,7 +2395,8 @@ void CSP_Group::InitPosSpeedRandom(int in_InitialSeed, SP_CalcFindSet& in_Settin
 
 	for (int i = 0; i < GetCount(); i++)
 	{
-		SData initData = { 0 };
+		SData initData;
+		initData.CLEAR();
 
 		initData.Position.X = (in_Settings.maxPos.X - in_Settings.minPos.X) * (dblHaf - (double)rand()) * dblDiv;
 		initData.Position.Y = (in_Settings.maxPos.Y - in_Settings.minPos.Y) * (dblHaf - (double)rand()) * dblDiv;
@@ -2215,7 +2409,7 @@ void CSP_Group::InitPosSpeedRandom(int in_InitialSeed, SP_CalcFindSet& in_Settin
 		initData.Velocity.Z = (in_Settings.maxSpeed.Z - in_Settings.minSpeed.Z) * (dblHaf - (double)rand());
 
 		initData.Velocity.SET_LENGHT(initData.AbsSpeed);
-
+		initData.Velocity_Linear = initData.Velocity;
 		SetParticleData(i, SP_DATA_ALL, initData);
 	}
 }
@@ -2223,136 +2417,44 @@ void CSP_Group::InitPosSpeedRandom(int in_InitialSeed, SP_CalcFindSet& in_Settin
 int CSP_Group::CalcDataByRelations(int in_Type)
 {
 	int KeyPointFlag = SP_STATE_ERROR_MAIN;
-	int m_Count = GetCount();
+	int tmpCount = GetCount();
 
 	SPRelation * pRelations = m_Relations.GetRelation(in_Type);
-	const BeStuckParticles* pBSP = (in_Type & GR_PS_RELATION_NEEDRECALC) ? m_Relations.FillNBeStuck(in_Type, 0, m_Count) : m_Relations.GetBeStuck(in_Type);
+	const RelatedParticles* pBSP = (in_Type & GR_PS_RELATION_NEEDRECALC) ? m_Relations.FillNRelated(in_Type, 0, tmpCount, GR_PS_COLLISION_IS_ULTIMATE) : m_Relations.GetRelated(in_Type);
 	SData* pCalcData;
 
 	if (m_Array && pRelations)
 	{
 		KeyPointFlag = 0;
 
-		for (int i = 0; i < m_Count; i++)
+		for (int i = 0; i < tmpCount; i++)
 			if ((pCalcData = (in_Type & GR_PS_RELATION_NEXT) ? &m_Array[i]->m_NextData : (in_Type & GR_PS_RELATION_CURRENT) ? m_Array[i]->GetCurData() : nullptr))
 			{
-				const BeStuckList* BSList = pBSP ? pBSP->GetBeStuckListById(i) : nullptr;
+				const RelatedList* BSList = pBSP ? pBSP->GetRelatedListById(i) : nullptr;
 				pCalcData->Accel_2_3D = { 0 };
 				pCalcData->Jerk_3_3D = { 0 };
 				pCalcData->Density = 0.0;
 				int tmpRet = 0;
 				SPRelation* pSingleRel = pRelations + i;
+				RelationAndRelated* pSelfRel = (RelationAndRelated *) (pRelations + i + i * m_maxCount);
+				pSelfRel->AsSelf = { 0 };
 
 				if (BSList == nullptr)
 				{
-					for (int j = 0; j < m_Count; j++, pSingleRel += m_maxCount)
+					for (int j = 0; j < tmpCount; j++, pSingleRel += m_maxCount)
 						if (i != j)
 							tmpRet |= CalcSingleDataByRelation(*pCalcData, *pSingleRel, m_pCalc);
+
+					pSelfRel->AsSelf.ByNormalData = *pCalcData;
 				}
 				else
 				{
 					ASSERT(BSList->nMasters > 0);
-					RelationAndBeStuck* pSelfRel = (RelationAndBeStuck *) (pRelations + i + i * m_maxCount);
 
-					pSelfRel->AsSelf = {0};
-
-					for (int j = 0; j < m_Count; j++, pSingleRel += m_maxCount)
-						if (i != j && !(pSingleRel->State & GR_PS_COLLISION_BESTUCK))
+					for (int j = 0; j < tmpCount; j++, pSingleRel += m_maxCount)
+						if (i != j && !(pSingleRel->State & GR_PS_COLLISION_IS_ULTIMATE))
 							tmpRet |= CalcSingleDataByRelation(pSelfRel->AsSelf.ByNormalData, *pSingleRel, m_pCalc);
-
-
-					if (BSList->nMasters == 1)
-					{
-						pSingleRel = pRelations + m_Relations.GetRelationPos(i, BSList->List[0].IdMaster);
-
-						SPos normal; 
-						normal.SET_AS_NORMAL(pCalcData->Position, pSingleRel->ViewPointData.Position, m_pCalc->CriticalDistance);
-
-						ASSERT((pSingleRel->State & GR_PS_COLLISION_DISTANCE) && pSingleRel->DistancePwr1 == m_pCalc->CriticalDistance);
-
-						//!!!!!!!!!!!!!!!!!корректировка позиции и скоростина данном этапе недопустима
-
-						//корректировка ускорения
-						////?????7 ускорение равно проекции ускорения VP на нормаль (прямая [ViewPoint,Particle]) + проекция остальных на плоскость
-						//??????ускорение равно ускорению VP + проекция остальных на плоскость
-						pSelfRel->AsSelf.ByNormalData.Accel_2_3D.SET_AS_PROJECTION_ON_PLANE_NORMAL(normal);
-						pCalcData->Accel_2_3D = pSelfRel->AsSelf.ByNormalData.Accel_2_3D;
-
-						ASSERT(fabs(pCalcData->Accel_2_3D.X) < 1.0e80);
-
-						SPos tmp = normal;
-						tmp.SET_AS_PROJECTION_OF_TO_NORMAL(pSingleRel->ViewPointData.Accel_2_3D);
-						pCalcData->Accel_2_3D.ADD(tmp);
-						ASSERT(fabs(pCalcData->Accel_2_3D.X) < 1.0e80);
-
-						pCalcData->Jerk_3_3D = pSelfRel->AsSelf.ByNormalData.Jerk_3_3D;
-						pCalcData->Jerk_3_3D.SET_AS_PROJECTION_OF_TO_NORMAL(normal);
-						tmp = normal;
-						tmp.SET_AS_PROJECTION_OF_TO_NORMAL(pSingleRel->ViewPointData.Jerk_3_3D);
-						pCalcData->Jerk_3_3D.ADD(tmp);
-						//pCalcData->Jerk_3_3D = { 0 };
-					}
-					else if (BSList->nMasters == 2)
-					{
-						SPRelation* pSingleRel_0 = pRelations + m_Relations.GetRelationPos(i, BSList->List[0].IdMaster);
-						SPRelation* pSingleRel_1 = pRelations + m_Relations.GetRelationPos(i, BSList->List[1].IdMaster);
-
-						ASSERT(0);
-						SPos PointVPMiddle;
-						PointVPMiddle.SET_AS_MIDDLE_POINT(pSingleRel_0->ViewPointData.Position, pSingleRel_1->ViewPointData.Position);
-
-						SPos NormalVP = pSingleRel_0->ViewPointData.Position;
-						NormalVP.MINUS(pSingleRel_1->ViewPointData.Position);
-
-						double DistanceVP_PWR2 = NormalVP.LENPWR2();
-						double DistParticleToMVP = sqrt(m_pCalc->CriticalDistancePwr2 - DistanceVP_PWR2 * 0.25);
-
-						SPos PartPprojToPlane;
-						PartPprojToPlane.SET_AS_PROJECTION_ON_PLANE(pCalcData->Position, PointVPMiddle, pSingleRel_0->ViewPointData.Position);///!!!!!!!!!!!!!!!!!!   NormalVP
-						PartPprojToPlane.MINUS(PointVPMiddle);
-						PartPprojToPlane.SET_LENGHT(DistParticleToMVP);
-						PartPprojToPlane.ADD(PointVPMiddle);
-
-						SPos Norm0;  Norm0.SET_AS_NORMAL(pSingleRel_0->ViewPointData.Position, pCalcData->Position, m_pCalc->CriticalDistance);
-						SPos Norm1;  Norm1.SET_AS_NORMAL(pSingleRel_1->ViewPointData.Position, pCalcData->Position, m_pCalc->CriticalDistance);
-
-						//корректировка ускорения
-						//ускорение равно проекции ускорения VP на нормаль (прямая [ViewPoint,Particle]) + проекция остальных на плоскость
-
-						SPos CrossLine = Norm0;
-						CrossLine.CROSS(Norm1);
-						CrossLine.MULT((pCalcData->Accel_2_3D.DOT(CrossLine) / CrossLine.LENPWR2()));
-						pCalcData->Accel_2_3D = CrossLine;
-						ASSERT(fabs(pCalcData->Accel_2_3D.X) < 1.0e80);
-
-						SPos tmpAccel3D = Norm0;
-						tmpAccel3D.SET_AS_PROJECTION_OF_TO_NORMAL(pSingleRel_1->ViewPointData.Accel_2_3D);
-						pCalcData->Accel_2_3D.ADD(tmpAccel3D);
-						ASSERT(fabs(pCalcData->Accel_2_3D.X) < 1.0e80);
-
-						tmpAccel3D = Norm1;
-						tmpAccel3D.SET_AS_PROJECTION_OF_TO_NORMAL(pSingleRel_0->ViewPointData.Accel_2_3D);
-						pCalcData->Accel_2_3D.ADD(tmpAccel3D);
-						ASSERT(fabs(pCalcData->Accel_2_3D.X) < 1.0e80);
-
-						CrossLine = Norm0;
-						CrossLine.CROSS(Norm1);
-						CrossLine.MULT((pCalcData->Jerk_3_3D.DOT(CrossLine) / CrossLine.LENPWR2()));
-						pCalcData->Jerk_3_3D = CrossLine;
-
-						SPos tmpAccelDeriv3D = Norm0;
-						tmpAccelDeriv3D.SET_AS_PROJECTION_OF_TO_NORMAL(pSingleRel_1->ViewPointData.Jerk_3_3D);
-						pCalcData->Jerk_3_3D.ADD(tmpAccelDeriv3D);
-
-						tmpAccelDeriv3D = Norm1;
-						tmpAccelDeriv3D.SET_AS_PROJECTION_OF_TO_NORMAL(pSingleRel_0->ViewPointData.Jerk_3_3D);
-						pCalcData->Jerk_3_3D.ADD(tmpAccelDeriv3D);
-						//pCalcData->Jerk_3_3D = { 0 };
-					}
-					else if (BSList->nMasters > 2)
-					{
-						ASSERT(0);
-					}
+					//те, что на барьере рассчитаны при вычислении новой позиции
 				}
 				KeyPointFlag |= tmpRet;
 				pCalcData->Density *= m_CountDivider;
@@ -2380,7 +2482,7 @@ int CSP_Group::CalcSingleDataByRelation(SData& pCalcData, SPRelation& in_CalcRel
 /*
 		//Jerk_3_3D  == -2.0 * S * v / pow(S * S - 1.0, 2);
 		double Jerk_3_3D;
-		double tmpVal = in_CalcRelations.DistancePwr2 - m_pCalc->CriticalDistance;
+		double tmpVal = in_CalcRelations.DistancePwr2 - m_pCalc->Critical.Distance;
 			
 		Jerk_3_3D  = in_CalcRelations.DistancePwr1 * in_CalcRelations.RelativeSpeed / (tmpVal * tmpVal);
 		SPos tmpDeriv = in_CalcRelations.RelativeVelocity_3D;
@@ -2439,6 +2541,7 @@ int CSP_Group::Cmd_Execute(char* in_Command)
 {
 	int ret = 0;
 	EnterCriticalSection(&m_cs);
+
 	if (in_Command && *in_Command)
 	{
 		TrimChar(in_Command, ' ');
@@ -2460,15 +2563,18 @@ int CSP_Group::Cmd_Execute(char* in_Command)
 			{
 				in_Command += 6;
 				while (*in_Command == ' ' || *in_Command == '\t' || *in_Command == '=') in_Command++;
-				sscanf_s(in_Command, "%i", &m_DelayMS);
-				if (m_DelayMS < 0 || m_DelayMS > 10000) m_DelayMS = 0;
+				int tmpInt;
+				sscanf_s(in_Command, "%i", &tmpInt);
+				if (tmpInt < 0 || tmpInt > 10000) tmpInt = 0;
+				m_pCalc->Time.Delay.SetDelay(tmpInt);
+
 			}
 			else if (strstr(in_Command, "ADD") == in_Command && in_Command[3] <= ' ')
 			{
 				in_Command += 3;
 				while (*in_Command == ' ' || *in_Command == '\t' || *in_Command == '=') in_Command++;
 
-				SData initData = { 0 };
+				SData initData;initData.CLEAR();
 
 				ReadCalcParam(in_Command, "POS", initData.Position, 0.0);
 				ReadCalcParam(in_Command, "SPEED", initData.Velocity, 0.0);
@@ -2558,6 +2664,7 @@ int CSP_Group::Cmd_Execute(char* in_Command)
 	LeaveCriticalSection(&m_cs);
 	return ret;
 }
+
 int CSP_Group::Cmd_Do(int in_Count)
 {
 	int ret = 0;
@@ -2578,6 +2685,15 @@ int CSP_Group::Cmd_Do(int in_Count)
 	return ret;
 }
 
+void CSP_Group::DoDelay()
+{
+	if (m_pCalc->Time.CheckDelay())
+	{
+		m_pCalc->Time.DoDelay();
+		m_pCalc->Time.SetTimeOfLastDelay();
+	}
+}
+
 int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in_UseDefs)
 {
 	int ret = 0; 
@@ -2586,6 +2702,10 @@ int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in
 	{
 		if ((in_SettingsGroup & SGROUP_TRACE))
 		{
+			int tmpInt;
+			double tmpDbl;
+			ret += ReadCalcParam(in_Settings, "STEP_DELAY_MS", tmpInt, 0, in_UseDefs);			m_pCalc->Time.Delay.SetDelay(tmpInt);
+			ret += ReadCalcParam(in_Settings, "STEP_DELAY_EVERY", tmpDbl, 1.0, in_UseDefs);		m_pCalc->Time.Delay.SetDelayEveryTimeDelta(tmpDbl);
 			ret += ReadCalcParam(in_Settings, "TRACE_SPEED_ARR", m_pCalc->DrawSet.ShowSpeedFor, 0xFFFFFFFF, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "TRACE_ACC_ARR", m_pCalc->DrawSet.ShowAccFor, 0xFFFFFFFF, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "TRACE_GROUP_ARR", m_pCalc->DrawSet.ShowGroupArrows, 0xFFFFFFFF, in_UseDefs);
@@ -2593,7 +2713,8 @@ int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in
 			ret += ReadCalcParam(in_Settings, "TRACE_SHOWLINKSFROM", m_pCalc->DrawSet.ShowLinksFrom, 0x0001, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "TRACE_SHOWLINKSTO", m_pCalc->DrawSet.ShowLinksTo, 0, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "TRACE_LINKS", m_pCalc->DrawSet.nLinks, 10, in_UseDefs);
-			ret += ReadCalcParam(in_Settings, "TRACE_REFRESH", m_pCalc->refresh.Delta, 5, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_REFRESH", m_pCalc->refresh.Delta, 50, in_UseDefs);
+			ret += ReadCalcParam(in_Settings, "TRACE_SHOTREFRESH", m_pCalc->ShotRefresh.Delta, 10, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "TRACE_00_POS", m_pCalc->DrawSet.m_00_Pos, 0, in_UseDefs);
 
 			if (ReadCalcParam(in_Settings, "TRACE_MAGN", m_pCalc->DrawSet.ViewMltpl_Ext, 0, READPARAMS_NOT_USE_DEFS) != 0 && m_pCalc->DlgTrace)
@@ -2621,6 +2742,8 @@ int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in
 			ret += ReadCalcParam(in_Settings, "MAXLOOP_FIND", tmpInt, -1, in_UseDefs);
 			m_pCalcFind->FindCounter.SetData(m_pCalc->nIterations, tmpInt);
 
+			ret += ReadCalcParam(in_Settings, "ASSERT_STEP", tmpInt, -1, in_UseDefs);
+			m_pCalc->CalcCounter.SetAssertStep(tmpInt);
 
 			if ((tmpInt = ReadCalcParam(in_Settings, "MAXSTEP_VAL", tmpVal, 0.1, in_UseDefs))|| !(in_UseDefs & READPARAMS_NOT_USE_DEFS))
 				m_pCalc->Time.SetMaxStep(tmpVal);
@@ -2631,7 +2754,7 @@ int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in
 			ret += tmpInt;
 
 			if ((tmpInt = ReadCalcParam(in_Settings, "BESTUCKMAXSTEP_VAL", tmpVal, SP_PREC_TIME_MLTPL, in_UseDefs))|| !(in_UseDefs & READPARAMS_NOT_USE_DEFS))
-				m_pCalc->Time.SetBeStuckMaxStep(tmpVal);
+				m_pCalc->Time.SetRelatedMaxStep(tmpVal);
 			ret += tmpInt;
 
 			if ((tmpInt = ReadCalcParam(in_Settings, "PRECISSION_MLTPL_ACCEL_VAL", tmpVal, 1.0, in_UseDefs)) || !(in_UseDefs & READPARAMS_NOT_USE_DEFS))
@@ -2660,6 +2783,8 @@ int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in
 		if ((in_SettingsGroup & SGROUP_MISC))
 		{
 			m_ThreadsMax = 0;
+			ret += ReadCalcParam(in_Settings, "INITIALCHECK", m_pCalc->InitialCheckFlags, 1, in_UseDefs);
+
 			ret += ReadCalcParam(in_Settings, "NTHREADS", m_ThreadsMax_Initial, 0, in_UseDefs);
 			if (m_ThreadsMax_Initial < 1 || m_ThreadsMax_Initial > GR_MAX_THREADS_COUNT)
 				m_ThreadsMax_Initial = 0;
@@ -2747,20 +2872,18 @@ int CSP_Group::ReadSettingsGroup(char* in_Settings, int in_SettingsGroup, int in
 				PartCntr.AddInitial(SP_TYPE_POSITIVE, 2 - PartCntr.GetInitial().GetCount());
 
 			ret += ReadCalcParam(in_Settings, "WINDTYPE", m_pCalc->WindType, 0, in_UseDefs);
-			ret += ReadCalcParam(in_Settings, "COLLISIONTYPE", m_pCalc->CollisionType, 0, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "DENSITYDERIVLEVEL", m_pCalc->DensityDerivLevel, 2, in_UseDefs);
 				if (m_pCalc->DensityDerivLevel > 3 || m_pCalc->DensityDerivLevel < 1) m_pCalc->DensityDerivLevel = 2;
 			ret += ReadCalcParam(in_Settings, "ACCCALCTYPE", m_pCalc->AccCalcType, 0, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "CLASSICTYPE", m_pCalc->ClassicType, 0, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "ADDITIVETYPE", m_pCalc->AdditiveType, 0, in_UseDefs);
 			ret += ReadCalcParam(in_Settings, "DENSITYCALCTYPE", m_pCalc->DensityCalcType, 0, in_UseDefs);
-			ret += ReadCalcParam(in_Settings, "MAXABSSPEED", m_pCalc->maxAbsSpeed,  1.0, in_UseDefs);
-			m_pCalc->maxAbsSpeedPwr2 = m_pCalc->maxAbsSpeed * m_pCalc->maxAbsSpeed;
+			ret += ReadCalcParam(in_Settings, "MAXABSSPEED", m_pCalc->Critical.Speed,  1.0, in_UseDefs);
 
 			ret += ReadCalcParam(in_Settings, "PARENTSPACETHICKNESS", m_pCalc->ParentSpaceThickness, 0.0, in_UseDefs);
-			ret += ReadCalcParam(in_Settings, "CRITICALDISTANCE", m_pCalc->CriticalDistance, 1.0, in_UseDefs);
-			m_pCalc->CriticalDistancePwr2 = m_pCalc->CriticalDistance * m_pCalc->CriticalDistance;
-			m_pCalc->CriticalDistancePwr3 = m_pCalc->CriticalDistance * m_pCalc->CriticalDistancePwr2;
+			ret += ReadCalcParam(in_Settings, "CRITICALDISTANCE", m_pCalc->Critical.Distance, 1.0, in_UseDefs);
+
+			m_pCalc->Critical.Prepare();
 		}
 	}
 
@@ -2792,3 +2915,249 @@ UINT DoCommandThread(LPVOID pParam)
 	return 0;
 }
 
+void CSP_Group::CheckBeforeCalc()
+{
+	m_ThreadsMax = m_ThreadsMax_Initial;
+	if (GetCount() < m_ThreadsMax) m_ThreadsMax = GetCount();
+	CheckThreads();
+};
+
+
+void CSP_Group::ReadParticleData(const char* in_Settings, int in_ParticleId)
+{
+	int IdStart = 0, IdEnd = GetCount() - 1;
+	if (in_ParticleId >= IdStart && in_ParticleId <= IdEnd)
+		IdStart = IdEnd = in_ParticleId;
+
+	const char* prefix = "PARTICLEDATA[";
+	char tmps[50];
+	const char* posTmp = strstr(in_Settings, prefix);
+	if (posTmp)
+	{
+		strcpy_s(m_tmpString, SPG_TEMPSTRING_LEN, posTmp);
+
+		char* posPrev = m_tmpString, *pos;
+		while ((pos = strstr(posPrev, prefix)))
+			posPrev = pos + 1;
+
+		while (posPrev != m_tmpString && *posPrev && *posPrev != '\r' && *posPrev != '\n')
+			posPrev++;
+
+		*posPrev = 0;
+
+		for (int i = IdStart; i <= IdEnd; i++)
+		{
+			SData initData;
+			initData.CLEAR();
+			sprintf_s(tmps, 50, "%s%d]", prefix, i);
+
+			if ((pos = strstr(m_tmpString, tmps)))
+			{
+				pos += 15;
+				char* posEnd = pos, charAtEnd;
+				while (*posEnd && *posEnd != '\r' && *posEnd != '\n')
+					posEnd++;
+
+				charAtEnd = *posEnd;
+				*posEnd = 0;
+
+				ReadCalcParam(pos, "POSITION", initData.Position, 0.0);
+				ReadCalcParam(pos, "VELOCITY", initData.Velocity, 0.0);
+				ReadCalcParam(pos, "ACCELERATION", initData.Accel_2_3D, 0.0);
+				ReadCalcParam(pos, "JERK", initData.Jerk_3_3D, 0.0);
+				initData.AbsSpeed = initData.Velocity.LEN();
+				initData.Velocity_Linear = initData.Velocity;
+
+				*posEnd = charAtEnd;
+			}
+
+			SetParticleData(i, SP_DATA_ALL, initData);
+		}
+	}
+}
+
+void CSP_Group::ReadParticleLook(const char* in_Settings, int in_ParticleId)
+{
+	int IdStart = 0, IdEnd = GetCount() - 1;
+	if (in_ParticleId >= IdStart && in_ParticleId <= IdEnd)
+		IdStart = IdEnd = in_ParticleId;
+	const char* prefix = "TRACE_LOOK[";
+
+	const char* posTmp = in_Settings;
+	while ((posTmp = strstr(posTmp, prefix)))
+	{
+		posTmp += 11;
+		int idx = atoi(posTmp);
+
+		if (idx >= IdStart && idx <= IdEnd)
+		{
+			char* tmpDst = m_tmpString;
+			while (*posTmp && *posTmp != '\r' && *posTmp != '\n')
+				*(tmpDst++) = *(posTmp++);
+
+			*tmpDst = 0;
+			m_Array[idx]->m_TraceSettings.SET(m_tmpString);
+		}
+	}
+}
+
+
+void CSP_Group::PrepareForCalc(int in_CalcOrFind)
+{
+	EnterCriticalSection(&m_cs);
+	EnterCriticalSection(&m_cs_Command);
+
+	ClearCalcState(M_STATE_READY);
+
+	while (GetCount() > 0)
+		RemoveSpParticle(GetCount() - 1);
+
+
+	SData initData; initData.CLEAR();
+
+	while (PartCntr.GetCount(SP_TYPE_POSITIVE) < PartCntr.GetInitial().GetCount(SP_TYPE_POSITIVE))
+	{
+		AddSpParticle(SP_TYPE_POSITIVE, initData, m_pCalc);
+	}
+
+	while (PartCntr.GetCount(SP_TYPE_NEGATIVE) < PartCntr.GetInitial().GetCount(SP_TYPE_NEGATIVE))
+	{
+		AddSpParticle(SP_TYPE_NEGATIVE, initData, m_pCalc);
+	}
+
+	InitItems(SP_CLEAR_SOFT);
+
+
+	if (in_CalcOrFind == 0)
+	{   //Calc
+		if (m_pCalc->sRandSeed_Calc < 0)
+		{
+
+			ReadParticleData(m_pCalc->CalcParamsDecoded, -1);
+			CalcRelationsInit();
+		}
+		else
+		{
+			InitPosSpeedRandom(m_pCalc->sRandSeed_Calc, m_pCalc->CalcFindSet);
+			if ((m_pCalc->InitialCheckFlags & 0x0001))
+				RepairPositions();
+		}
+
+		CalcDataByRelations(GR_PS_RELATION_CURRENT);
+		CalcRelationsInit();//??????
+		CalcDataByRelations(GR_PS_RELATION_CURRENT);
+
+		m_pCalc->CalcCounter.InitLoop();
+		m_pCalc->Time.FixStartTime();
+	}
+	else if (in_CalcOrFind == 1)
+	{//Find
+		InitPosSpeedRandom(m_pCalcFind->sRandSeed == -1 ? m_pCalcFind->stat.Count : -1, m_pCalcFind->Settings);
+		if ((m_pCalc->InitialCheckFlags & 0x0001))
+			RepairPositions();
+
+		CalcRelationsInit();//??????
+		CalcDataByRelations(GR_PS_RELATION_CURRENT);
+		CalcRelationsInit();//??????
+
+		SetCalcState(M_STATE_READY);
+
+		ZeroMemory(&m_pCalc->Stat, sizeof(SP_CalcStat));
+
+		CollectStat(STAT_TYPE_ALL_CURRENT | STAT_TYPE_SETPARTICLE);
+
+		m_pCalcFind->FindCounter.InitLoop();
+		m_pCalc->Time.FixStartTimeCur();
+	}
+
+	CheckBeforeCalc();
+
+	ReadParticleLook(m_pCalc->CalcParamsDecoded, -1);
+
+	LeaveCriticalSection(&m_cs_Command);
+	LeaveCriticalSection(&m_cs);
+};
+
+
+
+int CSP_Group::SetCalcState(int in_State)
+{
+	if (in_State == M_STATE_OFF) m_CalcState = M_STATE_OFF;
+	else
+	{
+		if ((in_State & M_STATE_READY))
+			m_CalcState |= M_STATE_READY;
+
+		if ((in_State & M_STATE_CALC))
+			m_CalcState |= M_STATE_CALC;
+
+		if ((in_State & M_STATE_BREAK))
+			m_CalcState |= M_STATE_BREAK;
+
+		if ((in_State & M_STATE_PAUSE))
+			m_CalcState |= M_STATE_PAUSE;
+
+		if ((in_State & M_STATE_DO_NEXT))
+			m_CalcState |= M_STATE_DO_NEXT;
+
+		if ((in_State & M_STATE_DO_REPORT))
+			m_CalcState |= M_STATE_DO_REPORT;
+
+		if ((in_State & M_STATE_CHANGED))
+			m_CalcState |= M_STATE_CHANGED;
+	}
+
+	return m_CalcState;
+};
+int CSP_Group::ClearCalcState(int in_State)
+{
+	m_CalcState &= (0xFFFFFFFF ^ in_State);
+
+	return m_CalcState;
+};
+
+double CSP_Group::CalcCriticalDistTime(SPRelation& PrevRelation, double in_CalcTime, double* newTimePoint)
+{
+	double RetKeyPoint;
+	TwoDoubleRoots result;
+	SPos dV = PrevRelation.Distance_3D;
+	dV.SET_AS_PROJECTION_OF(PrevRelation.RelativeVelocity_3D);
+	SPos dA = PrevRelation.Distance_3D;
+	dA.SET_AS_PROJECTION_OF(PrevRelation.Acceleration_3D);
+	dA.MULT(0.5);
+
+	result = QuadraticEequationSolution(dA.LEN(), dV.LEN(), m_pCalc->Critical.Distance - PrevRelation.DistancePwr1);
+	double newDeltaTime = result.root1.Dbl;
+	if ((isnan(newDeltaTime) || newDeltaTime < 0.0) && (isnan(newDeltaTime = result.root2.Dbl) || newDeltaTime < 0.0))
+	{
+		RetKeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.15);
+	}
+	else if (newDeltaTime == 0.0)
+	{
+		RetKeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep()) - m_pCalc->Time.GetMinStep() * 0.1;
+	}
+	else if (m_pCalc->Time.GetCurTime() + newDeltaTime <= in_CalcTime)
+	{
+		RetKeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(newDeltaTime);
+	}
+	else
+	{
+		RetKeyPoint = m_pCalc->Time.GetNextTime_ByCorrectedDelta(m_pCalc->Time.GetStep() * 0.4321);
+	}
+
+	if (newTimePoint) *newTimePoint = newDeltaTime;
+
+	return RetKeyPoint;
+}
+
+
+int CSP_Group::CheckHealth()
+{
+	int ret = 0;
+	int m_Count = PartCntr.GetCount();
+	if (m_Array)
+		for (int i = 0; i < m_Count; i++)
+			if (m_Array[i]) ret++;
+
+	return m_Count - ret;
+}

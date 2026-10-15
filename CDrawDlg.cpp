@@ -27,7 +27,7 @@ CDrawDlg::CDrawDlg(SP_Calc* in_pData, CWnd* pParent /*=nullptr*/)
 
 	m_uRedrawFlag = 1;
 
-	m_XYZ = SP_DRAW_XY;
+	m_XYZ = SP_DRAW_XY | SP_DRAW_PART_MS;
 }
 
 CDrawDlg::~CDrawDlg()
@@ -58,6 +58,7 @@ BEGIN_MESSAGE_MAP(CDrawDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_XYZ, &CDrawDlg::OnBnClickedButtonXyz)
 	ON_BN_CLICKED(IDC_BUTTONCMD, &CDrawDlg::OnBnClickedButtoncmd)
 	ON_BN_CLICKED(IDC_BUTTON_GROUP, &CDrawDlg::OnBnClickedButtonGroup)
+	ON_BN_CLICKED(IDC_BUTTON_MSE, &CDrawDlg::OnBnClickedButtonMse)
 END_MESSAGE_MAP()
 
 
@@ -67,7 +68,7 @@ END_MESSAGE_MAP()
 void CDrawDlg::OnPaint()
 {
 	CPaintDC dc(this);
-	if (m_pData)
+	if (m_pData && m_pData->Group && m_pData->Group->m_Array)
 	{
 		EnterCriticalSection(&m_pData->Group->m_cs);
 
@@ -92,50 +93,37 @@ void CDrawDlg::OnPaint()
 		hOldBitmap = (HBITMAP)DCMem.SelectObject(m_hDCBitmap);
 		if (m_uRedrawFlag)
 		{
-
-			//SPos tmp = { 0 };
-			//PaintTraceToCDC(&DCMem, m_pData, SP_DRAW_XY, tmp);
 			SDrawSettings oldDrawSet = m_pData->DrawSet;
 
-			//m_pData->DrawSet.iShowFlags = SP_SHOWFLAG_TRACE;
-
 			SPos TraceSize = { 0 };
-			int BMP_Size = (int) (m_pData->DrawSet.BMP_Size.X > m_pData->DrawSet.BMP_Size.Y ? m_pData->DrawSet.BMP_Size.Y : m_pData->DrawSet.BMP_Size.X);
+			//int BMP_SizeMin = (int) (m_pData->DrawSet.BMP_Size.X > m_pData->DrawSet.BMP_Size.Y ? m_pData->DrawSet.BMP_Size.Y : m_pData->DrawSet.BMP_Size.X);
 
-			m_pData->Group->SetViewPoint(m_pData->DrawSet.ViewPoint.TimeInPc, m_pData->DrawSet.ViewPoint.Spread);
-			m_pData->Group->GetMinMaxTracePos(m_pData->DrawSet.PosMin, m_pData->DrawSet.PosMax, m_pData->DrawSet.ViewPoint.StartIdx, m_pData->DrawSet.ViewPoint.EndIdx);
+			m_pData->Group->SetViewPoint(m_pData->DrawSet.ViewPoint.TimeInPc, m_pData->DrawSet.ViewPoint.Spread, m_XYZ);
+			m_pData->Group->GetMinMaxTracePos(m_pData->DrawSet.PosMin, m_pData->DrawSet.PosMax, m_pData->DrawSet.ViewPoint);
 
 			TraceSize.SET_AS_DELTA(m_pData->DrawSet.PosMax, m_pData->DrawSet.PosMin);
 			if (TraceSize.X == 0.0 && TraceSize.Y == 0.0 && TraceSize.Z == 0.0) TraceSize.X = TraceSize.Y = TraceSize.Z = 10.0;
 
-			if (TraceSize.X > TraceSize.Y && TraceSize.X > TraceSize.Z)
-				m_pData->DrawSet.ViewMltpl = BMP_Size / TraceSize.X;
-			else
-				if (TraceSize.Y > TraceSize.X && TraceSize.Y > TraceSize.Z)
-					m_pData->DrawSet.ViewMltpl = BMP_Size / TraceSize.Y;
-				else
-					m_pData->DrawSet.ViewMltpl = BMP_Size / TraceSize.Z;
+			SPos MgnValue = m_pData->DrawSet.BMP_Size;
+			MgnValue /= TraceSize;
 
-			m_pData->DrawSet.ViewMltpl *= 0.98;
+			m_pData->DrawSet.ViewMltpl = (MgnValue.X <= MgnValue.Y) ? MgnValue.X : MgnValue.Y;
+			if (m_pData->DrawSet.ViewMltpl > MgnValue.Z) m_pData->DrawSet.ViewMltpl = MgnValue.Z;
 
-			//m_pData->DrawSet.m_00_Pos = m_pData->DrawSet.BMP_Size;
-			//m_pData->DrawSet.m_00_Pos.MULT(0.5);
-
-			m_pData->DrawSet.m_00_Pos = { 0 };
+			//m_pData->DrawSet.ViewMltpl *= 0.98;
 
 			SPos delta00 = { 0 };
 
-			if (m_pData->DrawSet.BMP_Size.X > m_pData->DrawSet.BMP_Size.Y)
-				delta00.X = m_pData->DrawSet.BMP_Size.X - m_pData->DrawSet.BMP_Size.Y;
-			else
-				delta00.Y = m_pData->DrawSet.BMP_Size.Y - m_pData->DrawSet.BMP_Size.X;
+			//if (m_pData->DrawSet.BMP_Size.X > m_pData->DrawSet.BMP_Size.Y)
+			//	delta00.X = m_pData->DrawSet.BMP_Size.X - m_pData->DrawSet.BMP_Size.Y;
+			//else
+			//	delta00.Y = m_pData->DrawSet.BMP_Size.Y - m_pData->DrawSet.BMP_Size.X;
 
 			m_pData->DrawSet.ViewMltpl *= m_pData->DrawSet.ViewMltpl_Ext;
 
-			m_pData->DrawSet.m_00_Pos.X = (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl;
-			m_pData->DrawSet.m_00_Pos.Y = (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl;
+			m_pData->DrawSet.m_00_Pos.X += (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl;
+			m_pData->DrawSet.m_00_Pos.Y += (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl;
 
-			
 			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT | SP_DRAW_GROUPINFO, delta00);
 
 			m_pData->DrawSet = oldDrawSet;
@@ -538,36 +526,44 @@ void CDrawDlg::OnBnClicked_Refresh()
 	RedrawMe();
 }
 
-void CDrawDlg::OnBnClicked_Save()
+int CDrawDlg::SaveImage(const char* in_FileName)
 {
+	int ret = -1;
 	if (m_pData)
 	{
+		ret = -10;
 		EnterCriticalSection(&m_pData->Group->m_cs);
 		SDrawSettings oldDrawSet = m_pData->DrawSet;
 
+
 		SPos TraceSize = { 0 };
-		int BMP_Size = 2000;
 
-		m_pData->DrawSet.BMP_Size.X = BMP_Size;
-		m_pData->DrawSet.BMP_Size.Y = BMP_Size;
-
-		m_pData->DrawSet.ViewPoint.TimeInPc = m_ViewPrc;
-		m_pData->DrawSet.ViewPoint.Spread = m_ViewSpread;
-
-		m_pData->Group->SetViewPoint(m_ViewPrc, m_ViewSpread);
-		m_pData->Group->GetMinMaxTracePos(m_pData->DrawSet.PosMin, m_pData->DrawSet.PosMax, m_pData->DrawSet.ViewPoint.StartIdx, m_pData->DrawSet.ViewPoint.EndIdx);
+		m_pData->Group->SetViewPoint(m_pData->DrawSet.ViewPoint.TimeInPc, m_pData->DrawSet.ViewPoint.Spread, m_XYZ);
+		m_pData->Group->GetMinMaxTracePos(m_pData->DrawSet.PosMin, m_pData->DrawSet.PosMax, m_pData->DrawSet.ViewPoint);
 
 		TraceSize.SET_AS_DELTA(m_pData->DrawSet.PosMax, m_pData->DrawSet.PosMin);
+		if (TraceSize.X == 0.0 && TraceSize.Y == 0.0 && TraceSize.Z == 0.0) TraceSize.X = TraceSize.Y = TraceSize.Z = 10.0;
 
-		if (TraceSize.X > TraceSize.Y) m_pData->DrawSet.ViewMltpl = BMP_Size / TraceSize.X;
-		else m_pData->DrawSet.ViewMltpl = BMP_Size / TraceSize.Y;
+		SPos MgnValue = m_pData->DrawSet.BMP_Size;
+		MgnValue /= TraceSize;
+
+		m_pData->DrawSet.ViewMltpl = (MgnValue.X <= MgnValue.Y) ? MgnValue.X : MgnValue.Y;
+		if (m_pData->DrawSet.ViewMltpl > MgnValue.Z) m_pData->DrawSet.ViewMltpl = MgnValue.Z;
+
 
 		m_pData->DrawSet.ViewMltpl *= 0.98;
+
+		SPos delta00 = { 0 };
+
+		//if (m_pData->DrawSet.BMP_Size.X > m_pData->DrawSet.BMP_Size.Y)
+		//	delta00.X = m_pData->DrawSet.BMP_Size.X - m_pData->DrawSet.BMP_Size.Y;
+		//else
+		//	delta00.Y = m_pData->DrawSet.BMP_Size.Y - m_pData->DrawSet.BMP_Size.X;
+
 		m_pData->DrawSet.ViewMltpl *= m_pData->DrawSet.ViewMltpl_Ext;
 
-		m_pData->DrawSet.m_00_Pos.X = (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl;
-		m_pData->DrawSet.m_00_Pos.Y = (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl;
-
+		m_pData->DrawSet.m_00_Pos.X += (m_pData->DrawSet.BMP_Size.X - (m_pData->DrawSet.PosMax.X - m_pData->DrawSet.PosMin.X) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.X * m_pData->DrawSet.ViewMltpl;
+		m_pData->DrawSet.m_00_Pos.Y += (m_pData->DrawSet.BMP_Size.Y - (m_pData->DrawSet.PosMax.Y - m_pData->DrawSet.PosMin.Y) * m_pData->DrawSet.ViewMltpl) * 0.5 - m_pData->DrawSet.PosMin.Y * m_pData->DrawSet.ViewMltpl;
 
 		CPaintDC dc(this);
 		HBITMAP hBitmap;       // Handle to the old bitmap
@@ -583,21 +579,10 @@ void CDrawDlg::OnBnClicked_Save()
 			// Select the new bitmap object into the memory device context. 
 			hOldBitmap = (HBITMAP)DCMem.SelectObject(hBitmap);
 
-			SPos tmp = { 0 };
+			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT | SP_DRAW_GROUPINFO, delta00);
 
 
-			PaintTraceToCDC(&DCMem, m_pData, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_TEXT | SP_DRAW_GROUPINFO, tmp);
-
-			char fileMane[500];
-			sprintf_s(fileMane, "C:\\SParticle\\BMP\\CALC_NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_PT%g_Thr%d_%I64d.bmp",
-				m_pData->Group->GetCount(), m_pData->ClassicType, m_pData->AdditiveType,
-				m_pData->WindType, m_pData->CollisionType, m_pData->DensityCalcType, m_pData->AccCalcType, m_pData->DensityDerivLevel,
-				m_pData->ParentSpaceThickness, m_pData->Group->m_ThreadsCur, GetTickCount64());
-
-			SaveBitmap(fileMane, DCMem, m_hDCBitmap);
-
-
-			SaveBitmap(fileMane, DCMem, hBitmap);
+			ret = SaveBitmap(in_FileName, DCMem, hBitmap);
 
 			DCMem.SelectObject(hOldBitmap);
 			DeleteObject(hBitmap);
@@ -608,6 +593,21 @@ void CDrawDlg::OnBnClicked_Save()
 
 		LeaveCriticalSection(&m_pData->Group->m_cs);
 	}
+
+	return ret;
+}
+
+
+void CDrawDlg::OnBnClicked_Save()
+{
+	char fileMane[500];
+	sprintf_s(fileMane, "BMP\\CALC_Thr%d_%I64d__PCnt0.3%d_NP%d_AP%d__C%d_ADD%d_Wind%d_DCT%d_ACT%d_DL%d_PT%g.bmp",
+		m_pData->Group->m_ThreadsCur, GetTickCount64(),
+		m_pData->Group->GetCount(), m_pData->Group->PartCntr.GetCurrent().GetCount(SP_TYPE_POSITIVE), m_pData->Group->PartCntr.GetCurrent().GetCount(SP_TYPE_NEGATIVE),
+		m_pData->ClassicType, m_pData->AdditiveType, m_pData->WindType, m_pData->DensityCalcType, m_pData->AccCalcType, m_pData->DensityDerivLevel,
+		m_pData->ParentSpaceThickness);
+
+	SaveImage(fileMane);
 }
 
 void CDrawDlg::OnBnClicked_UpLeft()
@@ -651,14 +651,45 @@ void CDrawDlg::OnBnClicked_Center()
 
 void CDrawDlg::OnBnClickedButtonXyz()
 {
-	if (m_XYZ == SP_DRAW_XY) 
-		m_XYZ = SP_DRAW_XYZ;
+	int Prevm_XYZ = m_XYZ;
+
+	m_XYZ &= ~SP_DRAW_XYZ;
+
+	if ((Prevm_XYZ & SP_DRAW_XYZ)== SP_DRAW_XY)
+		m_XYZ |= SP_DRAW_XYZ;
 	else
-		m_XYZ = SP_DRAW_XY;
+		m_XYZ |= SP_DRAW_XY;
 
 	m_uRedrawFlag = 1;
 	OnBnClicked_Center();
 }
+
+
+void CDrawDlg::OnBnClickedButtonMse()
+{
+	int PrevValue = (m_XYZ & SP_DRAW_PART_ALL);
+
+	m_XYZ &= ~SP_DRAW_PART_ALL;
+	 
+	if (PrevValue == SP_DRAW_PART_MAIN) m_XYZ |= SP_DRAW_PART_MS;
+	else 
+		if (PrevValue == SP_DRAW_PART_MS) m_XYZ |= SP_DRAW_PART_ALL;
+		else
+			if (PrevValue == SP_DRAW_PART_ALL) m_XYZ |= SP_DRAW_PART_ETERNAL;
+			else
+				if (PrevValue == SP_DRAW_PART_ETERNAL) m_XYZ |= SP_DRAW_PART_MAIN;
+
+	char tmpS[8];
+	tmpS[0] = (m_XYZ & SP_DRAW_PART_MAIN) ? 'M' : 'm';
+	tmpS[1] = (m_XYZ & SP_DRAW_PART_SECONDARY) ? 'S' : 's';
+	tmpS[2] = (m_XYZ & SP_DRAW_PART_ETERNAL) ? 'E' : 'e';
+	tmpS[3] = 0;
+	SetDlgItemTextA(m_hWnd, IDC_BUTTON_MSE, tmpS);
+
+	m_uRedrawFlag = 1;
+	OnBnClicked_Center();
+}
+
 
 void CDrawDlg::OnBnClickedButtoncmd()
 {
@@ -667,6 +698,9 @@ void CDrawDlg::OnBnClickedButtoncmd()
 		char* tmps = new char[SD_PARAMSLEN];
 
 		::GetWindowTextA(::GetDlgItem(m_hWnd, IDC_EDITCMD), tmps, SD_PARAMSLEN);
+		PrepareParams(m_pData->Group->m_pCalc->CalcParams, tmps, SD_PARAMSLEN);
+		m_pData->Group->ReadParticleLook(m_pData->Group->m_pCalc->CalcParamsDecoded, -1);
+
 		m_pData->Group->Cmd_Add(tmps);
 		m_pData->Group->Cmd_Add("REDRAW");
 		delete [] tmps;

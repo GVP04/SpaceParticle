@@ -47,6 +47,7 @@ UINT DoCalc_111(LPVOID pParam)
 
 void my_Test();
 
+
 CSpaceOMApp::CSpaceOMApp()
 {
 	// support Restart Manager
@@ -56,9 +57,91 @@ CSpaceOMApp::CSpaceOMApp()
 	// Place all significant initialization in InitInstance
 
 
-	ASSERT(_chdir("C:\\SParticle") == 0);
+    _mkdir("D:\\SParticle");
+	_chdir("D:\\SParticle");
+    _mkdir("BMP");
+    _mkdir("BMP\\VIDEO_SRC");
 
-	//my_Test();
+    //SPos Point_A = {0}, Point_B = { 0 }, Point_C = { 0 };
+
+    //Point_A.X = 0.5;
+    //Point_B.X = -0.5;
+
+    //Point_C.X = 0.1;
+    //Point_C.Y = -1.0;
+
+    //SPos Point_Middle_AB;
+
+
+
+    //Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+    //SPos PlaneNormal;
+    //PlaneNormal.SET_AS_DELTA(Point_A, Point_Middle_AB);
+    //SPos pojPoint;
+    //pojPoint.SET_AS_DELTA(Point_C, Point_Middle_AB);
+    //pojPoint.SET_AS_PROJECTION_ONTO_PLANE(PlaneNormal);
+    //pojPoint.SET_LENGHT(sqrt(1.0 - PlaneNormal.LENPWR2()));
+    //pojPoint += Point_Middle_AB;
+    //double dist011 = Point_A.GetDistance(pojPoint);
+    //double dist111 = Point_B.GetDistance(pojPoint);
+
+
+    //ASSERT(0);
+    //ASSERT(0);
+    //ASSERT(0);
+
+
+
+    //SPos Point_A = {0}, Point_B = { 0 }, Point_To_Find = { 0 };
+    //Point_A.X = -3;
+    //Point_B.X = 3;
+    //Point_To_Find.X = 1;
+    //Point_To_Find.Y = 5;
+    //double EequiDistant = 5;
+
+
+    //SPos Point_Middle_AB;
+    //Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+
+    //SPos Delta_BA; Delta_BA.SET_AS_DELTA(Point_B, Point_A);
+    //double L2 = Delta_BA.LENPWR2();
+
+    //if (L2 > 1e-14)
+    //{
+    //    SPos PTF_To_MAB = Point_Middle_AB;
+    //    PTF_To_MAB -= Point_To_Find;
+    //    Delta_BA *= PTF_To_MAB.DOT(Delta_BA) / L2;
+    //    Point_To_Find += Delta_BA;
+    //    Point_To_Find -= Point_Middle_AB;
+    //    Point_To_Find.SET_LENGHT_by_Pwr2(EequiDistant * EequiDistant - L2 * 0.25);
+    //    Point_To_Find += Point_Middle_AB;
+    //}
+    //else
+    //{
+    //    Point_To_Find -= Point_Middle_AB;
+    //    Point_To_Find.SET_LENGHT(EequiDistant);
+    //    Point_To_Find += Point_Middle_AB;
+    //}
+
+
+
+
+    //SPos Delta_BA; Delta_BA.SET_AS_DELTA(Point_B, Point_A);
+    //double L2 = Delta_BA.LENPWR2();
+
+    //if (L2 > 1e-14)
+    //{
+    //    SPos Point_Middle_AB;  Point_Middle_AB.SET_AS_MIDDLE_POINT(Point_A, Point_B);
+    //    Point_Middle_AB -= Point_To_Find;
+    //    Delta_BA *= Point_Middle_AB.DOT(Delta_BA) / L2;
+    //    Point_To_Find += Delta_BA;
+    //}
+
+
+
+
+
+    ////my_Test();
 
 }
 

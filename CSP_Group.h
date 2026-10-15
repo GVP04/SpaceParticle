@@ -34,9 +34,6 @@
 
 #define M_CMD_MAXCOUNT		0x1000
 
-extern int mRGB[16];
-extern int mRGBDark[16];
-
 UINT DoCommandThread(LPVOID pParam);
 
 #define M_INNER_STATE_MASK		0x0000000F
@@ -65,7 +62,7 @@ struct GroupSummaryInfo
 	SPos Position; //позиция центра
 	SPos Speed_3D; //суммарная скорость 3D
 	SPos Acceleration_3D; //суммарное ускорение 3D
-	double Velocity; //суммарная скорость
+	double GroupVelocity; //суммарная скорость
 	double Acceleration; //суммарное ускорение
 	double TimePoint;
 	double VP_TimePoint_Min;
@@ -83,7 +80,7 @@ struct GroupSummaryInfo
 	{
 		Position = { 0 };
 		Speed_3D = { 0 };
-		Velocity = 0.0;
+		GroupVelocity = 0.0;
 		Acceleration_3D = { 0 };
 		Acceleration = 0.0;
 
@@ -104,7 +101,7 @@ struct GroupSummaryInfo
 		{
 			Position.DIV(Count);
 			Speed_3D.DIV(Count);
-			Velocity = Speed_3D.LEN();
+			GroupVelocity = Speed_3D.LEN();
 
 			Acceleration_3D.DIV(Count);
 			Acceleration = Acceleration_3D.LEN();
@@ -128,8 +125,8 @@ struct GroupSummaryInfo
 		if (inData)
 		{
 			Position.ADD(inData->Position);
-			Speed_3D.ADD(inData->Velocity);
-			Velocity += inData->AbsSpeed;
+			Speed_3D.ADD(inData->Velocity_Linear);
+			GroupVelocity += inData->AbsSpeed;
 			Acceleration_3D.ADD(inData->Accel_2_3D);
 			ASSERT(fabs(Acceleration_3D.X) < 1.0e80);
 
@@ -146,7 +143,7 @@ struct GroupSummaryInfo
 	{
 		Position.ADD(inInfo.Position);
 		Speed_3D.ADD(inInfo.Speed_3D);
-		Velocity += inInfo.Velocity;
+		GroupVelocity += inInfo.GroupVelocity;
 		Acceleration_3D.ADD(inInfo.Acceleration_3D);
 		Acceleration += inInfo.Acceleration;
 		Count += inInfo.Count;
@@ -213,7 +210,12 @@ struct GroupSummaryInfo
 				}
 				if (in_StrLen - ret > 0)
 				{
-					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, in_Format, Velocity);
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, "Vel_Linear");
+					if (in_StrLen - (ret += nOutput) > 0)		io_Str[ret++] = in_ValueDelim;
+				}
+				if (in_StrLen - ret > 0)
+				{
+					nOutput = sprintf_s(io_Str + ret, in_StrLen - ret, in_Format, GroupVelocity);
 					if (in_StrLen - (ret += nOutput) > 0)		io_Str[ret++] = in_ValueDelim;
 				}
 
@@ -292,54 +294,21 @@ struct GR_Thread;
 
 #define GR_THREAD_ALL				0x00FF
 
-#define GR_PS_NORM					0x00000000
-#define GR_PS_MAXABSSPEED			0x00000001
-#define GR_PS_MAXRELATIVESPEED		0x00000002
-#define GR_PS_FAR_AWAY_PRESENT		0x00000004
-#define GR_PS_COLLISION_PRESENT		0x000000F0
-#define GR_PS_COLLISION_BESTUCK		0x00000010
-#define GR_PS_COLLISION_DENSITY		0x00000020
-#define GR_PS_COLLISION_DISTANCE	0x00000040
-#define GR_PS_COLLISION_DISTANCE0	0x00000080
-
-#define GR_PS_MAX_IS_PRESENT		0x00000F00
-#define GR_PS_MAXABSSPEED_ON		0x00000100
-#define GR_PS_MAXABSSPEED_OFF		0x00000200
-#define GR_PS_MAXRELATIVESPEED_ON	0x00000400
-#define GR_PS_MAXRELATIVESPEED_OFF	0x00000800
-
-#define GR_PS_FAR_AWAY_PRESENT_ON	0x00001000
-#define GR_PS_FAR_AWAY_PRESENT_OFF	0x00002000
-#define GR_PS_POSITION_CHANGED		0x00004000
-#define GR_PS_POSITION_LOW_PREC		0x00008000
-
-#define GR_PS_RELATION_NEEDRECALC	0x10000000
-
-
-#define GR_PS_RELATION_CURRENT		0x01000000
-#define GR_PS_RELATION_NEXT			0x02000000
-#define GR_PS_RELATION_PREV			0x04000000
-#define GR_PS_RELATION_TEMP			0x08000000
-#define GR_PS_RELATION_CORRECTED	0x00800000
-#define GR_PS_RELATION_TYPEMASK		0x0F800000
-
-
-
-struct BeStuckInfo
+struct RelatedInfo
 {
 	int IdMaster;
 	int State;
+	SPRelation* RelationCurent;
+	SPRelation* RelationNext;
 };
 
-struct BeStuckList
+struct RelatedList
 {
 	int nMasters;
 	int IdParticle;
-	BeStuckInfo* List;
+	RelatedInfo* List;
 	int* PosByIdx;
 };
-
-
 
 
 struct BSP_PosByIdx
@@ -405,29 +374,29 @@ public:
 
 };
 
-struct BeStuckParticles
+struct RelatedParticles
 {
 private:
 	int Count;
 	int nParticles;
-	BeStuckList* List;
+	RelatedList* List;
 	int* PosByIdIndex;
 	//BSP_PosByIdx Idx;
 public:
 
 	static int CalcPoolSize(int in_MaxCount)
 	{
-		return in_MaxCount * ( sizeof(BeStuckList) + SP_MAX_STUCK_MASTERS * sizeof(BeStuckInfo) + sizeof(int));
+		return in_MaxCount * ( sizeof(RelatedList) + SP_MAX_STUCK_MASTERS * sizeof(RelatedInfo) + sizeof(int));
 	}
 
 	inline int GetCount() const { return nParticles; };
 
-	const BeStuckList* GetBeStuckListByNum(int in_Num) const
+	const RelatedList* GetRelatedListByNum(int in_Num) const
 	{
 		return in_Num >= 0 && in_Num < nParticles ? List + in_Num : nullptr;
 	};
 
-	const BeStuckList* GetBeStuckListById(int in_Idx) const
+	const RelatedList* GetRelatedListById(int in_Idx) const
 	{
 		return in_Idx >= Count || in_Idx < 0 || PosByIdIndex[in_Idx] < 0 ? nullptr : List + PosByIdIndex[in_Idx];
 	};
@@ -437,14 +406,14 @@ public:
 		return in_Idx >= Count || in_Idx < 0 ? -1 : PosByIdIndex[in_Idx];
 	};
 
-	BeStuckParticles()
+	RelatedParticles()
 	{
 		List = nullptr;
 		PosByIdIndex = nullptr;
 		RESET();
 	};
 
-	~BeStuckParticles()
+	~RelatedParticles()
 	{
 		RESET();
 	};
@@ -464,7 +433,7 @@ public:
 		if (in_Count < 2) in_Count = 10;
 		Count = in_Count;
 
-		List = (BeStuckList*) new BYTE[BeStuckParticles::CalcPoolSize(Count) + 100];
+		List = (RelatedList*) new BYTE[RelatedParticles::CalcPoolSize(Count) + 100];
 		PosByIdIndex = new int[Count + 100];
 
 		clear();
@@ -477,7 +446,7 @@ public:
 		if (List)
 		{
 			nParticles = 0;
-			List[0].List = (BeStuckInfo*)(&List[Count+1]);
+			List[0].List = (RelatedInfo*)(&List[Count+1]);
 			List[0].IdParticle = 0;
 			List[0].nMasters = 0;
 			List[0].List[0].IdMaster = 0;
@@ -507,13 +476,13 @@ public:
 		return ret;
 	}
 
-	int AddItem(int in_IdParticle, int in_IdMaster, int in_State)
+	int AddItem(int in_IdParticle, RelatedInfo & infoToAdd)
 	{
 		int ret = -1;
 
-		if (in_IdParticle < Count && in_IdMaster < Count)
+		if (in_IdParticle < Count && infoToAdd.IdMaster < Count)
 		{
-			BeStuckList* pItem;
+			RelatedList* pItem;
 			if (nParticles == 0)
 			{
 				pItem = List;
@@ -533,20 +502,37 @@ public:
 				nParticles++;
 				pItem->nMasters = 0;
 
-				BeStuckList* pItemPrev = pItem - 1;
+				RelatedList* pItemPrev = pItem - 1;
 				pItem->List = pItemPrev->List + pItemPrev->nMasters;
 				pItem->IdParticle = in_IdParticle;
 			}
-			while (pItem->nMasters && pItem->List[pItem->nMasters - 1].IdMaster >= in_IdMaster)
+
+			while (pItem->nMasters && pItem->List[pItem->nMasters - 1].IdMaster >= infoToAdd.IdMaster)
 				pItem->nMasters--;
-			pItem->List[pItem->nMasters].IdMaster = in_IdMaster;
-			pItem->List[pItem->nMasters].State = in_State;
+
+			pItem->List[pItem->nMasters] = infoToAdd;
 			pItem->nMasters++;
 			ret = nParticles;
 		}
 
 		return ret;
 	};
+
+	int DeleteRelatedListItemById(int in_IdParticle, int ItemNum)
+	{
+		int ret = -1;
+		if (in_IdParticle < Count && in_IdParticle >= 0 && PosByIdIndex[in_IdParticle] >= 0)
+		{
+			RelatedList* BSL = List + PosByIdIndex[in_IdParticle];
+
+			while (++ItemNum < BSL->nMasters)
+				BSL->List[ItemNum - 1] = BSL->List[ItemNum];
+
+			BSL->nMasters--;
+			ret = BSL->nMasters;
+		}
+		return ret;
+	}
 
 	////////////	int InsertItem(int in_IdParticle, int in_IdMaster, int in_State)
 	////////////	{
@@ -573,50 +559,47 @@ public:
 	////////////	};
 };
 
-struct BeStuckPool
+struct RelatedPool
 {
 private:
-	BeStuckParticles* Curent;
-	BeStuckParticles* Next;
-	BeStuckParticles* Prev;
-	BeStuckParticles* Temp; ///????????????????
-	BeStuckParticles* Corrected;
+	RelatedParticles* Curent;
+	RelatedParticles* Next;
+	RelatedParticles* Prev;
+	RelatedParticles* Temp; ///????????????????
 
 public:
 
-	BeStuckPool()
+	RelatedPool()
 	{
-		Corrected = Curent = Next = Prev = Temp = nullptr;
+		Curent = Next = Prev = Temp = nullptr;
 	};
 
-	~BeStuckPool()
+	~RelatedPool()
 	{
 		RESET();
 	};
 
-	inline BeStuckParticles* GetCurent() { return Curent; };
-	inline BeStuckParticles* GetNext() { return Next; };
-	inline BeStuckParticles* GetPrev() { return Prev; };
-	inline BeStuckParticles* GetTemp() { return Temp; };
-	inline BeStuckParticles* GetCorrected() { return Corrected; };
+	inline RelatedParticles* GetCurent() { return Curent; };
+	inline RelatedParticles* GetNext() { return Next; };
+	inline RelatedParticles* GetPrev() { return Prev; };
+	inline RelatedParticles* GetTemp() { return Temp; };
 
-	BeStuckParticles* GetBeStuck(int in_Type)
+	RelatedParticles* GetRelated(int in_Type)
 	{
-		BeStuckParticles* ret;
+		RelatedParticles* ret;
 		switch ((in_Type & GR_PS_RELATION_TYPEMASK))
 		{
 		case GR_PS_RELATION_CURRENT:	ret = GetCurent();	break;
 		case GR_PS_RELATION_NEXT:		ret = GetNext();	break;
 		case GR_PS_RELATION_PREV:		ret = GetPrev();	break;
 		case GR_PS_RELATION_TEMP:		ret = GetTemp();	break;
-		case GR_PS_RELATION_CORRECTED:	ret = GetCorrected();	break;
 		default:					ret = GetCurent();	break;
 		}
 		return ret;
 	};
 
 	void DoStep() {
-		BeStuckParticles* Swap;
+		RelatedParticles* Swap;
 		Swap = Prev;
 		Prev = Curent;
 		Curent = Next;
@@ -633,8 +616,6 @@ public:
 		Next = nullptr;
 		if (Temp) delete Temp;
 		Temp = nullptr;
-		if (Corrected) delete Corrected;
-		Corrected = nullptr;
 	};
 
 	void clear()
@@ -643,23 +624,22 @@ public:
 		if (Curent) Curent->clear();
 		if (Next) Next->clear();
 		if (Temp) Temp->clear();
-		if (Corrected) Corrected->clear();
 	};
 
-	BeStuckParticles* clear(int in_Type)
+	RelatedParticles* clear(int in_Type)
 	{
-		BeStuckParticles* toClear = GetBeStuck(in_Type);
+		RelatedParticles* toClear = GetRelated(in_Type);
 		if (toClear) toClear->clear();
 
 		return toClear;
 	};
 
-	int AddItem(int in_Type, int in_IdParticle, int in_IdMaster, int in_State)
+	int AddItem(int in_Type, int in_IdParticle, RelatedInfo& infoToAdd)
 	{
 		int ret = -1;
 
-		BeStuckParticles* toAdd = GetBeStuck(in_Type);
-		if (toAdd) ret = toAdd->AddItem(in_IdParticle, in_IdMaster, in_State);
+		RelatedParticles* toAdd = GetRelated(in_Type);
+		if (toAdd) ret = toAdd->AddItem(in_IdParticle, infoToAdd);
 
 		return ret;
 	};
@@ -668,16 +648,14 @@ public:
 	{
 		RESET();
 		if (in_Count < 2) in_Count = 10;
-		Curent = (BeStuckParticles*) new BeStuckParticles;
+		Curent = (RelatedParticles*) new RelatedParticles;
 		Curent->INIT(in_Count);
-		Next = (BeStuckParticles*) new BeStuckParticles;
+		Next = (RelatedParticles*) new RelatedParticles;
 		Next->INIT(in_Count);
-		Prev = (BeStuckParticles*) new BeStuckParticles;
+		Prev = (RelatedParticles*) new RelatedParticles;
 		Prev->INIT(in_Count);
-		Temp = (BeStuckParticles*) new BeStuckParticles;
+		Temp = (RelatedParticles*) new RelatedParticles;
 		Temp->INIT(in_Count);
-		Corrected = (BeStuckParticles*) new BeStuckParticles;
-		Corrected->INIT(in_Count);
 		clear();
 	};
 };
@@ -692,7 +670,7 @@ private:
 	SPRelation* m_Array;
 	int Count;
 	int nItems;
-	BeStuckPool BSP;
+	RelatedPool BSP;
 
 public:
 	Relations()
@@ -714,30 +692,41 @@ public:
 	SPRelation* GetNext(const SPRelation* in_OfRelation) { return in_OfRelation == Curent ? Next : Curent; };
 	SPRelation* GetPrev(const SPRelation* in_OfRelation) { return in_OfRelation == Curent ? Prev : Curent; };
 
-	BeStuckParticles* FillNBeStuck(int in_Type, int IdxSrt, int IdxEnd)
+	RelatedParticles* FillNRelated(int in_Type, int IdxSrt, int IdxEnd, int in_StateToAdd)
 	{
 		if (IdxSrt > Count || IdxSrt < 0) IdxSrt = 0;
 		if (IdxEnd > Count || IdxEnd < IdxSrt) IdxEnd = Count;
 
 		SPRelation* Src = GetRelation(in_Type);
-		BeStuckParticles* pBSP = BSP.clear(in_Type);
+		SPRelation* SrcNext = GetRelation(GR_PS_RELATION_NEXT);
+		RelatedParticles* pBSP = BSP.clear(in_Type);
+		RelatedInfo infoToAdd;
 
 		for (int i = IdxSrt; i < IdxEnd; i++)
 		{
 			SPRelation* pos = Src + i + IdxSrt * Count;
-			for (int j = IdxSrt; j < IdxEnd; j++, pos += Count)
-				if (i != j && (pos->State & GR_PS_COLLISION_BESTUCK))
-					pBSP->AddItem(i, j, pos->State);
+			SPRelation* posNext = SrcNext + i + IdxSrt * Count;
+			for (int j = IdxSrt; j < IdxEnd; j++, pos += Count, posNext += Count)
+				if (i != j && (pos->State & in_StateToAdd))
+				{
+					infoToAdd.IdMaster = j;
+					infoToAdd.State = pos->State;
+
+					infoToAdd.RelationCurent = pos;
+					infoToAdd.RelationNext = posNext;
+
+					pBSP->AddItem(i, infoToAdd);
+				}
 		}
 
 		return pBSP;
 	};
 
-	inline BeStuckParticles* GetBeStuck(int in_Type) { return BSP.GetBeStuck(in_Type); };
-	inline BeStuckParticles* GetBeStuck_Current() { return BSP.GetCurent(); };
-	inline BeStuckParticles* GetBeStuck_Next() { return BSP.GetNext(); };
-	inline BeStuckParticles* GetBeStuck_Prev() { return BSP.GetPrev(); };
-	inline BeStuckParticles* GetBeStuck_Temp() { return BSP.GetTemp(); };
+	inline RelatedParticles* GetRelated(int in_Type) { return BSP.GetRelated(in_Type); };
+	inline RelatedParticles* GetRelated_Current() { return BSP.GetCurent(); };
+	inline RelatedParticles* GetRelated_Next() { return BSP.GetNext(); };
+	inline RelatedParticles* GetRelated_Prev() { return BSP.GetPrev(); };
+	inline RelatedParticles* GetRelated_Temp() { return BSP.GetTemp(); };
 
 	inline int GetRelationPos(int in_First, int in_Second) { return in_First + in_Second * Count; };
 
@@ -822,7 +811,9 @@ public:
 		for (int i = in_IdxStart; i <= in_IdxEnd; i++, RelationPos += Count)
 			for (int j = RelationPos + in_IdxStart, pos = RelationPos+ in_IdxEnd; j <= pos; j++)
 				if (Next[j].State)
+				{
 					Next[j].State &= in_NotClearMask;
+				}
 	};
 
 	void DoStep() {
@@ -850,7 +841,7 @@ public:
 			ZeroMemory(m_Array, nItems * 4 * sizeof(SPRelation));
 	};
 
-	void clear_BeStuck(int in_Type)
+	void clear_Related(int in_Type)
 	{
 		BSP.clear(in_Type);
 	};
@@ -1007,7 +998,7 @@ struct CalceRelationParams
 	double ViewTime;
 	SPRelation* PrevRelations;
 	SPRelation* NewRelations;
-	BeStuckInfo BSI;
+	RelatedInfo BSI;
 	int CalcType;
 	int ThreadID;
 	double out_KeyPoint;
@@ -1032,6 +1023,16 @@ public:
 	{
 		//CompareFlag не используется здесь. А так можно по флагу определить какие переменные сравнивать
 		return !(ParticlesState & SP_STATE_ABS_CHANGE_LS) && !(RelationsState_Cur& SP_STATE_PHANTOM_CRITICAL_CHANGED) && TimePoint - PrevPrevData->TimePoint < SqueezeStep; //если разница больше 
+	}
+
+	bool TAD_OnAdd(STracePosInfo* PrevData)
+	{
+		return true; //false если проблема
+	}
+
+	bool TAD_OnUpdate(STracePosInfo* PrevData)
+	{
+		return true; //false если проблема
 	}
 
 	static bool TAD_CorrectData(STracePosInfo & PrevPrevData, const STracePosInfo & PrevData, int CorrectionFlag = 0) 
@@ -1180,7 +1181,7 @@ private:
 
 	Relations m_Relations;
 
-	BeStuckParticles* pBS_Corrected;
+	////RelatedParticles* pBS_Corrected;
 
 	///////////
 	static int AssertionVar;
@@ -1200,13 +1201,19 @@ private:
 	void CalcCountDevider();
 
 	char** m_CmdArr;
-	int m_DelayMS;
+
 	void CheckThreads();
 	void StopThreads();
+	void FiilParticlesState();
+	STracePosInfo nextStepInfo;
 
 public:
 	void RepairPositions();
 	void InitPosSpeedRandom(int in_InitialSeed, SP_CalcFindSet & in_Settings);
+
+	void DoDelay();
+
+	bool CheckMe() { return m_Array && *m_Array; }
 
 	REPORTER_THREAD_CALC(CMD_Param_File m_reporter;)
 
@@ -1220,6 +1227,9 @@ public:
 public:
 	int GetIdByMaxDistance(double in_RelDist);
 	inline int GetCount() { return PartCntr.GetCount(); }
+	const ParticleCountByType GetPtrInitial() const { return PartCntr.GetInitial(); }
+	const ParticleCountByType GetPtrCurrent() const { return PartCntr.GetCurrent(); }
+
 	int GetCountMax() { return m_maxCount; }
 	int AddSpParticle(int in_Type, const SData& in_Ptr, SP_Calc* pCalc);
 	int RemoveSpParticle(int in_Idx);
@@ -1233,13 +1243,15 @@ public:
 	//int GetMinMaxData(SData* out_Min, SData* out_Max, SData_SD* out_MinSD, SData_SD* out_MaxSD, int in_NextFlag = 0);
 	void Reset();
 	void Clear();
-	void DoDelay() { if (m_DelayMS > 0 && m_DelayMS < 10000) Sleep(m_DelayMS); };
+	void SetRelationByUltimate(SData& NextData, const SData& CurData, RelatedInfo& R_Info);
 	bool DoPause()
 	{
 		bool ret = (m_CalcState & M_STATE_PAUSE) != 0;
 		if (ret) Sleep(100);
 		return ret;
 	};
+
+	int GetThreadsCur() { return m_ThreadsCur; }
 
 	void ResumeThreadsAfter()
 	{
@@ -1260,58 +1272,21 @@ public:
 	int Cmd_Execute(char* in_Command);
 	int Cmd_Do(int in_Count = 0);
 	int GetCalcState() { return m_CalcState; };
-	int SetCalcState(int in_State)
-	{
-		if (in_State == M_STATE_OFF) m_CalcState = M_STATE_OFF;
-		else
-		{
-			if ((in_State & M_STATE_READY))
-				m_CalcState |= M_STATE_READY;
-
-			if ((in_State & M_STATE_CALC))
-				m_CalcState |= M_STATE_CALC;
-
-			if ((in_State & M_STATE_BREAK))
-				m_CalcState |= M_STATE_BREAK;
-
-			if ((in_State & M_STATE_PAUSE))
-				m_CalcState |= M_STATE_PAUSE;
-
-			if ((in_State & M_STATE_DO_NEXT))
-				m_CalcState |= M_STATE_DO_NEXT;
-
-			if ((in_State & M_STATE_DO_REPORT))
-				m_CalcState |= M_STATE_DO_REPORT;
-
-			if ((in_State & M_STATE_CHANGED))
-				m_CalcState |= M_STATE_CHANGED;
-		}
-
-		return m_CalcState;
-	};
-	int ClearCalcState(int in_State)
-	{
-		m_CalcState &= (0xFFFFFFFF ^ in_State);
-
-		return m_CalcState;
-	};
-
-
-	int CheckHealth()
-	{
-		int ret = 0;
-		int m_Count = PartCntr.GetCount();
-		if (m_Array)
-			for (int i = 0; i < m_Count; i++)
-				if (m_Array[i]) ret++;
-
-		return m_Count - ret;
-	}
+	int SetCalcState(int in_State);
+	int ClearCalcState(int in_State);
+	double CalcCriticalDistTime(SPRelation& PrevRelation, double in_CalcTime, double* newTimePoint = NULL);
+	int CheckHealth();
 
 	int GetMaxTraceId();
-	void GetMinMaxTracePos(SPos & min_Pos, SPos & max_Pos, int idx_Start, int idx_End);
-	void SetViewPoint(double in_Percents, double in_Spread);
+	void GetMinMaxTracePos(SPos & min_Pos, SPos & max_Pos, const ViewPointData & VPData);
+	void SetViewPoint(double in_Percents, double in_Spread, int ArrTypes);
 	void SetViewPointRange(int in_Start, int in_End);
+
+	const STracePosInfo* GetParticleInfoById(int in_Id)
+	{
+		return m_ParticleInfoArray->GetDataById(in_Id);
+	}
+
 
 	int CalcRelationsSingle(double in_NextTimePoint, SPRelation* const in_CalcRelations, SPRelation* const in_PrevRelations, int in_CalcType, int in_TimeType, double& out_KeyPoint);
 	int CalcRelationsMulti(double in_NextTimePoint, SPRelation* const in_CalcRelations, SPRelation* const in_PrevRelations, int in_CalcType, double& out_KeyPoint);
@@ -1322,7 +1297,6 @@ public:
 	int CalcDataByRelations(int in_Type);
 	int CalcSingleDataByRelation(SData&  pCalcData, SPRelation& in_CalcRelations, SP_Calc* const pCalc);
 
-
 	//нужна процедура создания обратной траектории для добавляемых частиц
 	//int CSP_Group::CreateHistory(int in_nTimes)
 
@@ -1330,110 +1304,19 @@ public:
 
 	int NextStep();
 
-	int CorrectBeStuckParticles(int in_Flags, double & KeyPoint);
-
-	int CalcBeStuckNextPos(SData & out_Data, int in_IdParticle, double in_NextTime, double* const out_KeyPoint);
-
+	int ComputeParticleDataAtPhantomBarrier(SData & out_Data, int in_IdParticle, double in_NextTime, double* const out_KeyPoint);
 
 	int CheckTimes();
 
 	CSP_Group();
 	~CSP_Group();
 	CSpParticle* GetItem(int in_Idx);
-	void CheckBeforeCalc()
-	{
-		m_ThreadsMax = m_ThreadsMax_Initial;
-		if (GetCount() < m_ThreadsMax) m_ThreadsMax = GetCount();
-		CheckThreads();
-		pBS_Corrected = m_Relations.GetBeStuck(GR_PS_RELATION_CORRECTED);
-	};
+	void CheckBeforeCalc();
 
+	void PrepareForCalc(int in_CalcOrFind);
 
-
-	void PrepareForCalc(int in_CalcOrFind)
-	{
-		EnterCriticalSection(&m_cs);
-		EnterCriticalSection(&m_cs_Command);
-
-		ClearCalcState(M_STATE_READY);
-
-
-
-		while (GetCount() > 0)
-			RemoveSpParticle(GetCount() - 1);
-
-
-		while (PartCntr.GetCount(SP_TYPE_POSITIVE) < PartCntr.GetInitial().GetCount(SP_TYPE_POSITIVE))
-		{
-			SData initData = { 0 };
-			AddSpParticle(SP_TYPE_POSITIVE, initData, m_pCalc);
-		}
-
-		while (PartCntr.GetCount(SP_TYPE_NEGATIVE) < PartCntr.GetInitial().GetCount(SP_TYPE_NEGATIVE))
-		{
-			SData initData = { 0 };
-			AddSpParticle(SP_TYPE_NEGATIVE, initData, m_pCalc);
-		}
-
-		InitItems(SP_CLEAR_SOFT);
-
-
-		if (in_CalcOrFind == 0)
-		{
-			if (m_pCalc->sRandSeed_Calc < 0)
-			{
-				for (int i = 0; i < GetCount(); i++)
-				{
-					char tmps[500];
-					SData initData = { 0 };
-					sprintf_s(tmps, 500, "p%d_POS", i);
-					ReadCalcParam(m_pCalc->CalcParams, tmps, initData.Position, 0.0);
-
-					sprintf_s(tmps, 500, "p%d_SPEED", i);
-					ReadCalcParam(m_pCalc->CalcParams, tmps, initData.Velocity, 0.0000001);
-					initData.AbsSpeed = initData.Velocity.LEN();
-
-					SetParticleData(i, SP_DATA_ALL, initData);
-				}
-				CalcRelationsInit();
-			}
-			else
-			{
-				InitPosSpeedRandom(m_pCalc->sRandSeed_Calc, m_pCalc->CalcFindSet);
-				RepairPositions();
-			}
-
-			CalcDataByRelations(GR_PS_RELATION_CURRENT);
-			CalcRelationsInit();//??????
-			CalcDataByRelations(GR_PS_RELATION_CURRENT);
-
-			m_pCalc->CalcCounter.InitLoop();
-			m_pCalc->Time.FixStartTime();
-		}
-		else if (in_CalcOrFind == 1)
-		{
-			InitPosSpeedRandom(m_pCalcFind->sRandSeed == -1 ? m_pCalcFind->stat.Count : -1, m_pCalcFind->Settings);
-			RepairPositions();
-
-			CalcRelationsInit();//??????
-			CalcDataByRelations(GR_PS_RELATION_CURRENT);
-			CalcRelationsInit();//??????
-
-			SetCalcState(M_STATE_READY);
-
-			ZeroMemory(&m_pCalc->Stat, sizeof(SP_CalcStat));
-
-			CollectStat(STAT_TYPE_ALL_CURRENT | STAT_TYPE_SETPARTICLE);
-
-			m_pCalcFind->FindCounter.InitLoop();
-			m_pCalc->Time.FixStartTimeCur();
-		}
-
-		CheckBeforeCalc();
-
-		LeaveCriticalSection(&m_cs_Command);
-		LeaveCriticalSection(&m_cs);
-	};
+	void ReadParticleData(const char * in_Settings, int in_ParticleId);
+	void ReadParticleLook(const char * in_Settings, int in_ParticleId);
 
 };
 

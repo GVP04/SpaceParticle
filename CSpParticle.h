@@ -23,15 +23,12 @@
 
 #define SP_DENSITY_MIN			0.0
 #define SP_DENSITY_MAX			1.0
-#define SP_DENSITY_MIN_DELTA	0.000000000001
 
 #define SP_CLEAR_SOFT			0x0000
 #define SP_CLEAR_HARD			0x0001
 
 
 #define SP_PREC_TIME_MLTPL		0.00000000000001
-#define SP_PREC_SPEED_PWR2		0.0000000001
-#define SP_PREC_LIMIT			0.0000000000001
 
 #define SP_NEWPOINT_STATE_OFF		0x0000
 #define SP_NEWPOINT_STATE_ON		0x0001
@@ -48,30 +45,34 @@
 //REL - относительная величина (связанность второго уровня)
 
 // Ok
-#define SP_STATE_ОК					0x00000000
+#define SP_STATE_ОК								0x00000000
 // ошибка
-#define SP_STATE_ERROR_MAIN			0x80000000
-#define SP_STATE_ERROR_MINOR		0xC0000000
+#define SP_STATE_ERROR_MAIN						0x80000000
+#define SP_STATE_ERROR_MINOR					0xC0000000
 // в процессе
-#define SP_STATE_INPROC				0x00000001
+#define SP_STATE_INPROC							0x00000001
 // позиция на нижней границе диапазона
-#define SP_STATE_DOWN				0x00000002
+#define SP_STATE_DOWN							0x00000002
 // позиция на верхней границе диапазона
-#define SP_STATE_UP					0x00000004
+#define SP_STATE_UP								0x00000004
 // позиция внутри границ диапазона
-#define SP_STATE_MID				0x00000006
+#define SP_STATE_MID							0x00000006
+//следующий шаг должен быть минимальным
+#define SP_STATE_NEXT_STEP_MIN					0x00000008
+
 
 // точка видимости ранее начальной точки сохраненной траектории (<0)
-#define SP_STATE_LOW_VIEW			0x00000010
+#define SP_STATE_LOW_VIEW						0x00000010
 // точка видимости позже последней точки сохраненной траектории (<0)
-#define SP_STATE_HIGH_VIEW			0x00000020
+#define SP_STATE_HIGH_VIEW						0x00000020
 // нулевая абсолютная скорость
-#define SP_STATE_ABS_0_SPEED		0x00000040
+#define SP_STATE_ABS_0_SPEED					0x00000040
 // нулевая относительная скорость
-#define SP_STATE_REL_0_SPEED		0x00000080
+#define SP_STATE_REL_0_SPEED					0x00000080
 
 
 //////////////////WARNINGS    
+#define SP_STATE_LOW_PRECISSION					0x00400000
 
 #define SP_STATE_WARNING_MASK					0x000FFF00		
 
@@ -83,21 +84,16 @@
 // фантомное расстояние меньше CriticalDistance
 #define SP_STATE_PHANTOM_DIST_LE_CRITICAL		0x00002000
 #define SP_STATE_PHANTOM_BESTUCK				0x00004000
+#define SP_STATE_PHANTOM_EXPELLED				0x00001000
 // фантомное расстояние менее или равно CriticalDistance
 #define SP_STATE_PHANTOM_DIST_CRITICAL_CHG		0x00008000
-#define SP_STATE_ANTIPHANTOM_DIST_CRITICAL_CHG	0x00010000
 
 // фантомная плотность меньше 1
 #define SP_STATE_PHANTOM_DENSITY_LE_0			0x00040000
 // фантомная плотность равна 1
 #define SP_STATE_PHANTOM_DENSITY_LE_CHG			0x00080000
-#define SP_STATE_ANTIPHANTOM_DENSITY_LE_CHG		0x00100000
-
-// ускорение меньше 0
-#define SP_STATE_REL_ACCELERATION_INF			0x00020000
 
 #define SP_STATE_PHANTOM_CRITICAL_CHANGED		(SP_STATE_PHANTOM_DIST_CRITICAL_CHG|SP_STATE_PHANTOM_DENSITY_LE_CHG)
-#define SP_STATE_ANTIPHANTOM_CRITICAL_CHANGED	(SP_STATE_ANTIPHANTOM_DIST_CRITICAL_CHG|SP_STATE_ANTIPHANTOM_DENSITY_LE_CHG)
 
 
 
@@ -105,19 +101,22 @@
 
 //////////////////WARNINGS
 
-#define SP_STATE_RELATION_MASK			0x0F000000
-#define SP_STATE_RELATION_MASK_CLR_CMD	0xF0FFFFFF
-#define SP_STATE_RELATION_MASK_CLR_ALL	0x00000000
-#define SP_STATE_RELATION_MASK_CLR_NDST	0x00002000
-#define SP_STATE_NEED_RECALC			0x01000000
-#define SP_STATE_NEED_UPDATE			0x03000000
-#define SP_STATE_FAR_AWAY				0x00000100
-#define SP_STATE_AFTER_FAR_AWAY			0x00000200
+#define SP_STATE_RELATION_MASK					0x0F000000
+#define SP_STATE_RELATION_MASK_CLR_CMD			0xF0FFFFFF
+#define SP_STATE_RELATION_MASK_CLR_ALL			0x00000000
+#define SP_STATE_NEED_RECALC					0x01000000
+#define SP_STATE_NEED_UPDATE					0x03000000
+#define SP_STATE_FAR_AWAY						0x00000100
+#define SP_STATE_AFTER_FAR_AWAY					0x00000200
 
+#define SP_STATE_DATA_LINEAR					0x00100000
+
+////////////////////////////					0xC35CFFFF
 
 
 #define SDA_DEF_AMOUNT		0x100000
 #define SD_PARAMSLEN		0x10000
+#define SD_PARAMSLENDECODED	0x40000
 
 
 //Флаги расчета CalcSingleRelation
@@ -128,10 +127,54 @@
 #define SP_CALCRELATION_NEED_UPDATE_ONLY		0x00000004
 #define SP_CALCRELATION_NEED_UPDATE_ONLY		0x00000004
 
+////////////////////////GR_PS///////////////////////////////////////////////////////////
+
+#define GR_PS_NORM					0x00000000
+#define GR_PS_MAXABSSPEED			0x00000001
+#define GR_PS_MAXRELATIVESPEED		0x00000002
+#define GR_PS_FAR_AWAY_PRESENT		0x00000004
+
+#define GR_PS_FAR_AWAY_PRESENT_ON	0x00000010
+#define GR_PS_FAR_AWAY_PRESENT_OFF	0x00000020
+#define GR_PS_POSITION_CHANGED		0x00000040
+#define GR_PS_POSITION_LOW_PREC		0x00000080
+
+#define GR_PS_MAX_IS_PRESENT		0x00000F00
+#define GR_PS_MAXABSSPEED_ON		0x00000100
+#define GR_PS_MAXABSSPEED_OFF		0x00000200
+#define GR_PS_MAXRELATIVESPEED_ON	0x00000400
+#define GR_PS_MAXRELATIVESPEED_OFF	0x00000800
+
+#define GR_PS_COLLISION_PRESENT		0x000FF000
+#define GR_PS_COLLISION_DENSITY		0x00002000
+#define GR_PS_COLLISION_DISTANCE	0x00004000
+#define GR_PS_COLLISION_BESTUCK		0x00010000
+#define GR_PS_COLLISION_EXPELLED	0x00020000
+#define GR_PS_COLLISION_IS_INSIDE	0x00040000
+#define GR_PS_COLLISION_IS_ULTIMATE	0x00080000
+
+#define GR_PS_DATA_LINEAR			0x00100000
+
+#define GR_PS_RELATION_CURRENT		0x01000000
+#define GR_PS_RELATION_NEXT			0x02000000
+#define GR_PS_RELATION_PREV			0x04000000
+#define GR_PS_RELATION_TEMP			0x08000000
+#define GR_PS_RELATION_TYPEMASK		0x0F000000
+
+#define GR_PS_RELATION_NEEDRECALC	0x10000000
+#define GR_PS_RELATION_NONEEDRECALC	0x20000000
+
+///////////////////////////////     0x3F1F6FF7
+//////////////////////GR_PS////////////////////////////////////////////////////////////
+
+
+
+
 
 class CDrawDlg;
 class CFindDlg;
 class CSP_Group;
+class CSpParticle;
 
 struct SP_Refresh
 {
@@ -149,7 +192,7 @@ struct SP_Refresh
 struct SPRelation
 {
 	SData ViewPointData;
-
+	CSpParticle* ViewParticlePtr;
 	SPos Distance_3D;
 	//простая векторная разница скоростей без проекции на вектор дистанции
 	SPos RelativeVelocity_3D;
@@ -179,6 +222,7 @@ struct SPRelation
 	void CLEAR()
 	{
 		ViewPointData.CLEAR();
+		ViewParticlePtr = nullptr;
 		State = 0;
 		LowIdxOfViewPont_Near = -1;
 		DensityAtBasePoint = 0.0;
@@ -221,7 +265,7 @@ struct SPRelation
 
 		Distance_3D.X = Distance_3D.Y = Distance_3D.Z = 9.9e99;
 		DistancePwr1 = DistancePwr2 = DistancePwr3 = 9.9e99;
-			
+
 		RelativeVelocity_3D = { 0 };
 		RelativeSpeed = RelativeSpeedAbs = 0.0;
 
@@ -233,85 +277,12 @@ struct SPRelation
 		Wind_3D = { 0 };
 	}
 
-
+	double Calc_RelativeAcceleration(int in_CalcType);
+	double Calc_RelativeDensity(int in_CalcType);
 	// Расчёт третьей производной (рывка)
-	void CALC_JERK_AS_RELATIVE()
-	{
-		if (DistancePwr2 != 1.0)
-		{
-			double DistPwr2minus1 = DistancePwr2 - 1.0;
-			double a_magnitude = 1.0 / DistPwr2minus1;
-			double DistDotVelocity = Distance_3D.DOT(RelativeVelocity_3D);
-			double d_a_dt = -2.0 * DistancePwr1 * DistDotVelocity / (DistPwr2minus1 * DistPwr2minus1);
-
-		
-			// Производная единичного вектора
-			SPos dn_dt = RelativeVelocity_3D; dn_dt.DIV(DistancePwr1);
-			SPos dn_dt2 = Distance_3D;  dn_dt2.MULT( DistDotVelocity / DistancePwr3);
-			dn_dt.MINUS(dn_dt2);
-			dn_dt.MULT(a_magnitude);
-
-			// Рывок
-			// Единичный вектор направления
-			Jerk_3_3D = Distance_3D;
-			Jerk_3_3D.NORMALIZE();
-			//
-			Jerk_3_3D.MULT(d_a_dt);
-			Jerk_3_3D += dn_dt;
-
-			ASSERT(fabs(Jerk_3_3D.X) < 1.0e80);
-		}
-		else
-		{
-			Jerk_3_3D = { 0 };
-		}
-	}
-
+	void CALC_JERK_AS_RELATIVE();
 	// Расчёт четвёртой производной (snap) численно
-	void CALC_SNAP_AS_RELATIVE()
-	{
-		double DistPwr2minus1 = DistancePwr2 - 1.0;
-		double DistPwr2minus1Pwr2 = DistPwr2minus1 * DistPwr2minus1;
-		double DistDotVelocity = Distance_3D.DOT(RelativeVelocity_3D);
-		double dot_S = DistDotVelocity / DistancePwr1;  // dS/dt
-		double v_dot_vPLUSr_dot_a = RelativeVelocity_3D.LENPWR2() + Distance_3D.DOT(Acceleration_3D);  // |v|^2
-		double ddv_dotS = DistDotVelocity * dot_S;
-
-		// Компонент A и его производная dA/dt
-		double A = -2.0 * DistDotVelocity / (DistPwr2minus1Pwr2 * DistancePwr1);
-		double numerator_A = v_dot_vPLUSr_dot_a * DistPwr2minus1 * DistancePwr1 - ddv_dotS * (4.0 * DistancePwr2 + DistPwr2minus1);
-		double denominator_A = 1.0 / (DistPwr2minus1Pwr2 * DistancePwr2);
-		double dA_dt = -2.0 * numerator_A * denominator_A;
-
-		// Компонент B и его производная dB/dt
-		double B = 1.0 / (DistPwr2minus1 * DistancePwr1);
-		double dB_dt = -(2.0 * DistancePwr2 * dot_S * DistPwr2minus1 + DistPwr2minus1Pwr2 * dot_S) * denominator_A;
-
-		double  ddv_dotSdivDistancePwr3 = ddv_dotS / DistancePwr3;
-		double factor_dC = v_dot_vPLUSr_dot_a / DistancePwr3 - 3.0 * ddv_dotSdivDistancePwr3;
-
-		SPos tmp = Distance_3D; tmp *= (-ddv_dotSdivDistancePwr3 - ddv_dotSdivDistancePwr3 / DistancePwr1);
-		SPos dC_dt = RelativeVelocity_3D; dC_dt *= factor_dC; dC_dt += tmp;
-
-
-		// Итоговая четвёртая производная
-		// Термы для расчёта snap
-		Snap_4_3D = Distance_3D;  Snap_4_3D *= dA_dt;                             // dA/dt * r
-
-		tmp = RelativeVelocity_3D; tmp *= A;                      // A * v
-		Snap_4_3D += tmp;
-
-		// Вектор C и его производная dC/dt
-		SPos C = Distance_3D; C *= -DistDotVelocity;  C /= DistancePwr3; C += RelativeVelocity_3D;  C *= dB_dt;// dB/dt * (v + C)
-		Snap_4_3D += C;
-
-		tmp = Acceleration_3D;  tmp *= B;  // B * a
-		Snap_4_3D += tmp;
-
-		tmp = dC_dt;  tmp *= B;  // B * dC/dt
-		Snap_4_3D += tmp;
-
-	}
+	void CALC_SNAP_AS_RELATIVE();
 };
 
 struct SSingleRelation
@@ -342,11 +313,11 @@ struct SSingleRelation
 
 struct SelfCalcData
 {
-	SData ByBeStuckData;
+	SData ByRelatedData;
 	SData ByNormalData;
 };
 
-union RelationAndBeStuck
+union RelationAndRelated
 {
 	SPRelation AsRelation;
 	SelfCalcData AsSelf;
@@ -362,16 +333,16 @@ struct SMinMaxRelation
 	/// </summary>
 	SSingleRelation Real_Distance;
 	SSingleRelation Phantom_Distance;
-	SSingleRelation Velocity;
+	SSingleRelation RelVelocity;
 
 	void CLEAR()
 	{
 		//Distance.CLEAR();
-		//Velocity.CLEAR();
+		//RelVelocity.CLEAR();
 
 		ZeroMemory(&Real_Distance, sizeof(SSingleRelation));
 		ZeroMemory(&Phantom_Distance, sizeof(SSingleRelation));
-		ZeroMemory(&Velocity, sizeof(SSingleRelation));
+		ZeroMemory(&RelVelocity, sizeof(SSingleRelation));
 	}
 };
 
@@ -393,9 +364,15 @@ struct SMinMaxRelation
 #define SP_DRAW_XZ			0x00000001 
 #define SP_DRAW_YZ			0x00000002 
 
-#define SP_DRAW_3D			0x00000010 
-
 #define SP_DRAW_MAX_ID		0x10000000
+
+#define SP_DRAW_PART_ALL		0x07000000
+#define SP_DRAW_PART_MS			0x03000000
+#define SP_DRAW_PART_MAIN		0x01000000
+#define SP_DRAW_PART_SECONDARY	0x02000000
+#define SP_DRAW_PART_ETERNAL	0x04000000
+
+
 
 struct ViewPointData
 {
@@ -423,6 +400,122 @@ struct ViewPointData
 };
 
 
+
+struct SDrawElementSettings
+{
+	int Width;
+	int Color;
+	int Type;
+	int Rerserve;
+
+	void INIT()
+	{
+		Width = 0;
+		Color = 0;
+		Type = 0;
+		Rerserve = 0;
+	}
+};
+
+
+#define DTS_ETYPE_MASK			0x000000FF
+#define DTS_ETYPE_NORM			0x00000001
+#define DTS_ETYPE_SLAVE			0x00000002
+#define DTS_ETYPE_INSIDE		0x00000004
+#define DTS_ETYPE_VELOSITY		0x00000008
+#define DTS_ETYPE_ACCELERATION	0x00000010
+#define DTS_ETYPE_PHLINK		0x00000020
+
+struct SDrawTraceSettings
+{
+	SDrawElementSettings Normal;
+	SDrawElementSettings Slave;
+	SDrawElementSettings Inside;
+	SDrawElementSettings Velocity;
+	SDrawElementSettings Acceleration;
+	SDrawElementSettings PhantomLink;
+
+	SDrawTraceSettings()
+	{
+		INIT();
+	}
+
+	void INIT()
+	{
+		Normal.INIT();
+		Slave.INIT();
+		Inside.INIT();
+		Velocity.INIT();
+		Acceleration.INIT();
+		PhantomLink.INIT();
+	}
+
+	void SET(int in_Variant)
+	{
+		const int mRGB[16] = {
+			RGB(200, 0, 0),RGB(0, 200, 0),RGB(0, 0, 200),RGB(200, 200, 0),RGB(200, 0, 200),RGB(0, 200, 200),
+			RGB(200, 100, 0),RGB(200, 0, 100),RGB(200, 100, 100),RGB(100, 200, 0),RGB(0, 200, 100),RGB(100, 0, 200),
+			RGB(0, 100, 200),RGB(0, 100, 100),RGB(100, 0, 100),RGB(100, 100, 0),
+		};
+
+		const int mRGBDark[16] = {
+			RGB(111, 0, 0),RGB(0, 111, 0),RGB(0, 0, 111),RGB(111, 111, 0),RGB(111, 0, 111),RGB(0, 111, 111),
+			RGB(111, 51, 0),RGB(111, 0, 51),RGB(111, 51, 51),RGB(51, 111, 0),RGB(0, 111, 51),RGB(51, 0, 111),
+			RGB(0, 51, 111),RGB(0, 51, 51),RGB(51, 0, 51),RGB(51, 51, 0),
+		};
+
+
+		Normal.Color = mRGB[in_Variant % 16];
+		Slave.Color = mRGB[in_Variant % 16];
+		Inside.Color = mRGBDark[in_Variant % 16];
+		Velocity.Color = mRGB[in_Variant % 16];
+		Acceleration.Color = mRGB[in_Variant % 16];
+		PhantomLink.Color = mRGB[in_Variant % 16];
+
+		Normal.Width = 2;
+		Slave.Width = 1;
+		Inside.Width = 1;
+		Velocity.Width = 1;
+		Acceleration.Width = 1;
+		PhantomLink.Width = 1;
+
+		Normal.Type = PS_SOLID;
+		Slave.Type = PS_SOLID;
+		Inside.Type = PS_SOLID;
+		Velocity.Type = PS_DASH;
+		Acceleration.Type = PS_DASH;
+		PhantomLink.Type = PS_DASHDOTDOT;
+	}
+
+	int SET(const char* SettingsString)
+	{
+		int ret = 0;
+		if (SettingsString)
+		{
+			const char* subname[] = { "NORMAL.","SLAVE.", "INSIDE.", "VELOCITY.", "ACCELERATION.", "PHANTOMLINK.", "", };
+			SDrawElementSettings* pTypes = &Normal;
+
+			int TypeNum = 0;
+
+			while (*subname[TypeNum])
+			{
+				char subnameFull[100];
+				strcpy_s(subnameFull, 100, subname[TypeNum]);
+				strcat_s(subnameFull, 100, "TYPE");
+				ret += ReadCalcParam(SettingsString, subnameFull, pTypes[TypeNum].Type, 0, READPARAMS_NOT_USE_DEFS);
+				strcpy_s(subnameFull, 100, subname[TypeNum]);
+				strcat_s(subnameFull, 100, "WIDTH");
+				ret += ReadCalcParam(SettingsString, subnameFull, pTypes[TypeNum].Width, 0, READPARAMS_NOT_USE_DEFS);
+				strcpy_s(subnameFull, 100, subname[TypeNum]);
+				strcat_s(subnameFull, 100, "COLOR");
+				ret += ReadCalcParam(SettingsString, subnameFull, pTypes[TypeNum].Color, 0, READPARAMS_NOT_USE_DEFS);
+				TypeNum++;
+			}
+		}
+		return ret;
+	}
+};
+
 struct SDrawSettings
 {
 	SPos m_00_Pos; //позиция нулевой координаты на картинке
@@ -442,6 +535,7 @@ struct SDrawSettings
 	int ShowAccFor;
 	int ShowGroupArrows;
 	int ShowLinksTo;
+	int ShowFlags;
 	int nLinks;
 	int iShowFlags;
 
@@ -450,9 +544,9 @@ struct SDrawSettings
 		m_00_Pos = {0};
 		ViewMltpl = 1.0;
 		ViewMltpl_Ext = 0.1;
-		BMP_Size.X = 1400;
-		BMP_Size.Y = 1400;
-		BMP_Size.Z = 1400;
+		BMP_Size.X = 2000;
+		BMP_Size.Y = 1200;
+		BMP_Size.Z = 1200;
 		PosMin = { 0 }; 
 		PosMax = { 0 }; 
 		WindowPos = { 0 };
@@ -463,7 +557,9 @@ struct SDrawSettings
 		ShowGroupArrows = 0xFFFFFFFF;
 		ShowLinksFrom = 0x1;
 		ShowLinksTo = 0;
+		ShowFlags = 0xFFFFFFFF;
 		nLinks = 10;
+
 		iShowFlags = SP_DRAW_TEXT | SP_DRAW_CLEARBKG | SP_DRAW_GROUPINFO;
 	}
 
@@ -508,36 +604,6 @@ struct SP_CalcStat
 		Prev_Rel_Max = Rel_Max;
 	};
 };
-
-
-#define COLISSION_TYPEMASK		0x0000000F
-#define COLISSION_NONE			0x00000000
-//упругое столкновение
-#define COLISSION_ELASTIC		0x00000001
-//неупругое столкновение
-#define COLISSION_INELASTIC		0x00000002
-//абсолютно скользкое slippery
-#define COLISSION_SLIPPERY		0x00000003
-
-//изменяет скорость
-#define COLISSION_SPEED_MASK	0x000000F0
-#define COLISSION_SPEED_ADD		0x00000010
-#define COLISSION_SPEED_OPPOSITE	0x00000020
-#define COLISSION_SPEED_NOCHANGE	0x00000020
-#define COLISSION_SPEED_VIEWPOINT	0x00000030
-#define COLISSION_SPEED_SET4	0x00000040
-//изменяет позицию
-#define COLISSION_POS_MASK		0x00000F00
-#define COLISSION_POS_SET1		0x00000100
-#define COLISSION_POS_SET2		0x00000200
-#define COLISSION_POS_SET3		0x00000300
-#define COLISSION_POS_SET4		0x00000400
-//изменяет ускорение
-#define COLISSION_ACCEL_MASK	0x0000F000
-#define COLISSION_ACCEL_SET1	0x00001000
-#define COLISSION_ACCEL_SET2	0x00002000
-#define COLISSION_ACCEL_SET3	0x00003000
-#define COLISSION_ACCEL_SET4	0x00004000
 
 struct SP_StopParam
 {
@@ -646,7 +712,42 @@ public:
 	}
 };
 
+struct CalcDelay
+{
+private:
+	int m_DelayMS;
+	double m_DelayEveryTimeDelta;
+	double TimeOfLastDelay;
 
+public:
+
+	CalcDelay()
+	{
+		CLEAR();
+	}
+
+	void CLEAR()
+	{
+		m_DelayMS = 0;
+		m_DelayEveryTimeDelta = 1.0e100;
+		TimeOfLastDelay = 0.0;
+	}
+
+	void RESET()
+	{
+		TimeOfLastDelay = 0.0;
+	}
+
+
+	bool CheckDelay(double in_CurTime) {return (in_CurTime >= TimeOfLastDelay + m_DelayEveryTimeDelta);	}
+	void SetTimeOfLastDelay(double in_Time) { TimeOfLastDelay = in_Time; }
+	void SetDelay(int in_Delay) { m_DelayMS = in_Delay;}
+	void SetDelayEveryTimeDelta(double in_Delay) { m_DelayEveryTimeDelta = in_Delay;}
+	void DoDelay() { if (m_DelayMS > 0 && m_DelayMS < 10000) Sleep(m_DelayMS); };
+};
+
+
+#define SPTIME_NEXT_STEP_MIN		0x00001000
 
 struct SPTime
 {
@@ -663,15 +764,17 @@ private:
 	double UpLimit;
 	double PrevUpLimit;
 
-	PrecissionInfo PrecInfo;
+	int State;
+	int Reserve;
 
+	PrecissionInfo PrecInfo;
 
 	//установки
 	double MinStepSet;
 	double TraceMinStep;
 	double HistoryMinStep;
 	double TraceBaseStep;
-	double BeStuckMaxStep;
+	double RelatedMaxStep;
 	double MaxStep;
 
 	//stat
@@ -684,16 +787,18 @@ private:
 	inline void SetMinStepDeltaMinus() { MinStepDeltaMinus = MinStep * 0.1; };
 
 public:
+	CalcDelay Delay;
+	bool CheckDelay() { return Delay.CheckDelay(CurTime); }
+	void SetTimeOfLastDelay() { Delay.SetTimeOfLastDelay(CurTime); }
+	void DoDelay() { Delay.DoDelay(); }
+
+
 
 	void CLEAR()
 	{
 		if (MinStepSet < SP_PREC_TIME_MLTPL) MinStepSet = SP_PREC_TIME_MLTPL;
 		if (MinStep < MinStepSet) MinStep = MinStepSet;
 
-		TraceMinStep = 0.0000001;
-		HistoryMinStep = 0.1;
-		TraceBaseStep = 0.001;
-		BeStuckMaxStep = 0.00001;
 		PrevPrevStep = PrevStep = NextStep = MinStep;
 		NextStep4321 = NextStep * 0.4321;
 		SetMinStepDeltaMinus();
@@ -702,14 +807,24 @@ public:
 		NextTime = SP_PREC_TIME_MLTPL;
 		FixStartTime();
 		PrecInfo.CLEAR();
+		State = 0;
 	}
 
 	void RESET()
 	{
+		RelatedMaxStep = 0.00001;
+		TraceBaseStep = 0.001;
+		TraceMinStep = 0.0000001;
+		HistoryMinStep = 0.1;
 		CLEAR();
 		SetMinStep(SP_PREC_TIME_MLTPL);
 		SetMaxStep(0.01);
+		Delay.RESET();
 	}
+
+	int AddFlag(int in_Flag) {	return (State |= in_Flag);	}
+	int DelFlag(int in_Flag) { return (State &= ~in_Flag); }
+	int GetFlag(int in_Flag) { return State; }
 
 	inline bool IsMinimalStep() const { return NextStep <= MinStep; }
 	inline bool IsMinimalStep(double in_CmpDelta) const { return NextStep <= MinStep; }
@@ -735,9 +850,9 @@ public:
 
 	//inline double GetMinStepDeltaMinus() { return MinStepDeltaMinus; }
 
-	double CheckByBeStuckStep()
+	double CheckByRelatedStep()
 	{
-		return BeStuckMaxStep < NextStep ? SetStep(BeStuckMaxStep) : NextStep;
+		return RelatedMaxStep < NextStep ? SetStep(RelatedMaxStep) : NextStep;
 	}
 
 	double SetMinStep(double in_Step)
@@ -756,12 +871,12 @@ public:
 		return ret;
 	}
 
-	double SetBeStuckMaxStep(double in_Step)
+	double SetRelatedMaxStep(double in_Step)
 	{
-		double ret = BeStuckMaxStep;
+		double ret = RelatedMaxStep;
 		
-		if (BeStuckMaxStep < SP_PREC_TIME_MLTPL) BeStuckMaxStep = SP_PREC_TIME_MLTPL;
-		else BeStuckMaxStep = in_Step;
+		if (RelatedMaxStep < SP_PREC_TIME_MLTPL) RelatedMaxStep = SP_PREC_TIME_MLTPL;
+		else RelatedMaxStep = in_Step;
 
 		return ret;
 	}
@@ -816,7 +931,7 @@ public:
 			NextStep = NextTime - CurTime;
 		}
 		NextStep4321 = NextStep * 0.4321;
-
+		ASSERT(NextStep > 1.0e-14);
 		return NextStep;
 	}
 	double SetNextTimeSimple(double in_NextTime)
@@ -831,6 +946,9 @@ public:
 		PrevUpLimit = UpLimit = SP_MAX_TIME_DISTANCE;
 		NextTime = in_NextTime;
 		NextStep = NextTime - CurTime;
+
+		ASSERT(NextStep > 1.0e-14);
+
 		NextStep4321 = NextStep * 0.4321;
 		return NextTime;
 	}
@@ -838,15 +956,28 @@ public:
 	double SetNextTimeEx(double in_NextTime)
 	{
 		double delta = NextTime - in_NextTime;
-
-		if (delta < 0)
-			SetNextTimeForce(in_NextTime);
-		else if (NextStep * 0.05 > delta)
-			SetStep(NextStep * 0.90);
-		else if (NextStep * 0.95 < delta)
-			SetStep(NextStep * 0.10);
-		else
-			SetStep(in_NextTime - CurTime);
+		if (delta != 0.0)
+		{
+			if (delta < 0)
+				SetNextTimeForce(in_NextTime);
+			//else if (NextStep * 0.0625 > delta)
+			//	SetStep(NextStep * 0.9375);
+			//else if (NextStep * 0.9375 < delta)
+			//	SetStep(NextStep * 0.125);
+			else
+			{
+				NextStep = in_NextTime - CurTime;
+				ASSERT(NextStep > 0.0);
+				NextTime = CurTime + NextStep;
+				if (NextTime > UpLimit)
+				{
+					NextTime = UpLimit;
+					NextStep = NextTime - CurTime;
+				}
+				NextStep4321 = NextStep * 0.4321;
+				if (NextStep4321 <= 0) NextStep4321 = NextStep;
+			}
+		}
 
 		return NextTime;
 	}
@@ -893,7 +1024,7 @@ public:
 			CurTime = in_CurTime;
 			PrevPrevStep = PrevStep;
 			SetStep(PrevStep = CurTime - PrevTime);
-			if (CurTime > UpLimit) UpLimit = CurTime + NextStep;
+//			if (CurTime > UpLimit) UpLimit = CurTime + NextStep;
 		}
 		else
 		{
@@ -921,27 +1052,31 @@ public:
 
 
 		PrevUpLimit = UpLimit = SP_MAX_TIME_DISTANCE;
+
 		//место для изменения динамики рпасчета
-		if (MaxStepTmp >= MinStep && MaxStepTmp < PrevStep)
+		if ((State & SPTIME_NEXT_STEP_MIN))
+		{
+			SetStep(MinStep);
+		}
+		else if (MaxStepTmp >= MinStep && MaxStepTmp < PrevStep)
 		{
 			SetStep(MaxStepTmp);
 		}
-		else 
-			if (PrevPrevStep > PrevStep)
+		else if (PrevPrevStep > PrevStep)
 				SetStep(PrevStep);
 			else
 				SetStep(PrevStep * 1.2);
-		if (IsMinimalStep())
-			PrevUpLimit = UpLimit = NextTime;
+
+//		if (IsMinimalStep())
+//			PrevUpLimit = UpLimit = NextTime;
 	}
 
-	double GetUpLimit() const { return UpLimit; }
 	double SetUpLimit(double in_tUpLimit) 
 	{
-		UpLimit = in_tUpLimit - MinStep * 0.5;
+//		UpLimit = in_tUpLimit - MinStep * 0.5;
 
-		if (UpLimit < CurTime + MinStep) UpLimit = CurTime + MinStep;
-		if (UpLimit > NextTime) UpLimit = NextTime;
+//		if (UpLimit < CurTime + MinStep) UpLimit = CurTime + MinStep;
+//		if (UpLimit > NextTime) UpLimit = NextTime;
 
 		return UpLimit; 
 	}
@@ -949,6 +1084,11 @@ public:
 	void FixStartTimeCur()
 	{
 		end_Calc = end_CalcCur = start_CalcCur = GetTickCount64();
+	}
+
+	int GetStartTime()
+	{
+		return (int)start_CalcCur;
 	}
 
 	void FixEndTimeCur()
@@ -1006,6 +1146,69 @@ public:
 	}
 };
 
+struct CriticalValues
+{
+private:
+	double Eps_Delta;
+public:
+	double Speed;
+	double SpeedPlusEps;
+	double SpeedMinusEps;
+	double SpeedPwr2;
+	double Distance;
+	double DistancePlusEps;
+	double DistanceMinusEps;
+	double DistancePwr2;
+	double DistancePwr3;
+
+	CriticalValues()
+	{
+		INIT();
+	}
+
+	void INIT()
+	{
+		Speed = 1.0;
+		Distance = 1.0;
+		Eps_Delta = 1.0e-14;
+		Prepare();
+	}
+
+	void SetSpeed(double in_Value)
+	{
+		Speed = in_Value;
+		Prepare();
+	}
+
+	void SetDistance(double in_Value)
+	{
+		Distance = in_Value;
+		Prepare();
+	}
+	void SetEps_Delta(double in_Value)
+	{
+		Eps_Delta = in_Value;
+		Prepare();
+	}
+
+	void Prepare()
+	{
+		SpeedPwr2 = Speed * Speed;
+
+		DistancePwr2 = Distance * Distance;
+		DistancePwr3 = DistancePwr2 * Distance;
+
+		SpeedPlusEps = Speed + Eps_Delta;
+		SpeedMinusEps = Speed - Eps_Delta;
+		DistancePlusEps = Distance + Eps_Delta;
+		DistanceMinusEps = Distance - Eps_Delta;
+	}
+
+	inline bool IsDistanceNear(double in_Value) const {	return (in_Value <= DistancePlusEps && in_Value >= DistanceMinusEps);}
+	inline bool IsSpeedNear(double in_Value) const { return (in_Value <= SpeedPlusEps && in_Value >= SpeedMinusEps); }
+};
+
+
 struct SP_Calc
 {
 
@@ -1018,19 +1221,18 @@ struct SP_Calc
 
 	SDrawSettings DrawSet;
 	SP_Refresh refresh;
+	SP_Refresh ShotRefresh;
 
 	LoopCounter CalcCounter;
+
+	CriticalValues Critical;
+	double ParentSpaceThickness;
 
 	SP_CalcFindSet CalcFindSet;
 
 	//settings&rules//////////////////////
 	char* CalcParams;
-	double maxAbsSpeed;
-	double maxAbsSpeedPwr2;
-	double ParentSpaceThickness;
-	double CriticalDistance;
-	double CriticalDistancePwr2;
-	double CriticalDistancePwr3;
+	char* CalcParamsDecoded;
 
 	int AccCalcType; //0 нет влияния плотности на время/скорость. 1 есть влияние умножене. 2 есть влияние умножене. 
 	int DensityCalcType; //
@@ -1042,15 +1244,13 @@ struct SP_Calc
 	int ClassicType; // 1 - ViewPoint в точке нахождения частицы на момент запроса. 2 - ViewPoint в точке следующей расчетной позиции если таковая есть
 	int DensityDerivLevel;
 	int WindType;
-	int CollisionType;
 	int sRandSeed_Calc;
 
 	int nIterations;
 	int OutPutFlags;
+	int InitialCheckFlags;
 
 	int AlighmentRes1;
-
-
 
 	SP_Calc()
 	{
@@ -1062,15 +1262,12 @@ struct SP_Calc
 		DlgTrace = nullptr;;
 
 		refresh = { 0 };
+		ShotRefresh = { 0 };
 
 		CalcParams = nullptr;
+		CalcParamsDecoded = nullptr;
 
-		maxAbsSpeed = 1.0;
-		maxAbsSpeedPwr2 = 1.0;
 		ParentSpaceThickness = 0.0;
-		CriticalDistance = 1.0;
-		CriticalDistancePwr2 = 1.0;
-		CriticalDistancePwr3 = 1.0;
 		AccCalcType = 0; 
 		DensityCalcType = 0;
 		sRandSeed_Calc = -1;
@@ -1079,8 +1276,8 @@ struct SP_Calc
 		ClassicType = 0;
 		DensityDerivLevel = 0;
 		WindType = 0;
-		CollisionType = COLISSION_SLIPPERY | COLISSION_SPEED_OPPOSITE | COLISSION_POS_SET1 | COLISSION_ACCEL_SET1;
 	
+		InitialCheckFlags = 1;
 		OutPutFlags = 0;
 		AlighmentRes1 = 0;
 	}
@@ -1103,6 +1300,7 @@ struct SP_CalcFind
 
 	CFindDlg* DlgFind;
 	char* FindParams;
+	char* FindParamsDecoded;
 	int m_FIND_REFRESH;
 	int sRandSeed;
 
@@ -1113,6 +1311,7 @@ struct SP_CalcFind
 		stat = {0};
 		m_FIND_REFRESH = 5;
 		FindParams = nullptr;
+		FindParamsDecoded = nullptr;
 		sRandSeed = -1;
 		stat = { 0 };
 	};
@@ -1250,6 +1449,8 @@ class SPTraceArrayDynEx;
 #define ITGL_CALC_ACCELERATION	0x00004
 #define ITGL_CALC_ACCDERIV		0x00008
 #define ITGL_CALC_TIME			0x00010
+#define ITGL_CALC_USELINEAR		0x00010
+
 
 
 class CSpParticle
@@ -1276,9 +1477,11 @@ private:
 	int m_TypeFlags;
 
 public:
-	int m_CountBeStuck;
+	int m_CountRelated;
+	SDrawTraceSettings m_TraceSettings;
 
 public:
+	//SData* GetDataByIdLinear(int in_Id);
 	SData* GetDataById(int in_Id);
 	SData* GetCurData(); 
 	const SData* GetCurData_C();
@@ -1288,8 +1491,10 @@ public:
 	SData GetNextData() { return m_NextData; };
 
 	void GetLastDeltaAcc(SPos& in_DeltaAcc);
+	int GetTypeFlags() { return m_TypeFlags; }
+	int GetParticleType() { return (m_TypeFlags & SP_TYPE_FORM_MASK); }
 
-	static int ItgrlFull(SData& Result, const SData& DataSrc, double in_Time, const SP_Calc& in_pCalcParams, double * const out_KeyPoint);
+	static int ItgrlFull(SData& Result, const SData& DataSrc, double in_Time, const SP_Calc& in_pCalcParams, double * const out_KeyPoint, int in_Flags);
 	static int ItgrlFullMoveOnMaxSpeedOnly(SData& Result, const SData& DataSrc, double in_Time, const SP_Calc& in_pCalcParams, int in_CalcFlag);
 
 	int CalcMidData(SData& Result, const SData&  Ptr1, const SData& Ptr2, double absMidPoint);
@@ -1306,32 +1511,30 @@ public:
 	int NewPoint_Begin(double in_NewTimePoint);
 	void NewPoint_Clear();
 	///
-	int CalcPrevData(SData& out_Data, double in_DataTime);
 	void Clear(int in_Flags);
 
 	SPos GetCurPosition() { return GetCurData_C()->Position; };
 	void GetCurPosition(SPos& inout_Position) { inout_Position = GetCurData_C()->Position; };
-	SPos GetCurSpeed() { return GetCurData_C()->Velocity; };
-	void GetCurSpeed(SPos &inout_Speed) { inout_Speed = GetCurData_C()->Velocity; };
+	SPos GetCurVelocity() { return GetCurData_C()->Velocity; };
+	SPos GetCurVelocity_Linear() { return GetCurData_C()->Velocity_Linear; };
+	void GetCurVelocity(SPos &inout_V) { inout_V = GetCurData_C()->Velocity; };
+	void GetCurVelocity_Linear(SPos &inout_V) { inout_V = GetCurData_C()->Velocity_Linear; };
 	double GetCurSpeedValue(){ return GetCurData_C()->AbsSpeed; };
 	SPos GetCurAcc() { return GetCurData_C()->Accel_2_3D; };
 	int GetCurPos();
 	double GetCurTime();
 	double GetPrevTime(int n_StepsBefore);
-	int GetPointCount();
-	int FindViewPointByTimeLinear(SData& out_Data, const SData& in_Pos, double in_ViewTime, double in_StartTime);
+	//для получения точки видимости на прямолмнейной равномерной траектории
+	int FindViewPointByTimeLinear_LE0(SData& out_Data, const SData& in_Pos, double in_ViewTime, double in_StartTime);
 	int FindViewPointMinIdByTime(const SPos& in_Pos, double in_ViewTime, double in_StartTime, double in_EndTime);
 	int FindViewPointByTime(SData& out_Data, const SData& in_Pos, double in_ViewTime, double in_StartTime, double in_EndTime, int * const out_LowIdx = nullptr);
 	//int FindViewPointByDistance(FindInIntervalParams & Params);
 	int GetPrevDataByTime(SData& out_Data, double in_ViewTime, double * const out_KeyPoint);
-	int GetPrevDataByTimeFast_(SData& out_Data, int& out_Idx, int StartIdx, double in_ViewTime, double* const out_KeyPoint);
 	int GetPrevDataByTimeLinear(SData& out_Data, int& out_Idx, int StartIdx, double in_ViewTime);
 	int GetNextDataByTime(SData& out_Data, double in_ViewTime, double * const out_KeyPoint);
-	int GetMovement(SData & out_Data, const SData & cur_Data, double in_NewTime, double* const out_KeyPoint);
 	int GetDataAtLowPoint(SData& out_Data, double in_ViewTime);
 	char* GetStateDescription(char *out_Str, int in_StrLen, double in_ReportTime);
 	char* GetStateDescription(char* out_Str, int in_StrLen, int in_nPoints);
-	double GetAbsSpeedPwr2();
 	void GetMinMaxTracePos(SPos& min_Pos, SPos& max_Pos, int idxStart, int idx_End);
 	int GetLowIdxByTime(double in_ViewTime);
 	int GetLowIdxByTime(double in_ViewTime, int in_IdxStart);
@@ -1350,5 +1553,3 @@ public:
 
 
 
-double Calc_RelativeAcceleration(int in_RelPartType, int in_CalcType, double in_DensityAtBasePoint);
-double Calc_RelativeDensity(int in_RelPartType, int in_CalcType, double in_DistancePwr1, double in_DistancePwr2);

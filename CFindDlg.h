@@ -15,6 +15,7 @@ public:
 	SP_CalcFind* m_pData;
 
 	int m_uRedrawFlag;
+	int m_XYZ;
 
 
 
@@ -46,4 +47,5 @@ public:
 	afx_msg void OnBnClicked_Next();
 	afx_msg void OnBnClicked_NextAndReport();
 	afx_msg void OnBnClickedButtonRefreshlive();
+	afx_msg void OnBnClickedButtonMse();
 };

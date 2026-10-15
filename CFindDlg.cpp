@@ -30,6 +30,7 @@ CFindDlg::CFindDlg(CWnd* pParent /*=nullptr*/)
 	m_BMP_Size.Z = 500;
 
 	m_uRedrawFlag = 1;
+	m_XYZ = SP_DRAW_PART_MS | SP_DRAW_XYZ;
 }
 
 CFindDlg::~CFindDlg()
@@ -56,6 +57,7 @@ BEGIN_MESSAGE_MAP(CFindDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BUTTON_NEXT, &CFindDlg::OnBnClicked_Next)
 	ON_BN_CLICKED(IDC_BUTTON_NEXTANDREPORT, &CFindDlg::OnBnClicked_NextAndReport)
 	ON_BN_CLICKED(IDC_BUTTON_REFRESHLIVE, &CFindDlg::OnBnClickedButtonRefreshlive)
+	ON_BN_CLICKED(IDC_BUTTON_MSE, &CFindDlg::OnBnClickedButtonMse)
 END_MESSAGE_MAP()
 
 
@@ -169,9 +171,9 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 			m_pData->curCalc.DrawSet.ViewPoint.TimeInPc = 100.0;
 			m_pData->curCalc.DrawSet.ViewPoint.Spread = 100.0;
 
-			m_pData->curCalc.Group->SetViewPoint(100.0, 100.0);
+			m_pData->curCalc.Group->SetViewPoint(100.0, 100.0, m_XYZ);
 
-			m_pData->curCalc.Group->GetMinMaxTracePos(m_pData->curCalc.DrawSet.PosMin, m_pData->curCalc.DrawSet.PosMax, 0, SP_DRAW_MAX_ID);
+			m_pData->curCalc.Group->GetMinMaxTracePos(m_pData->curCalc.DrawSet.PosMin, m_pData->curCalc.DrawSet.PosMax, m_pData->curCalc.DrawSet.ViewPoint);
 			SPos TraceSize;
 			TraceSize.SET_AS_DELTA(m_pData->curCalc.DrawSet.PosMax, m_pData->curCalc.DrawSet.PosMin);
 
@@ -194,7 +196,8 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 			else
 				delta00.Y = cy - cx;
 
-			PaintTraceToCDC(DCMem, &m_pData->curCalc, SP_DRAW_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_GROUPINFO, delta00);
+			m_pData->curCalc.DrawSet.ViewMltpl *= 0.95;
+			PaintTraceToCDC(DCMem, &m_pData->curCalc, m_XYZ | SP_DRAW_CLEARBKG | SP_DRAW_GROUPINFO, delta00);
 
 			m_pData->curCalc.DrawSet = oldDrawSet;
 
@@ -212,16 +215,19 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 			txtlen = sprintf_s(tmps, 300, "CurStep %d_%d   Time %4.4g    Step %5.5g", m_pData->FindCounter.GetCurLoop(), m_pData->FindCounter.GetCurStep(), m_pData->curCalc.Time.GetCurTime(), m_pData->curCalc.Time.GetStep());
 			posY += 20; TextOutA(hDC, 1, posY, tmps, txtlen);
 
-			txtlen = sprintf_s(tmps, 300, "MinRelDistR %5.5g  MaxRelDistR %5.5g     MinRelDistP %5.5g  MaxRelDistP %5.5g     MinRelSpeed %5.5g  MaxRelSpeed %5.5g", m_pData->curCalc.Stat.Rel_Min.Real_Distance.MMValue, m_pData->curCalc.Stat.Rel_Max.Real_Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Phantom_Distance.MMValue, m_pData->curCalc.Stat.Rel_Max.Phantom_Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Velocity.MMValue, m_pData->curCalc.Stat.Rel_Max.Velocity.MMValue);
+			txtlen = sprintf_s(tmps, 300, "MinRelDistR %5.5g  MaxRelDistR %5.5g     MinRelDistP %5.5g  MaxRelDistP %5.5g     MinRelSpeed %5.5g  MaxRelSpeed %5.5g", 
+				m_pData->curCalc.Stat.Rel_Min.Real_Distance.MMValue, m_pData->curCalc.Stat.Rel_Max.Real_Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Phantom_Distance.MMValue, 
+				m_pData->curCalc.Stat.Rel_Max.Phantom_Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.RelVelocity.MMValue, m_pData->curCalc.Stat.Rel_Max.RelVelocity.MMValue);
 			posY += 20; TextOutA(hDC, 1, posY, tmps, txtlen);
 
-//			txtlen = sprintf_s(tmps, 300, "DltMinRelDistance %5.5g  DltMinRelSpeed %5.5g  DltMaxRelSpeed %5.5g", m_pData->curCalc.Stat.Rel_Min.Distance.MMValue - m_pData->curCalc.Stat.Prev_Rel_Min.Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.Velocity.MMValue - m_pData->curCalc.Stat.Prev_Rel_Min.Velocity.MMValue, m_pData->curCalc.Stat.Rel_Max.Velocity.MMValue - m_pData->curCalc.Stat.Prev_Rel_Max.Velocity.MMValue);
+//			txtlen = sprintf_s(tmps, 300, "DltMinRelDistance %5.5g  DltMinRelSpeed %5.5g  DltMaxRelSpeed %5.5g", m_pData->curCalc.Stat.Rel_Min.Distance.MMValue - 
+// m_pData->curCalc.Stat.Prev_Rel_Min.Distance.MMValue, m_pData->curCalc.Stat.Rel_Min.RelVelocity.MMValue - m_pData->curCalc.Stat.Prev_Rel_Min.RelVelocity.MMValue, m_pData->curCalc.Stat.Rel_Max.RelVelocity.MMValue - m_pData->curCalc.Stat.Prev_Rel_Max.RelVelocity.MMValue);
 //			posY += 20; TextOutA(hDC, 1, posY, tmps, txtlen);
 
 			GroupSummaryInfo GrInfo_Cur;
 			m_pData->curCalc.Group->GetGroupSummaryInfo(&GrInfo_Cur, m_pData->curCalc.Time.GetCurTime());
 
-			txtlen = sprintf_s(tmps, 300, "Group Velocity %3.3g | X=%3.3g Y=%3.3g Z=%3.3g", GrInfo_Cur.Velocity, GrInfo_Cur.Speed_3D.X, GrInfo_Cur.Speed_3D.Y, GrInfo_Cur.Speed_3D.Z);
+			txtlen = sprintf_s(tmps, 300, "Group Velocity %3.3g | X=%3.3g Y=%3.3g Z=%3.3g", GrInfo_Cur.GroupVelocity, GrInfo_Cur.Speed_3D.X, GrInfo_Cur.Speed_3D.Y, GrInfo_Cur.Speed_3D.Z);
 			TextOutA(hDC, 1, posY += 20, tmps, txtlen);
 			txtlen = sprintf_s(tmps, 300, "Group Accel %3.3g | X=%3.3g Y=%3.3g Z=%3.3g", GrInfo_Cur.Acceleration, GrInfo_Cur.Acceleration_3D.X, GrInfo_Cur.Acceleration_3D.Y, GrInfo_Cur.Acceleration_3D.Z);
 			TextOutA(hDC, 1, posY += 20, tmps, txtlen);
@@ -232,15 +238,20 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 			posY += 10;
 			for (int i = 0; i < m_PtrCount; i++)
 			{
-				SPos tmp = m_pData->curCalc.Group->m_Array[i]->GetCurPosition();
+				CSpParticle* pParticle = m_pData->curCalc.Group->m_Array[i];
+				SPos tmp = pParticle->GetCurVelocity();
 				posY += 20; 
-				DCMem->SetTextColor(mRGB[(i) % 16]);
-				txtlen = sprintf_s(tmps, 300, "%0.2d Pos/Velocity", i);
+				DCMem->SetTextColor(pParticle->m_TraceSettings.Normal.Color);
+				txtlen = sprintf_s(tmps, 300, "%cP_%0.2d Vel / Pos", pParticle->GetParticleType() != SP_TYPE_NEGATIVE ? 'N':'A', i);
 				TextOutA(hDC, 1, posY, tmps, txtlen);
 
+				int tmpPosX = 130;
 				DCMem->SetTextColor(RGB(0, 0, 0));
+
+				txtlen = sprintf_s(tmps, 300, "S%3.3g", tmp.LEN());
+				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
+				tmpPosX += txtlen * 8 + 5;
 				txtlen = sprintf_s(tmps, 300, "X%3.3g", tmp.X);
-				int tmpPosX = 100;
 				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
 				tmpPosX += txtlen * 8 + 5;
 				txtlen = sprintf_s(tmps, 300, "Y%3.3g", tmp.Y);
@@ -249,13 +260,10 @@ void CFindDlg::PaintToCDC(CDC* DCMem)
 				txtlen = sprintf_s(tmps, 300, "Z%3.3g", tmp.Z);
 				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
 
-				m_pData->curCalc.Group->m_Array[i]->GetCurSpeed(tmp);
+				pParticle->GetCurPosition(tmp);
 
 				tmpPosX += txtlen * 8 + 5;
-				txtlen = sprintf_s(tmps, 300, "S%3.3g", tmp.LEN());
-				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
-				tmpPosX += txtlen * 8 + 5;
-				txtlen = sprintf_s(tmps, 300, "X%3.3g", tmp.X);
+				txtlen = sprintf_s(tmps, 300, " / X%3.3g", tmp.X);
 				TextOutA(hDC, tmpPosX, posY, tmps, txtlen);
 				tmpPosX += txtlen * 8 + 5;
 				txtlen = sprintf_s(tmps, 300, "Y%3.3g", tmp.Y);
@@ -351,10 +359,13 @@ void CFindDlg::OnBnClicked_Save()
 			hOldBitmap = (HBITMAP)DCMem.SelectObject(m_hDCBitmap);
 
 			char fileMane[500];
-			sprintf_s(fileMane, "C:\\SParticle\\BMP\\FIND_NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_nc%0.3d_PT%g_%I64d.bmp", 
-				m_pData->curCalc.Group->GetCount(), m_pData->curCalc.ClassicType, m_pData->curCalc.AdditiveType, 
-				m_pData->curCalc.WindType, m_pData->curCalc.CollisionType, m_pData->curCalc.DensityCalcType, m_pData->curCalc.AccCalcType, m_pData->curCalc.DensityDerivLevel,
-				m_pData->stat.Count, m_pData->curCalc.ParentSpaceThickness, GetTickCount64());
+			sprintf_s(fileMane, "BMP\\FIND_Thr%d_%I64d__PCnt0.3%d_NP%d_AP%d__C%d_ADD%d_Wind%d_DCT%d_ACT%d_DL%d_STAT%d_PT%g.bmp", 
+				m_pData->curCalc.Group->m_ThreadsCur, GetTickCount64(),
+				m_pData->curCalc.Group->GetCount(), m_pData->curCalc.Group->PartCntr.GetCurrent().GetCount(SP_TYPE_POSITIVE), m_pData->curCalc.Group->PartCntr.GetCurrent().GetCount(SP_TYPE_NEGATIVE),
+				m_pData->curCalc.ClassicType, m_pData->curCalc.AdditiveType, m_pData->curCalc.WindType, m_pData->curCalc.DensityCalcType,
+				m_pData->curCalc.AccCalcType, m_pData->curCalc.DensityDerivLevel, m_pData->stat.Count, m_pData->curCalc.ParentSpaceThickness);
+
+
 			SaveBitmap(fileMane, DCMem, m_hDCBitmap);
 
 			DCMem.SelectObject(hOldBitmap);
@@ -366,4 +377,29 @@ void CFindDlg::OnBnClicked_Save()
 void CFindDlg::OnBnClickedButtonRefreshlive()
 {
 	m_LiveCntr = 10000;
+}
+
+void CFindDlg::OnBnClickedButtonMse()
+{
+
+		int PrevValue = (m_XYZ & SP_DRAW_PART_ALL);
+
+		m_XYZ &= ~SP_DRAW_PART_ALL;
+
+		if (PrevValue == SP_DRAW_PART_MAIN) m_XYZ |= SP_DRAW_PART_MS;
+		else
+			if (PrevValue == SP_DRAW_PART_MS) m_XYZ |= SP_DRAW_PART_ALL;
+			else
+				if (PrevValue == SP_DRAW_PART_ALL) m_XYZ |= SP_DRAW_PART_ETERNAL;
+				else
+					if (PrevValue == SP_DRAW_PART_ETERNAL) m_XYZ |= SP_DRAW_PART_MAIN;
+
+		char tmpS[8];
+		tmpS[0] = (m_XYZ & SP_DRAW_PART_MAIN) ? 'M' : 'm';
+		tmpS[1] = (m_XYZ & SP_DRAW_PART_SECONDARY) ? 'S' : 's';
+		tmpS[2] = (m_XYZ & SP_DRAW_PART_ETERNAL) ? 'E' : 'e';
+		tmpS[3] = 0;
+		SetDlgItemTextA(m_hWnd, IDC_BUTTON_MSE, tmpS);
+
+		m_uRedrawFlag = 1;
 }

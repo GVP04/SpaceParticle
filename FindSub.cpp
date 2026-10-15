@@ -15,9 +15,8 @@ UINT DoCalc_1(LPVOID pParam)
 {
 	if (pParam)
 	{
-		int assert_Val = -1;
 		SP_Calc* m_Calc = (SP_Calc*)pParam;
-		FILE* ptrFile = nullptr;
+		{		FILE* ptrFile = nullptr;
 
 		m_Calc->Group->Reset();
 
@@ -25,15 +24,17 @@ UINT DoCalc_1(LPVOID pParam)
 		REPORTER_THREAD_CALC(m_Calc->Group->m_reporter.OPEN();)
 
 		m_Calc->Group->SetCalcState(M_STATE_CALC | M_STATE_READY);
-		m_Calc->Group->ReadSettingsGroup(m_Calc->CalcParams, SGROUP_ALL);
+		m_Calc->Group->ReadSettingsGroup(m_Calc->CalcParamsDecoded, SGROUP_ALL);
 
+		if ((m_Calc->OutPutFlags & 0x0001) == 0 || !fopen_s(&ptrFile, "report.txt", "wt"))
 
-		if ((m_Calc->OutPutFlags & 0x0001) == 0 || !fopen_s(&ptrFile, "C:\\SParticle\\report.txt", "wt"))
-		{
 			m_Calc->Group->PrepareForCalc(0);
 
-			if (ptrFile && (m_Calc->OutPutFlags & 0x0001)) m_Calc->Group->WriteState(ptrFile, m_Calc->Group->GetCurTime());
+			if (ptrFile && (m_Calc->OutPutFlags & 0x0001))
+				m_Calc->Group->WriteState(ptrFile, m_Calc->Group->GetCurTime());
 
+			m_Calc->Time.FixStartTimeCur();
+			
 			while (
 				m_Calc->CalcCounter.NextAndCheck()
 				&& m_Calc->Group->GetCurTime() < m_Calc->CalcFindSet.StopIF.Time && (m_Calc->Group->GetCalcState() & M_STATE_CALC) && !(m_Calc->Group->GetCalcState() & M_STATE_BREAK))
@@ -46,7 +47,8 @@ UINT DoCalc_1(LPVOID pParam)
 						if (ptrFile && (m_Calc->OutPutFlags & 0x0001)) fprintf(ptrFile, "%d\t%d\t", m_Calc->CalcCounter.GetCurLoop(), m_Calc->CalcCounter.GetCurStep());
 						REPORTER_THREAD_CALC(m_Calc->Group->m_reporter.OUTPUT("MAIN Step ", tttt++);)
 
-						ASSERT(m_Calc->CalcCounter.GetCurStep() != assert_Val);
+						m_Calc->CalcCounter.AssertCurStep();
+
 						m_Calc->Group->NextStep();
 
 						if (ptrFile && (m_Calc->OutPutFlags & 0x0001)) m_Calc->Group->WriteState(ptrFile, 1, 1);
@@ -81,7 +83,7 @@ UINT DoCalc_Find(LPVOID pParam)
 		m_Calc->stat = { 0 };
 		m_Calc->curCalc.Group->SetCalcState(M_STATE_CALC);
 
-		m_Calc->curCalc.Group->ReadSettingsGroup(m_Calc->FindParams, SGROUP_ALL);
+		m_Calc->curCalc.Group->ReadSettingsGroup(m_Calc->FindParamsDecoded, SGROUP_ALL);
 
 		m_Calc->curCalc.Group->SetCalcState(M_STATE_READY);
 		m_Calc->curCalc.Time.FixStartTime();
@@ -90,12 +92,12 @@ UINT DoCalc_Find(LPVOID pParam)
 			char fileMane[500];
 			{
 				char tmpCaption[500];
-				sprintf_s(tmpCaption, "Find NP%d_C%d_ADD%d_Wind%d_Clls%X_DCT%d_ACT%d_DL%d_nc%0.3d_PT%g_%d",
+				sprintf_s(tmpCaption, "Find NP%d_C%d_ADD%d_Wind%d_DCT%d_ACT%d_DL%d_nc%0.3d_PT%g_%d",
 					m_Calc->curCalc.Group->GetCount(), m_Calc->curCalc.ClassicType, m_Calc->curCalc.AdditiveType,
-					m_Calc->curCalc.WindType, m_Calc->curCalc.CollisionType, m_Calc->curCalc.DensityCalcType, m_Calc->curCalc.AccCalcType, m_Calc->curCalc.DensityDerivLevel, m_Calc->stat.Count,
+					m_Calc->curCalc.WindType, m_Calc->curCalc.DensityCalcType, m_Calc->curCalc.AccCalcType, m_Calc->curCalc.DensityDerivLevel, m_Calc->stat.Count,
 					m_Calc->curCalc.ParentSpaceThickness, GetTickCount());
 				::SetWindowTextA(m_Calc->DlgFind->m_hWnd, tmpCaption);
-				sprintf_s(fileMane, "C:\\SParticle\\%s.txt", tmpCaption);
+				sprintf_s(fileMane, "%s.txt", tmpCaption);
 			}
 
 			char* tmpOutput = new char[SPG_TEMPSTRING_LEN + 0x10];
@@ -106,9 +108,7 @@ UINT DoCalc_Find(LPVOID pParam)
 				{
 					m_Calc->curCalc.Group->PrepareForCalc(1);
 
-
-					char* tmppos = tmpOutput;
-					tmppos += sprintf_s(tmpOutput, SPG_TEMPSTRING_LEN - (tmppos - tmpOutput), "Iteration\t%d\tReported\t%d\n", m_Calc->stat.Count, m_Calc->stat.Reported);
+					sprintf_s(tmpOutput, SPG_TEMPSTRING_LEN, "Iteration\t%d\tReported\t%d\n", m_Calc->stat.Count, m_Calc->stat.Reported);
 
 					if (ptrFile && (m_Calc->curCalc.OutPutFlags & 0x0001)) m_Calc->curCalc.Group->WriteState(ptrFile, m_Calc->curCalc.Group->GetCurTime());
 
@@ -262,6 +262,8 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 
 			DCMem->SetBkColor(RGB(255, 255, 255));
 			DCMem->SetTextColor(RGB(0, 0, 0));
+			HPEN PenBlack1 = CreatePen(PS_SOLID, 1, 0);
+
 
 			int nTrace = mData->Group->GetCount();
 			if (nTrace > 1 && mData->Group->m_Array[0] && mData->Group->m_ParticleInfoArray)
@@ -272,7 +274,6 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 				SData* StopData_0 = mData->Group->m_Array[0]->GetDataById(StopIdx_0);
 				if (!StopData_0) StopData_0 = mData->Group->m_Array[0]->GetCurData();
 
-				int StartIdx_0 = mData->DrawSet.ViewPoint.StartIdx;
 				int nPoints_0 = mData->DrawSet.ViewPoint.GetCount(StopIdx_0);
 
 				GroupSummaryInfo GrInfo_Cur;
@@ -293,7 +294,7 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 						TextOutA(hDC, 1, yStart, tmps, txtlen);
 						txtlen = sprintf_s(tmps, 300, "Time = %15.15g  | TimeStep = %15.15g ", StopData_0->TimePoint, mData->Group->m_pCalc->Time.GetStep());
 						TextOutA(hDC, 1, yStart += 20, tmps, txtlen);
-						txtlen = sprintf_s(tmps, 300, "Group Velocity %g | X=%g Y=%g Z=%g", GrInfo_Cur.Velocity, GrInfo_Cur.Speed_3D.X, GrInfo_Cur.Speed_3D.Y, GrInfo_Cur.Speed_3D.Z);
+						txtlen = sprintf_s(tmps, 300, "Group Velocity %g | X=%g Y=%g Z=%g", GrInfo_Cur.GroupVelocity, GrInfo_Cur.Speed_3D.X, GrInfo_Cur.Speed_3D.Y, GrInfo_Cur.Speed_3D.Z);
 						TextOutA(hDC, 1, yStart += 20, tmps, txtlen);
 						txtlen = sprintf_s(tmps, 300, "Group Accel %g | X=%g Y=%g Z=%g", GrInfo_Cur.Acceleration, GrInfo_Cur.Acceleration_3D.X, GrInfo_Cur.Acceleration_3D.Y, GrInfo_Cur.Acceleration_3D.Z);
 						TextOutA(hDC, 1, yStart += 20, tmps, txtlen);
@@ -302,30 +303,38 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 
 						try
 						{
-							SData nullData = { 0 };
+							SData nullData;nullData.CLEAR();
 
 							for (int i = 0; i < nTrace; i++, yStart+= 2)
 							{
-								int StopIdx = mData->Group->m_Array[i]->GetCurPos();
+								CSpParticle* pParticle = mData->Group->m_Array[i];
+								int StopIdx = pParticle->GetCurPos();
 								if (StopIdx > mData->DrawSet.ViewPoint.EndIdx) StopIdx = mData->DrawSet.ViewPoint.EndIdx;
 
-								SData* pData = mData->Group->m_Array[i]->GetDataById(StopIdx);
+								SData* pData = pParticle->GetDataById(StopIdx);
 								if (pData == nullptr) pData = &nullData;
 
-								DCMem->SetTextColor(mRGB[i % 16]);
-								TextOutA(hDC, 1, yStart += 20, "Velocity", 5);
+								yStart += 20;
+
+								DCMem->SetTextColor(pParticle->m_TraceSettings.Normal.Color);
+
+
+								txtlen = sprintf_s(tmps, 300, "%cP_%0.2d Velocity", pParticle->GetParticleType() != SP_TYPE_NEGATIVE ? 'N' : 'A', i);
+								TextOutA(hDC, 1, yStart, tmps, txtlen);
+
+
 								DCMem->SetTextColor(RGB(0, 0, 0));
 
 								txtlen = sprintf_s(tmps, 300, "%g | X=%g Y=%g Z=%g", pData->Velocity.LEN(), pData->Velocity.X, pData->Velocity.Y, pData->Velocity.Z);
-								TextOutA(hDC, 60, yStart, tmps, txtlen);
+								TextOutA(hDC, 105, yStart, tmps, txtlen);
 
 
-								DCMem->SetTextColor(mRGB[i % 16]);
-								TextOutA(hDC, 1, yStart += 20, "Density", 7);
+								DCMem->SetTextColor(pParticle->m_TraceSettings.Normal.Color);
+								TextOutA(hDC, 47, yStart += 20, "Density", 7);
 								DCMem->SetTextColor(RGB(0, 0, 0));
 
 								txtlen = sprintf_s(tmps, 300, "%g | Acc %g | X=%g Y=%g Z=%g", pData->Density, pData->Accel_2_3D.LEN(), pData->Accel_2_3D.X, pData->Accel_2_3D.Y, pData->Accel_2_3D.Z);
-								TextOutA(hDC, 60, yStart, tmps, txtlen);
+								TextOutA(hDC, 105, yStart, tmps, txtlen);
 							}
 						}
 						catch (...)
@@ -333,9 +342,11 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 							;
 						}
 
-						txtlen = sprintf_s(tmps, 300, "MIN RELATIVE   Dist_R/P= %g/%g | Velocity = %g", mData->Group->m_pCalc->Stat.Rel_Min.Real_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Min.Phantom_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Min.Velocity.MMValue);
+						txtlen = sprintf_s(tmps, 300, "MIN RELATIVE   Dist_R/P= %g/%g | Velocity = %g", 
+							mData->Group->m_pCalc->Stat.Rel_Min.Real_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Min.Phantom_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Min.RelVelocity.MMValue);
 						yStart += 20;  TextOutA(hDC, 1, yStart, tmps, txtlen);
-						txtlen = sprintf_s(tmps, 300, "MAX RELATIVE   Dist_R/P= %g/%g | Velocity = %g", mData->Group->m_pCalc->Stat.Rel_Max.Real_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Max.Phantom_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Max.Velocity.MMValue);
+						txtlen = sprintf_s(tmps, 300, "MAX RELATIVE   Dist_R/P= %g/%g | Velocity = %g", 
+							mData->Group->m_pCalc->Stat.Rel_Max.Real_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Max.Phantom_Distance.MMValue, mData->Group->m_pCalc->Stat.Rel_Max.RelVelocity.MMValue);
 						yStart += 20; TextOutA(hDC, 1, yStart, tmps, txtlen);
 					}
 					//Отрисовка параметров группы
@@ -424,6 +435,21 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 						double ArrowsMagn = ((double*)(&delta))[idxCrd1];
 						if (ArrowsMagn > ((double*)(&delta))[idxCrd2]) ArrowsMagn = ((double*)(&delta))[idxCrd2];
 
+						int EndIdx = mData->DrawSet.ViewPoint.EndIdx;
+						if (EndIdx > mData->Group->m_ParticleInfoArray->GetCurPos())
+							EndIdx = mData->Group->m_ParticleInfoArray->GetCurPos();
+						int* arrIdx = new int[mData->DrawSet.nLinks + 100];
+						double TimeStart = mData->Group->m_ParticleInfoArray->GetDataById(mData->DrawSet.ViewPoint.StartIdx)->TimePoint;
+						arrIdx[0] = mData->DrawSet.ViewPoint.StartIdx;
+						double TimeEnd = mData->Group->m_ParticleInfoArray->GetDataById(EndIdx)->TimePoint;
+						arrIdx[mData->DrawSet.nLinks - 1] = arrIdx[mData->DrawSet.nLinks] = EndIdx;
+						double deltaT = (TimeEnd - TimeStart) / (mData->DrawSet.nLinks - 1);
+
+						double tmpTime = TimeStart + deltaT;
+						for (int i = 1; i < mData->DrawSet.nLinks; i++, tmpTime += deltaT)
+							arrIdx[i] = mData->Group->m_ParticleInfoArray->GetLowIdxByTime(tmpTime);
+
+
 						for (int idParticle = 0; idParticle < nTrace; idParticle++)
 						{
 							int Pwr2Id = 1 << idParticle;
@@ -431,27 +457,18 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 
 							if ((mData->DrawSet.ShowItems & Pwr2Id) && ((Pwr2Id & mData->DrawSet.ShowSpeedFor) || (Pwr2Id & mData->DrawSet.ShowAccFor)))
 							{
-								HPEN PenLink = CreatePen(PS_DASH, 1, mRGB[(idParticle + 8) % 16]);
-								SelectObject(hDC, PenLink);
+								HPEN PenLinkVelocity = CreatePen(PS_DASH, 1, pParticle->m_TraceSettings.Velocity.Color);
+								HPEN PenLinkAcc = CreatePen(PS_DASH, 1, pParticle->m_TraceSettings.Acceleration.Color);
 
 								if (mData->DrawSet.nLinks == 0) mData->DrawSet.nLinks = 10;
 
-								int StopIdx = pParticle->GetCurPos();
-								if (StopIdx > mData->DrawSet.ViewPoint.EndIdx) StopIdx = mData->DrawSet.ViewPoint.EndIdx;
-
 								int nPoints = mData->DrawSet.ViewPoint.GetCount(pParticle->GetCurPos());
-								int ViewStep = nPoints / mData->DrawSet.nLinks;
-								if (ViewStep < 1) ViewStep = 1;
 								SData nullSData;
 								nullSData.CLEAR();
 
-								for (int Itemidex = mData->DrawSet.ViewPoint.StartIdx; Itemidex < StopIdx; Itemidex += ViewStep)
+								for (int LinkNum = 0; LinkNum < mData->DrawSet.nLinks; LinkNum++)
 								{
-									if (Itemidex + ViewStep > StopIdx)
-										Itemidex = StopIdx;
-
-									SData* pData = pParticle->GetDataById(Itemidex);
-									if (!pData) pData = &nullSData;
+									SData* pData = pParticle->GetDataById(arrIdx[LinkNum]);
 
 									int posSX = (int)(mData->DrawSet.m_00_Pos.X + delta00.X + (double)(((double*)(&pData->Position))[idxCrd1] * mData->DrawSet.ViewMltpl));
 									int posSY = (int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (double)(((double*)(&pData->Position))[idxCrd2] * mData->DrawSet.ViewMltpl));
@@ -463,15 +480,16 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 											if (i == 0)
 											{
 												endPoint = pData->Velocity;
-												//endPoint.ADD(GrInfo.Speed_3D);
 												endPoint.MULT(mData->DrawSet.ViewMltpl);
 												endPoint.ADD(pData->Position);
+												SelectObject(hDC, PenLinkVelocity);
 											}
 											else
 											{
 												endPoint = pData->Accel_2_3D;
 												endPoint.MULT(mData->DrawSet.ViewMltpl * ArrowsMagn);
 												endPoint.ADD(pData->Position);
+												SelectObject(hDC, PenLinkAcc);
 											}
 
 											int posEX = (int)(mData->DrawSet.m_00_Pos.X + delta00.X + (((double*)(&endPoint))[idxCrd1] * mData->DrawSet.ViewMltpl));
@@ -480,9 +498,11 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 											DrawArrow(hDC, posSX, posSY, posEX, posEY, 3);
 										}
 								}
-								DeleteObject(PenLink);
+								DeleteObject(PenLinkAcc);
+								DeleteObject(PenLinkVelocity);
 							}
 						}
+						delete[] arrIdx;
 					}
 
 					//отрисовка связей 
@@ -508,13 +528,14 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 
 							if ((mData->DrawSet.ShowItems & Pwr2Id) && (Pwr2Id & mData->DrawSet.ShowLinksFrom))
 							{
-								HPEN PenLink = CreatePen(PS_DASHDOTDOT, 1, mRGB[(idParticle + 8) % 16]);
+								HPEN PenLink = CreatePen(PS_DASHDOTDOT, 1, mData->Group->m_Array[idParticle]->m_TraceSettings.PhantomLink.Color);
 								SelectObject(hDC, PenLink);
 
 								for (int LinkToPtr = 0; LinkToPtr < nTrace; LinkToPtr++)
 									if (idParticle != LinkToPtr && ((1 << LinkToPtr) & mData->DrawSet.ShowLinksTo))
 									{
 										double PrevTime = -999999.0;
+
 										for (int LinkNum = 0; LinkNum < mData->DrawSet.nLinks; LinkNum++)
 										{
 											SData* pData = mData->Group->m_Array[idParticle]->GetDataById(arrIdx[LinkNum]);
@@ -522,26 +543,46 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 											{
 												int posC1 = (int)(mData->DrawSet.m_00_Pos.X + delta00.X + (double)(((double*)(&pData->Position))[idxCrd1] * mData->DrawSet.ViewMltpl));
 												int posC2 = (int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (double)(((double*)(&pData->Position))[idxCrd2] * mData->DrawSet.ViewMltpl));
-												SData VP_Data = { 0 };
+												SData VP_Data;VP_Data.CLEAR();
 
 												int idMin = mData->Group->m_Array[LinkToPtr]->FindViewPointMinIdByTime(pData->Position, pData->TimePoint, PrevTime, pData->TimePoint);
 												if (idMin < 0)
-													mData->Group->m_Array[LinkToPtr]->FindViewPointByTimeLinear(VP_Data, *pData, pData->TimePoint, PrevTime);
+													mData->Group->m_Array[LinkToPtr]->FindViewPointByTimeLinear_LE0(VP_Data, *pData, pData->TimePoint, PrevTime);
 												else
 													VP_Data = *mData->Group->m_Array[LinkToPtr]->GetDataById(idMin);
 
-												/////////if ((mData->Group->m_Array[LinkToPtr]->FindViewPointByTime(&VP_Data, pData, pData->TimePoint, PrevTime, pData->TimePoint) & SP_STATE_ERROR_MINOR) != SP_STATE_ERROR_MAIN)
+												if (fabs(VP_Data.Position.X) > 1.0e50)
 												{
-													PrevTime = VP_Data.TimePoint;
-													MoveToEx(hDC, posC1, posC2, nullptr);
-													LineTo(hDC,
-														(int)(mData->DrawSet.m_00_Pos.X + delta00.X + (((double*)(&VP_Data.Position))[idxCrd1] * mData->DrawSet.ViewMltpl)),
-														(int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (((double*)(&VP_Data.Position))[idxCrd2] * mData->DrawSet.ViewMltpl)));
-													//mData->Group->m_Array[LinkToPtr]->GetPrevDataByTime(&VP_Data, pData->TimePoint, NULL);
-													//LineTo(hDC,
-													//	(int)(mData->DrawSet.m_00_Pos.X + delta00.X + (((double*)(&VP_Data.Position))[idxCrd1] * mData->DrawSet.ViewMltpl)),
-													//	(int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (((double*)(&VP_Data.Position))[idxCrd2] * mData->DrawSet.ViewMltpl)));
+													VP_Data.Position.X = pData->Position.X + 1.5;
+													VP_Data.Position.Y = pData->Position.Y + 1.5;
+													VP_Data.Position.Z = pData->Position.Z + 1.5;
 												}
+
+												PrevTime = VP_Data.TimePoint;
+												MoveToEx(hDC, posC1, posC2, nullptr);
+												LineTo(hDC,
+													(int)(mData->DrawSet.m_00_Pos.X + delta00.X + (((double*)(&VP_Data.Position))[idxCrd1] * mData->DrawSet.ViewMltpl)),
+													(int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (((double*)(&VP_Data.Position))[idxCrd2] * mData->DrawSet.ViewMltpl)));
+
+												//отрисовка барьера стрелкой в направлении от фантома
+												SPos PB_Point; PB_Point.SET_AS_DELTA(pData->Position, VP_Data.Position);
+												PB_Point.SET_LENGHT(mData->Group->m_pCalc->Critical.Distance);
+
+												SPos PB_start = PB_Point;
+												PB_start.SET_LENGHT(0.1);
+
+												PB_Point += VP_Data.Position;
+
+												int posEX = (int)(mData->DrawSet.m_00_Pos.X + delta00.X + (((double*)(&PB_Point))[idxCrd1] * mData->DrawSet.ViewMltpl));
+												int posEY = (int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (((double*)(&PB_Point))[idxCrd2] * mData->DrawSet.ViewMltpl));
+												PB_Point -= PB_start;
+
+												int posSX = (int)(mData->DrawSet.m_00_Pos.X + delta00.X + (((double*)(&PB_Point))[idxCrd1] * mData->DrawSet.ViewMltpl));
+												int posSY = (int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (((double*)(&PB_Point))[idxCrd2] * mData->DrawSet.ViewMltpl));
+
+												SelectObject(hDC, PenBlack1);
+												DrawArrow(hDC, posSX, posSY, posEX, posEY, 5);
+												SelectObject(hDC, PenLink);
 											}
 										}
 									}
@@ -558,14 +599,20 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 
 						if (nTrace >= 32 || (mData->DrawSet.ShowItems & Pwr2Id))
 						{
-							HPEN PenPtr = CreatePen(PS_SOLID, 1, mRGB[idParticle % 16]);
+							SDrawTraceSettings& TraceSet = mData->Group->m_Array[idParticle]->m_TraceSettings;
+
+							HPEN PenPtr = CreatePen(TraceSet.Normal.Type, TraceSet.Normal.Width, TraceSet.Normal.Color);
+							HPEN PenPtrUltimate = CreatePen(TraceSet.Slave.Type, TraceSet.Slave.Width, TraceSet.Slave.Color);
+							HPEN PenPtrInside = CreatePen(TraceSet.Inside.Type, TraceSet.Inside.Width, TraceSet.Inside.Color);
+
 							SelectObject(hDC, PenPtr);
 
 							STracePosInfo* PInfoStart = mData->Group->m_ParticleInfoArray->GetDataById(mData->DrawSet.ViewPoint.StartIdx);
 							STracePosInfo* PInfoEnd = mData->Group->m_ParticleInfoArray->GetDataById(mData->DrawSet.ViewPoint.EndIdx);
 							if (!PInfoEnd) PInfoEnd = mData->Group->m_ParticleInfoArray->GetCurData();
 							double deltaT = (PInfoEnd->TimePoint - PInfoStart->TimePoint) * 0.0001220703125; // 0.0001220703125 = 1/ 0x2000 
-
+							if (deltaT < mData->Time.GetMinStep()) 
+								deltaT = mData->Time.GetMinStep();
 							double TimeCur = PInfoStart->TimePoint;
 
 							int CurIdx = pParticle->GetLowIdxByTime(TimeCur);
@@ -577,11 +624,12 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 							int Last1 = -posC1, Last2 = -posC2;
 
 
-							MoveToEx(hDC, posC1 + 2, posC2 + 2, nullptr);
-							LineTo(hDC, posC1 - 2, posC2 + 2);
-							LineTo(hDC, posC1 + 2, posC2 - 2);
-							LineTo(hDC, posC1 - 2, posC2 - 2);
-							LineTo(hDC, posC1 + 2, posC2 + 2);
+							MoveToEx(hDC, posC1 + 4, posC2 + 4, nullptr);
+							LineTo(hDC, posC1 - 4, posC2 + 4);
+							LineTo(hDC, posC1 - 4, posC2 - 4);
+							LineTo(hDC, posC1 + 4, posC2 - 4);
+							LineTo(hDC, posC1 + 4, posC2 + 4);
+							MoveToEx(hDC, posC1, posC2, nullptr);
 
 							int LastID = CurIdx;
 							while (TimeCur < PInfoEnd->TimePoint)
@@ -594,6 +642,14 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 								{
 									LastID = CurIdx;
 									pDataCur = pParticle->GetDataById(CurIdx);
+									SelectObject(hDC, PenPtr);
+
+									//ASSERT(pDataCur->Velocity.Z == 0.0 && pDataCur->Position.Z == 0.0 && pDataCur->Accel_2_3D.Z == 0.0 && pDataCur->Jerk_3_3D.Z == 0.0 && pDataCur->Velocity_Linear.Z == 0.0);
+										if ((pDataCur->State & GR_PS_COLLISION_IS_ULTIMATE))
+											SelectObject(hDC, PenPtrUltimate);
+
+										if ((pDataCur->State & GR_PS_COLLISION_IS_INSIDE))
+												SelectObject(hDC, PenPtrInside);
 
 									posC1 = (int)(mData->DrawSet.m_00_Pos.X + delta00.X + (double)(((double*)(&pDataCur->Position))[idxCrd1] * mData->DrawSet.ViewMltpl));
 									posC2 = (int)(mData->DrawSet.m_00_Pos.Y + delta00.Y + (double)(((double*)(&pDataCur->Position))[idxCrd2] * mData->DrawSet.ViewMltpl));
@@ -601,12 +657,13 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 									if (posC1 != Last1 || posC2 != Last2)
 									{
 										LineTo(hDC, posC1, posC2);
-										//MoveToEx(hDC, posC1, posC2, nullptr);
 										Last1 = posC1;
 										Last2 = posC2;
 									}
 								}
 							}
+							DeleteObject(PenPtrInside);
+							DeleteObject(PenPtrUltimate);
 							DeleteObject(PenPtr);
 						}
 					}
@@ -614,29 +671,34 @@ void PaintTraceToCDC(CDC* DCMem, SP_Calc* mData, int in_DrawFlags, SPos& delta00
 			}
 			catch (...) { ; }
 
+			DeleteObject(PenBlack1);
 		}
 	}
 }
 
-void SaveBitmap(char* in_FileName, HDC in_hdc, HBITMAP in_hBMP)
+int SaveBitmap(const char* in_FileName, HDC in_hdc, HBITMAP in_hBMP)
 {
+	int ret = -1;
 	FILE* ptrFile;
 	if (in_FileName && *in_FileName && in_hdc && in_hBMP && !fopen_s(&ptrFile, in_FileName, "wb"))
 	{
 		BITMAPINFO bmi = { 0 };
 		bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-
+		ret = -2;
 		if (GetDIBits(in_hdc, in_hBMP, 0, 0, nullptr, &bmi, DIB_RGB_COLORS))
 		{
+			ret = -3;
 			HANDLE hDIB = nullptr;
 			bmi.bmiHeader.biCompression = BI_RGB;
 
 			if ((hDIB = GlobalAlloc(GHND, bmi.bmiHeader.biSizeImage)))
 			{
+				ret = -4;
 				char* lpbitmap = (char*)GlobalLock(hDIB);
 
 				if (GetDIBits(in_hdc, in_hBMP, 0, bmi.bmiHeader.biHeight, lpbitmap, &bmi, DIB_RGB_COLORS))
 				{
+					ret = 0;
 					BITMAPFILEHEADER bmfh = { 0 };
 					bmfh.bfOffBits = sizeof(BITMAPFILEHEADER) + bmi.bmiHeader.biSize;
 					bmfh.bfSize = bmfh.bfOffBits + bmi.bmiHeader.biSizeImage;
@@ -656,15 +718,14 @@ void SaveBitmap(char* in_FileName, HDC in_hdc, HBITMAP in_hBMP)
 		}
 		fclose(ptrFile);
 	}
-	return;
+	return ret;
 }
 
 
-
-int ReadCalcParam(char* in_Src, const char* in_Mask, SPos& data, double defValue, int inFlags)
+int ReadCalcParam_(const char* in_Src, const char* in_Mask, SPos& data, double defValue, int inFlags)
 {
 	int ret = 0;
-	char* pos = in_Src;
+	const char* pos = in_Src;
 	int lenMask = (int)strlen(in_Mask);
 	if (!(inFlags & READPARAMS_NOT_USE_DEFS))
 	{
@@ -676,7 +737,7 @@ int ReadCalcParam(char* in_Src, const char* in_Mask, SPos& data, double defValue
 	while ((pos = strstr(pos, in_Mask)))
 	{
 		pos++;
-		char* posEQ = strstr(pos, "=");
+		const char* posEQ = strstr(pos, "=");
 		if (posEQ++)
 		{
 			if (pos[lenMask] == 'X')
@@ -699,36 +760,77 @@ int ReadCalcParam(char* in_Src, const char* in_Mask, SPos& data, double defValue
 	return ret;
 }
 
-int ReadCalcParam(char* in_Src, const char* in_Mask, int& data, int defValue, int inFlags)
+int ReadCalcParam(const char* in_Src, const char* in_Mask, SPos& data, double defValue, int inFlags)
 {
 	int ret = 0;
-	char* pos = in_Src;
+	const char* pos = in_Src;
+
+	if (!(inFlags & READPARAMS_NOT_USE_DEFS))
+		data.X = data.Y = data.Z = defValue;
+
+	size_t len = strlen(in_Mask);
+
+	while (pos && (pos = strstr(pos, in_Mask)))
+	{
+		pos += len;
+		while (*pos == ' ') pos++;
+
+		if (*pos == '=')
+		{
+			data.X = atof(++pos);
+			while (*pos && *pos != ',' && *pos != '\r' && *pos != '\n') pos++;
+
+			if (*pos == ',')
+			{
+				data.Y = atof(++pos);
+
+				while (*pos && *pos != ',' && *pos != '\r' && *pos != '\n') pos++;
+
+				if (*pos == ',')
+					data.Z = atof(++pos);
+			}
+
+			pos = nullptr;
+		}
+	
+	}
+	return ret;
+}
+
+int ReadCalcParam(const char* in_Src, const char* in_Mask, int& data, int defValue, int inFlags)
+{
+	int ret = 0;
+	const char* pos = in_Src;
 	if (!(inFlags & READPARAMS_NOT_USE_DEFS)) data = defValue;
 
 	if ((pos = strstr(pos, in_Mask)))
 	{
 		pos++;
-		char* posEQ = strstr(pos, "=");
+		const char* posEQ = strstr(pos, "=");
 		if (posEQ++)
 		{
 			while (*posEQ == ' ' || *posEQ == '\t') posEQ++;
 			ret = 1;
-			sscanf_s(posEQ, "%i", &data);
+			if (sscanf_s(posEQ, "%i", &data) == 0)
+			{
+				if (!(inFlags & READPARAMS_NOT_USE_DEFS)) data = defValue;
+				else data = 0;
+			}
 		}
 	}
 	return ret;
 }
 
-int ReadCalcParam(char* in_Src, const char* in_Mask, double& data, double defValue, int inFlags)
+int ReadCalcParam(const char* in_Src, const char* in_Mask, double& data, double defValue, int inFlags)
 {
 	int ret = 0;
-	char* pos = in_Src;
+	const char* pos = in_Src;
 	if (!(inFlags & READPARAMS_NOT_USE_DEFS)) data = defValue;
 
 	if ((pos = strstr(pos, in_Mask)))
 	{
 		pos++;
-		char* posEQ = strstr(pos, "=");
+		const char* posEQ = strstr(pos, "=");
 		if (posEQ++)
 		{
 			data = atof(posEQ);

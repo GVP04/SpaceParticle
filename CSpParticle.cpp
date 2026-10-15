@@ -14,7 +14,7 @@ CSpParticle::CSpParticle(SP_Calc& in_pCalc, int in_TypeFlags)
 	NewPoint_Clear();
 	m_NextData = { 0 };
 	m_Data = new SPTraceArrayDynEx<SData, double>(m_pCalc->nIterations < 5 ? SDA_DEF_AMOUNT : m_pCalc->nIterations, &m_pCalc->Time);
-	m_CountBeStuck = 0;
+	m_CountRelated = 0;
 }
 
 CSpParticle::CSpParticle(int in_MaxItems, int in_TypeFlags)
@@ -24,7 +24,8 @@ CSpParticle::CSpParticle(int in_MaxItems, int in_TypeFlags)
 	m_NewPointState = SP_NEWPOINT_STATE_ON;
 	NewPoint_Clear();
 	m_NextData.CLEAR();
-	m_Data = new SPTraceArrayDynEx<SData, double>(in_MaxItems < 5 ? 1000 : in_MaxItems + 100, &m_pCalc->Time);
+	int nItms = in_MaxItems < 5 ? 1000 : in_MaxItems + 100;
+	m_Data = new SPTraceArrayDynEx<SData, double>(nItms, &m_pCalc->Time);
 }
 
 CSpParticle::~CSpParticle()
@@ -36,7 +37,7 @@ CSpParticle::~CSpParticle()
 void CSpParticle::Clear(int in_Flags)
 {
 	m_StateNext = m_StateCurr = m_StatePrev = 0;
-	m_CountBeStuck = 0;
+	m_CountRelated = 0;
 
 	if (m_Data) m_Data->Clear(in_Flags);
 	else
@@ -118,8 +119,7 @@ void CSpParticle::NewPoint_Clear()
 {
 	m_NewPointState = SP_NEWPOINT_STATE_OFF;
 	m_StateNext = 0;
-
-	//m_NextData = { 0 };
+	m_NextData.State = 0;
 }
 
 
@@ -172,7 +172,7 @@ char* CSpParticle::GetStateDescription(char* out_Str, int in_StrLen, double in_R
 			int tmpCurPos = m_Data->GetCurPos();
 			if (tmpCurPos >= 0)
 			{
-				SData tmpData = { 0 };
+				SData tmpData;
 				double tmpTime = 0.0;
 				int ret = GetPrevDataByTime(tmpData, in_ReportTime, &tmpTime);
 				out_Str = GetFlagsDescription(out_Str, ret);
@@ -196,7 +196,7 @@ char* CSpParticle::GetStateDescription(char* out_Str, int in_StrLen, double in_R
 //напоминание -- время изменения плотности == расстоянию
 int CSpParticle::FindViewPointByTime(SData& out_Data, const SData& in_Pos, double in_ViewTime, double in_StartTime, double in_EndTime, int* const out_LowIdx)
 {
-	ASSERT(in_StartTime < in_EndTime);
+	ASSERT(in_StartTime < in_EndTime || in_StartTime == 0.0);
 
 	int ret = SP_STATE_ОК;
 	SData* VPDataID0 = GetDataById(0);
@@ -226,14 +226,15 @@ int CSpParticle::FindViewPointByTime(SData& out_Data, const SData& in_Pos, doubl
 		}
 		else
 		{
+			ret |= SP_STATE_DATA_LINEAR;
 			int FlagFind = 1;
 			if (in_StartTime <= VPDataID0->TimePoint)
 			{
 				double distanceTMP = VPDataID0->Position.GetDistance(in_Pos.Position);
-				double periodTMP = in_ViewTime - VPDataID0->TimePoint;// -m_pCalc->CriticalDistance;
+				double periodTMP = in_ViewTime - VPDataID0->TimePoint;// -m_pCalc->Critical.Distance;
 				if (distanceTMP >= periodTMP)
 				{//VP до сохраненной траектории
-					ret |= FindViewPointByTimeLinear(out_Data, in_Pos, in_ViewTime, in_StartTime);
+					ret |= FindViewPointByTimeLinear_LE0(out_Data, in_Pos, in_ViewTime, in_StartTime);
 					if (out_Data.TimePoint >= VPDataID0->TimePoint)
 						FlagFind = 1;
 					else
@@ -243,125 +244,83 @@ int CSpParticle::FindViewPointByTime(SData& out_Data, const SData& in_Pos, doubl
 
 			if (FlagFind)
 			{
-				int idMin = FindViewPointMinIdByTime(in_Pos.Position, in_ViewTime, in_StartTime, in_EndTime);
-				if (out_LowIdx)
-					*out_LowIdx = idMin;
+				int idMinRet = FindViewPointMinIdByTime(in_Pos.Position, in_ViewTime, in_StartTime, in_EndTime);
+				int idMin = idMinRet;
+				if ((idMinRet & 0xF0000000) == 0x90000000)
+					idMin = (idMinRet & 0x0FFFFFFF);
 
-				int CurPos = GetCurPos();
-
-				if (idMin < CurPos)
-				{
-					if (idMin >= 0)
-					{// есть пересечение в диапазоне [idMin]...[idMin+1] /// простой линйный расчет без учета ускорения
-						//правильно с учетом ускорения. ускорение ускорения пропорционально квадрату скорости.
-						//пока расчет позиции по спрямленной 
-						SData LowBorder = *GetDataById(idMin);
-						SData UpBorder = *GetDataById(idMin + 1);
-						double UpDelta, LowDelta;
-
-						LowDelta = in_ViewTime - LowBorder.TimePoint - LowBorder.Position.GetDistance(in_Pos.Position);
-						UpDelta = in_ViewTime - UpBorder.TimePoint - UpBorder.Position.GetDistance(in_Pos.Position);
-						
-						ASSERT(UpDelta <= 0.0 || UpBorder.AbsSpeed > 0.9999);		//расстояние больше времени. 
-						ASSERT(LowDelta >= 0.0);		//расстояние меньше времени. 
-
-						while (UpDelta < - m_pCalc->Time.GetMinStep() && LowDelta > m_pCalc->Time.GetMinStep())
-						{
-							SPos DeltaPos = UpBorder.Position; 
-							DeltaPos -= LowBorder.Position;
-							double RelMltpl = LowDelta / (LowDelta - UpDelta);
-							DeltaPos *= RelMltpl;
-							DeltaPos += LowBorder.Position;
-							double MidTime = UpBorder.TimePoint - LowBorder.TimePoint;
-							MidTime *= RelMltpl;
-							MidTime += LowBorder.TimePoint;
-
-							double MidDelta = in_ViewTime - MidTime - DeltaPos.GetDistance(in_Pos.Position);
-							if (MidDelta < 0.0)
-							{
-								UpDelta = MidDelta;
-								UpBorder.Position = DeltaPos;
-								UpBorder.TimePoint = MidTime;
-							}
-							else
-							{
-								LowDelta = MidDelta;
-								LowBorder.Position = DeltaPos;
-								LowBorder.TimePoint = MidTime;
-							}
-						}
-
-						if (UpDelta >= -m_pCalc->Time.GetMinStep())
-						{
-							out_Data = UpBorder;
-						}
-						else
-						{
-							out_Data = LowBorder;
-						}
-						//Через квадратное уравнение
-						//SData Up, Dn, Mid;
-						//Dn = LowBorder;
-						//Up = UpBorder;
-						//Dn.Accel_2_3D = {0}; Up.Accel_2_3D = { 0 };
-						//Dn.Velocity.SET_AS_DELTA(UpBorder.Position, LowBorder.Position);
-						//Dn.Velocity.DIV((UpBorder.TimePoint - LowBorder.TimePoint));
-						//Up.Velocity = Dn.Velocity;
-						//Mid = Dn;
-						//double tSwap, maxDelta = m_pCalc->Time.GetMinStep();
-						//ret = SP_STATE_INPROC;
-						//double DeltaT13 = in_ViewTime - Mid.TimePoint;
-						//while (ret == SP_STATE_INPROC)
-						//{
-						//	double newTime2;
-						//	SPos DP = Mid.Position; 
-						//	DP.MINUS(in_Pos.Position);
-						//	double C = DP.LENPWR2() - DeltaT13 * DeltaT13;
-						//	double B =  DeltaT13 + DP.DOT(Mid.Velocity);
-						//	B += B;
-						//	double A = Mid.Velocity.LENPWR2() - 1.0;
-						//	TwoDoubleRoots result = QuadraticEequationSolution( A, B, C);
-						//	newTime2 = Mid.TimePoint + result.root1.Dbl;
-						//	switch (CalcMidData(Mid, Dn, Up, newTime2))
-						//	{
-						//	case SP_STATE_UP:
-						//	case SP_STATE_DOWN:
-						//		ret = SP_STATE_ОК;
-						//		break;
-						//	case SP_STATE_MID:
-						//		DeltaT13 = in_ViewTime - Mid.TimePoint;
-						//		tSwap = DeltaT13 - in_Pos.Position.GetDistance(Mid.Position);
-						//		if (tSwap < 0.0)
-						//			Up = Mid;	
-						//		else
-						//			Dn = Mid;
-						//		if (Up.TimePoint - Dn.TimePoint < maxDelta || fabs(tSwap) < maxDelta)
-						//			ret = SP_STATE_ОК;
-						//		break;
-						//	default: //error
-						//		ret = SP_STATE_ERROR_MAIN;
-						//		break;
-						//	}
-						//}
-						//if (!(ret & SP_STATE_ERROR_MAIN))
-						//{
-						//	out_Data = Mid;
-						//	if (out_LowIdx && UpBorder.TimePoint == Mid.TimePoint)
-						//		*out_LowIdx = idMin + 1;
-						//}
-					}
-				}
-				else
-				{//время больше времени в последней позиции масиива траектории
-					ret = SP_STATE_HIGH_VIEW | SP_STATE_ERROR_MINOR;
-					double KeyPoint = 0.0;
-					GetNextDataByTime(out_Data, in_ViewTime, &KeyPoint);
-				}
-
-				if (out_Data.TimePoint < in_StartTime && !(ret & SP_STATE_FAR_AWAY))
+				if (idMinRet < 0)
 				{
 					ret |= SP_STATE_FAR_AWAY;
-					//out_Data->SET_AS_FARAWAY();
+				}
+				else
+				{
+					if (out_LowIdx)
+						*out_LowIdx = idMin;
+
+					if (idMin < GetCurPos())
+					{
+						if ((idMinRet & 0xF0000000) == 0x90000000)
+							out_Data = *GetDataById(idMin);
+						else
+							if (idMin >= 0)
+							{// есть пересечение в диапазоне [idMin]...[idMin+1] /// простой линйный расчет без учета ускорения
+								//правильно с учетом ускорения. ускорение ускорения пропорционально квадрату скорости.
+								//пока расчет позиции по спрямленной  GetDataByIdLinear(int in_Id)
+								SData LowBorder = *GetDataById(idMin);
+								SData UpBorder = *GetDataById(idMin + 1);
+
+								double dt = GetLinearViewTime(in_Pos, LowBorder);
+								double newVP = in_Pos.TimePoint + dt;
+
+								if (fabs(dt) != SP_MAX_TIME_DISTANCE) //&& newVP <= UpBorder.TimePoint)
+								{
+									if (newVP >= UpBorder.TimePoint)
+									{
+										//ASSERT(newVP <= UpBorder.TimePoint + 0.00001 || UpBorder.AbsSpeed >= m_pCalc->Critical.Speed); //следствие спрямления 
+										out_Data = UpBorder;
+										out_Data.LinearMove(m_pCalc->Time.GetMinStep() * -0.1);
+									}
+									else
+										if (newVP >= LowBorder.TimePoint)
+										{
+											out_Data = LowBorder;
+											out_Data.LinearMove(newVP - out_Data.TimePoint);
+											double dDelta, dDeltaPrev = 1.0e90;	////dDelta < 0 разница во времени меньше расстояния. Не успеет добежать информация.
+											int AssertCntr = 0;
+											double prev_newVP;
+
+											while ((dDelta = fabs(in_ViewTime - newVP - in_Pos.Position.GetDistance(out_Data.Position))) > 1.0e-14 && dDelta < dDeltaPrev)
+											{//коррекция результатов сжатия траектории
+												ASSERT(AssertCntr++ < 20);
+												dDeltaPrev = dDelta;
+												prev_newVP = newVP;
+
+												newVP = in_Pos.TimePoint + GetLinearViewTime(in_Pos, out_Data);
+												out_Data.LinearMove(newVP - out_Data.TimePoint);
+											}
+
+											if (dDelta > 1.0e-14 && dDelta != dDeltaPrev)
+												out_Data.LinearMove(prev_newVP - out_Data.TimePoint);
+										}
+										else
+										{
+											out_Data = LowBorder;
+											out_Data.LinearMove(m_pCalc->Time.GetMinStep() * -0.1);
+										}
+								}
+								else
+									ret |= SP_STATE_FAR_AWAY;
+							}
+							else
+								ret |= SP_STATE_FAR_AWAY;
+					}
+					else
+					{//время больше времени в последней позиции масиива траектории
+						ret = SP_STATE_HIGH_VIEW | SP_STATE_ERROR_MINOR;
+						double KeyPoint = 0.0;
+						GetNextDataByTime(out_Data, in_ViewTime, &KeyPoint);
+					}
 				}
 			}
 			ASSERT(!isnan(out_Data.TimePoint));
@@ -377,19 +336,43 @@ int CSpParticle::FindViewPointByTime(SData& out_Data, const SData& in_Pos, doubl
 }
 
 
-
-int CSpParticle::FindViewPointByTimeLinear(SData & out_Data, const SData & in_Pos, double in_ViewTime, double in_StartTime)
+//для получения точки видимости на прямолмнейной равномерной траектории
+int CSpParticle::FindViewPointByTimeLinear_LE0(SData & out_Data, const SData & in_Pos, double in_ViewTime, double in_StartTime)
 {
 	int ret = -1;
 	SData* VPDataID0 = GetDataById(0);
 	if (in_StartTime <= VPDataID0->TimePoint)
 	{
 		double LinearViewTime = GetLinearViewTime(in_Pos, *VPDataID0);
+		double newVP = in_Pos.TimePoint + LinearViewTime;
+
 		if (fabs(LinearViewTime) < SP_MAX_TIME_DISTANCE)
 		{
 			ret = 0;
 			out_Data = *VPDataID0;
-			out_Data.LinearMove(in_ViewTime + LinearViewTime - VPDataID0->TimePoint, LINEARMOVECLEARFLAG_ACCEL3D | LINEARMOVECLEARFLAG_ACCELDERIV3D);
+			out_Data.LinearMove(newVP - out_Data.TimePoint, LINEARMOVECLEARFLAG_ACCEL3D | LINEARMOVECLEARFLAG_ACCELDERIV3D);
+			double dDelta, dDeltaPrev = 1.0e90, prev_newVP;
+			int AssertCntr = 0;
+
+			//if (newVP > 0.0)
+			{
+				while (!isinf(newVP) && (dDelta = fabs(in_ViewTime - newVP - in_Pos.Position.GetDistance(out_Data.Position))) > 1.0e-14 && dDelta < dDeltaPrev)
+				{//коррекция результатов сжатия траектории
+					ASSERT(AssertCntr++ < 20);
+					dDeltaPrev = dDelta;
+					prev_newVP = newVP;
+
+					newVP = in_Pos.TimePoint + GetLinearViewTime(in_Pos, out_Data);
+					if (isinf(newVP))
+						dDelta = 0.0;
+					else
+						out_Data.LinearMove(newVP - out_Data.TimePoint);
+
+				}
+
+				if (dDelta > 1.0e-14 && dDelta != dDeltaPrev)
+					out_Data.LinearMove(prev_newVP - out_Data.TimePoint);
+			}
 		}
 		else
 		{
@@ -403,83 +386,76 @@ int CSpParticle::FindViewPointByTimeLinear(SData & out_Data, const SData & in_Po
 int CSpParticle::FindViewPointMinIdByTime(const SPos& in_Pos, double in_ViewTime, double in_StartTime, double in_EndTime)
 {
 	int ret = -1;
-	int MinIDAtViewTime;
-	if (in_ViewTime >= GetCurTime())
-		MinIDAtViewTime = GetCurPos();
-	else
-		MinIDAtViewTime = m_Data->GetLowIdxByTime(in_ViewTime);
 
-	if (m_pCalc->ClassicType || MinIDAtViewTime < 0)
-		ret = MinIDAtViewTime;
+	if (m_pCalc->ClassicType)
+	{
+		ret = m_Data->GetLowIdxByTime(in_ViewTime);
+	}
 	else
 	{
-		SData* pDataAtViewTime  = GetDataById(MinIDAtViewTime);
-		double distAtViewTime = in_Pos.GetDistance(pDataAtViewTime->Position);
-		if (distAtViewTime < m_pCalc->CriticalDistance) distAtViewTime = m_pCalc->CriticalDistance;
-
-		double maxTime = in_ViewTime - distAtViewTime * 0.5;
-		if (maxTime > in_EndTime) maxTime = in_EndTime;
-
-		int MaxID = m_Data->GetLowIdxByTime(maxTime);
+		int MaxID = in_ViewTime >= m_Data->GetCurTime() ? m_Data->GetCurPos() : m_Data->GetLowIdxByTime(in_ViewTime > in_EndTime ? in_EndTime : in_ViewTime);
 
 		if (MaxID >= 0)
 		{
-			//double minTime = in_ViewTime - distAtViewTime - distAtViewTime;
-			//if (minTime < in_StartTime) minTime = in_StartTime;
-			//int MinID = m_Data->GetLowIdxByTime(minTime);
-
 			int MinID = m_Data->GetLowIdxByTime(in_StartTime);
-			if (MinID < 0)
+			if (MinID < 0) MinID = 0;
+
+			SData* tmpData = GetDataById(MinID);
+			//dDelta < 0 разница во времени меньше расстояния. Не успеет добежать информация.
+			double dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
+
+			if (dDelta > 0)
 			{
-				SData* tmpData = GetDataById(0);
+				ret = MinID;
+				tmpData = GetDataById(MinID + 1); //чаще всего это верхняя граница
 				if (tmpData)
 				{
-					double dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
-
-					if (dDelta >= 0.0) //(dT > dDist)
-						MinID = 0;
-					else
-						MaxID = MinID;
-				}
-			}
-
-			int idMid = MinID + 3;
-			double dDelta = -1.0;
-
-			while (MinID < MaxID)
-			{
-				SData* tmpData = GetDataById(idMid);
-				ASSERT(tmpData);
-				//double dT = in_ViewTime - tmpData->TimePoint;
-				//double dDist = in_Pos.GetDistance(tmpData->Position);
-				//double dDelta = dT - dDist;
-				dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
-
-				if (dDelta >= 0.0) //(dT > dDist)
-					ret = MinID = idMid;
-				else // if (dT < dDist) так как вероятносьт попадания в равенство стремится к 0
-				{
-					if (MaxID != idMid)
-						MaxID = idMid;
-					else 
-						MaxID--;
-				}
-				//else MaxID = MinID = idMid;
-				idMid = ((MaxID - MinID + 1) >> 1) + MinID;
-			}
-			//!!!!Пока непонятно почему так бывает
-			if (ret < 0)
-			{
-				MinID++;
-				while (dDelta < 0.0 && --MinID >= 0)
-				{
-					SData* tmpData = GetDataById(MinID);
+					//dDelta < 0 разница во времени меньше расстояния. Не успеет добежать информация.
 					dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
+
+					if (dDelta <= 0) 
+						MaxID = MinID;
+					else
+						ret = MinID = MinID + 1;
+
+					if (MinID < MaxID)
+					{
+						int idMid = MinID + 2; //еще одна быстрая попытка
+						if (idMid > MaxID)
+							idMid = ((MaxID - MinID + 1) >> 1) + MinID;
+
+						while (MinID < MaxID)
+						{
+							tmpData = GetDataById(idMid);
+							ASSERT(tmpData);
+							//dDelta < 0 разница во времени меньше расстояния. Не успеет добежать информация.
+							dDelta = in_ViewTime - tmpData->TimePoint - in_Pos.GetDistance(tmpData->Position);
+
+							if (dDelta >= 0.0) //(dT > dDist)
+								ret = MinID = idMid;
+							else // if (dT < dDist) так как вероятносьт попадания в равенство стремится к 0
+							{
+								if (MaxID != idMid)
+									MaxID = idMid;
+								else
+									MaxID--;
+							}
+							//else MaxID = MinID = idMid;
+							idMid = ((MaxID - MinID + 1) >> 1) + MinID;
+						}
+					}
 				}
-
-				if (dDelta >= 0.0)
-					ret = MinID;
-
+			}
+			else if (dDelta < 0)
+			{//!!!??????как результат сжатия массива траектории 
+				ret = -2;
+				SData* tmpDataPrev = GetDataById(MinID - 1);
+				if (tmpDataPrev && tmpData->TimePoint - tmpDataPrev->TimePoint > dDelta * 128.0)
+					ret = (0x90000000 | MinID);
+			}
+			else //if (dDelta == 0)
+			{
+				ret = MinID;
 			}
 
 		}
@@ -497,17 +473,6 @@ int CSpParticle::GetDataAtLowPoint(SData& out_Data, double in_ViewTime)
 		out_Data = *tmp;
 		ret = 1;
 	}
-	return ret;
-}
-
-
-double CSpParticle::GetAbsSpeedPwr2()
-{
-	double ret = 0.0;
-	const SData* tmp = GetCurData_C();
-	if (tmp)
-		ret = tmp->Velocity.X * tmp->Velocity.X +  tmp->Velocity.Y * tmp->Velocity.Y + tmp->Velocity.Z * tmp->Velocity.Z;
-
 	return ret;
 }
 
@@ -540,42 +505,14 @@ int CSpParticle::GetDataById(int in_Idx, SData* inout_Reseult)
 	return tmp ? in_Idx : -1;
 }
 
-int CSpParticle::GetMovement(SData& out_Data, const SData& cur_Data, double in_NewTime, double* const out_KeyPoint)
-{
-	int ret = SP_STATE_ERROR_MAIN;
-	//double dTime = in_NewTime - cur_Data.TimePoint;
-	int  LowIdxStart = m_Data->GetLowIdxByTime(in_NewTime);
-
-	if (LowIdxStart >= 0) // && LowIdxStart < m_Data->GetCurPos())
-	{
-		SData* DataAtLowIdx = m_Data->GetDataById(LowIdxStart);
-		if (DataAtLowIdx->TimePoint > cur_Data.TimePoint)
-			ret = ItgrlFull(out_Data, *DataAtLowIdx, in_NewTime, *m_pCalc, out_KeyPoint);
-		else
-			ret = ItgrlFull(out_Data, cur_Data, in_NewTime, *m_pCalc, out_KeyPoint);
-	}
-	else
-		ret = GetPrevDataByTime(out_Data, in_NewTime, out_KeyPoint);
-
-	return ret;
-}
-
-
 int CSpParticle::GetNextDataByTime(SData& out_Data, double in_ViewTime, double* const out_KeyPoint)
 {
 	int ret = SP_STATE_ERROR_MAIN;
 	const SData* CurData = GetCurData_C();
-	int CurPos = GetCurPos();
-	if (CurData && CurPos >=0)
-	{
-		int idDn;
-		idDn = m_Data->GetLowIdxByTime(in_ViewTime);
+	if (CurData && in_ViewTime >= CurData->TimePoint)
+		ret = ItgrlFull(out_Data, *CurData, in_ViewTime, *m_pCalc, out_KeyPoint, 0);
 
-		if (idDn >= CurPos && in_ViewTime > GetCurTime())
-			ret = ItgrlFull(out_Data, *CurData, in_ViewTime, *m_pCalc, out_KeyPoint);
-	}
-
-	ASSERT(fabs(out_Data.Position.X) < 1000);
+//	ASSERT(fabs(out_Data.Position.X) < 1000);
 
 	return ret;
 }
@@ -616,53 +553,17 @@ int CSpParticle::GetPrevDataByTime(SData& out_Data, double in_ViewTime, double* 
 		}
 		else
 		{//Позиция до первой в траектории
-			ret = CalcPrevData(out_Data, in_ViewTime);
+			SData* Sdata0 = GetDataById(0);
+			if (Sdata0)
+			{//Правильно посчитать с учетом ускорения
+				out_Data = *Sdata0;
+				out_Data.LinearMove(in_ViewTime - Sdata0->TimePoint);
+			}
 		}
 	}
 		
 	return ret;
 }
-
-int CSpParticle::GetPrevDataByTimeFast_(SData& out_Data, int& out_Idx, int StartIdx, double in_ViewTime, double* const out_KeyPoint)
-{
-	int ret = SP_STATE_ERROR_MAIN;
-	out_Idx = -1;
-	const SData* CurData = GetCurData_C();
-	int CurPos = GetCurPos();
-	if (CurData)
-	{
-		int idDn;
-		idDn = m_Data->GetLowIdxByTime(in_ViewTime, StartIdx);
-
-		if (idDn == CurPos)
-		{
-			if (CurData->TimePoint == in_ViewTime)
-			{
-				ret = SP_STATE_ОК;
-				out_Data = *CurData;
-			}
-		}
-		else
-			if (idDn > CurPos)
-			{
-				out_Data = { 0 };
-			}
-		else
-		if (idDn >= 0)
-		{//Позиция между первой и последней точками траектории.
-			SData* SdataIdn = GetDataById(idDn);
-			out_Idx = idDn;
-			ItgrlFull(out_Data, *SdataIdn, in_ViewTime, *m_pCalc, out_KeyPoint);
-		}
-		else
-		{//Позиция до первой в траектории
-			ret = CalcPrevData(out_Data, in_ViewTime);
-		}
-	}
-		
-	return ret;
-}
-
 
 int CSpParticle::GetPrevDataByTimeLinear(SData& out_Data, int& out_Idx, int StartIdx, double in_ViewTime)
 {
@@ -684,52 +585,25 @@ int CSpParticle::GetPrevDataByTimeLinear(SData& out_Data, int& out_Idx, int Star
 			}
 			else
 				if (idDn > CurPos)
-				{
 					out_Data = { 0 };
-				}
 		}
 		else if (idDn >= 0)
-			{//Позиция между первой и последней точками траектории.
-				out_Idx = idDn;
-				out_Data.SetLinearFrom(*GetDataById(idDn), *GetDataById(idDn + 1), in_ViewTime);
-			}
-			else
-			{//Позиция до первой в траектории
-				ret = CalcPrevData(out_Data, in_ViewTime);
-			}
-	}
-
-	return ret;
-}
-
-
-
-int CSpParticle::CalcPrevData(SData& out_Data, double in_DataTime)
-{
-	int ret = -1;
-	int CurPos = GetCurPos();
-	if (CurPos >= 0)
-	{
-		double KeyPoint = 0.0;
-		SData* Sdata0 = GetDataById(0);
-		if (Sdata0)
-		{
-			if (in_DataTime >= Sdata0->TimePoint)
-				ret = GetPrevDataByTime(out_Data, in_DataTime, &KeyPoint);
-			else
-			{
+		{//Позиция между первой и последней точками траектории.
+			out_Idx = idDn;
+			out_Data.SetLinearFromVelocity_Linear(*GetDataById(idDn), *GetDataById(idDn + 1), in_ViewTime);
+		}
+		else
+		{//Позиция до первой в траектории
+			SData* Sdata0 = GetDataById(0);
+			if (Sdata0)
+			{//Правильно посчитать с учетом ускорения
 				out_Data = *Sdata0;
-				//Правильно посчитать с учетом ускорения
-				out_Data.LinearMove(in_DataTime - Sdata0->TimePoint);
+				out_Data.LinearMove(in_ViewTime - Sdata0->TimePoint);
 			}
 		}
 	}
-	return ret;
-}
 
-int CSpParticle::GetPointCount()
-{
-	return m_Data ? m_Data->GetCurPos() + 1 : 0;
+	return ret;
 }
 
 int CSpParticle::GetCurPos()
@@ -787,6 +661,7 @@ int CSpParticle::SetParticleData(int in_flags, const SData& in_Ptr)
 					curData->Velocity = in_Ptr.Velocity;
 					ret |= SP_DATA_SPEED;
 					curData->AbsSpeed = curData->Velocity.LEN();
+					curData->Velocity_Linear = curData->Velocity;
 				}
 				if ((in_flags & SP_DATA_POSITION))
 				{
@@ -903,6 +778,44 @@ int CSpParticle::Itgrl_s(SPos* const D_Res, SPos* const D1, double in_Mltpl, int
 int CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(SData& Result, const SData& DataSrc, double in_TimeDelta, const SP_Calc& in_pCalcParams, int in_CalcFlag)
 {
 	int ret = SP_STATE_ОК;
+
+	if ((in_CalcFlag & ITGL_CALC_TIME))
+		Result.TimePoint = DataSrc.TimePoint + in_TimeDelta;
+
+	const SPos* SrcVelocity = ((in_CalcFlag & ITGL_CALC_USELINEAR)) ? &DataSrc.Velocity_Linear : &DataSrc.Velocity;
+
+
+	if ((in_CalcFlag & ITGL_CALC_ACCELERATION))
+	{
+		Result.Accel_2_3D.X = DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * in_TimeDelta;
+		Result.Accel_2_3D.Y = DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * in_TimeDelta;
+		Result.Accel_2_3D.Z = DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * in_TimeDelta;
+		ASSERT(fabs(Result.Accel_2_3D.X) < 1.0e80);
+	}
+
+	if ((in_CalcFlag & ITGL_CALC_SPEED))
+	{
+		double deltaTimeD2 = in_TimeDelta * 0.5;
+		Result.Velocity.X = SrcVelocity->X + in_TimeDelta * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD2);
+		Result.Velocity.Y = SrcVelocity->Y + in_TimeDelta * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD2);
+		Result.Velocity.Z = SrcVelocity->Z + in_TimeDelta * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD2);
+		Result.Velocity.SET_LENGHT(in_pCalcParams.Critical.Speed);
+		Result.Velocity_Linear = Result.Velocity;
+	}
+
+	//SPos MidVelocity; MidVelocity.SET_AS_MIDDLE_POINT(DataSrc.Velocity, Result.Velocity);
+	//так быстрее
+	Result.Position.X += in_TimeDelta * (SrcVelocity->X + Result.Velocity.X) * 0.5;
+	Result.Position.Y += in_TimeDelta * (SrcVelocity->Y + Result.Velocity.Y) * 0.5;
+	Result.Position.Z += in_TimeDelta * (SrcVelocity->Z + Result.Velocity.Z) * 0.5;
+
+	return ret;
+}
+
+/*
+int CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(SData& Result, const SData& DataSrc, double in_TimeDelta, const SP_Calc& in_pCalcParams, int in_CalcFlag)
+{
+	int ret = SP_STATE_ОК;
 	double deltaTimeD2 = in_TimeDelta * 0.5;
 	double deltaTimeD4 = deltaTimeD2 * 0.5;
 
@@ -919,9 +832,10 @@ int CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(SData& Result, const SData& DataSrc
 
 	if ((in_CalcFlag & ITGL_CALC_SPEED))
 	{
-		Result.Velocity.X = DataSrc.Velocity.X + in_TimeDelta * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD2);
-		Result.Velocity.Y = DataSrc.Velocity.Y + in_TimeDelta * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD2);
-		Result.Velocity.Z = DataSrc.Velocity.Z + in_TimeDelta * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD2);
+		Result.Velocity.X = SrcVelocity->X + in_TimeDelta * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD2);
+		Result.Velocity.Y = SrcVelocity->Y + in_TimeDelta * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD2);
+		Result.Velocity.Z = SrcVelocity->Z + in_TimeDelta * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD2);
+		Result.Velocity.SET_LENGHT(in_pCalcParams.Critical.Speed);
 	}
 
 	//ASSERT(DataSrc.Jerk_3_3D.Z == 0.0);
@@ -933,14 +847,14 @@ int CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(SData& Result, const SData& DataSrc
 	SpeedDelta05.Y += deltaTimeD2 * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD4);
 	SpeedDelta05.Z += deltaTimeD2 * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD4);
 
-	SpeedDelta05.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+	SpeedDelta05.SET_LENGHT(in_pCalcParams.Critical.Speed);
 
 	SpeedDelta05 *= deltaTimeD2;
 	Result.Velocity.SET_AS_PROJECTION_OF(SpeedDelta05);
 
 	double NewLenTime = Result.Velocity.LEN() * 4.0 - in_TimeDelta;
 
-	Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+	Result.Velocity.SET_LENGHT(in_pCalcParams.Critical.Speed);
 	//так быстрее
 	Result.Position.X += NewLenTime * Result.Velocity.X;
 	Result.Position.Y += NewLenTime * Result.Velocity.Y;
@@ -948,12 +862,12 @@ int CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(SData& Result, const SData& DataSrc
 
 	return ret;
 }
+*/
 
-int CSpParticle::ItgrlFull(SData& Result, const SData& DataSrc, double in_Time, const SP_Calc& in_pCalcParams, double* const out_KeyPoint)
+int CSpParticle::ItgrlFull(SData& Result, const SData& DataSrc, double in_Time, const SP_Calc& in_pCalcParams, double* const out_KeyPoint, int in_CalcFlag)
 {
-	int ret = SP_STATE_ERROR_MAIN;
+	int ret = SP_STATE_ОК;
 
-	ret = SP_STATE_ОК;
 	Result = DataSrc;
 	Result.TimePoint = in_Time;
 
@@ -972,122 +886,116 @@ int CSpParticle::ItgrlFull(SData& Result, const SData& DataSrc, double in_Time, 
 
 	Result.AbsSpeed = Result.Velocity.LEN();
 
-	if (Result.AbsSpeed >= in_pCalcParams.maxAbsSpeed - in_pCalcParams.Time.GetPrecSpeed())
+	const SPos* SrcVelocity = ((in_CalcFlag & ITGL_CALC_USELINEAR)) ? &DataSrc.Velocity_Linear : &DataSrc.Velocity;
+
+	if (Result.AbsSpeed >= in_pCalcParams.Critical.Speed)
 	{
 		ret |= SP_STATE_ABS_SPEED_AL;
-		Result.AbsSpeed = in_pCalcParams.maxAbsSpeed;
-		Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
+		Result.AbsSpeed = in_pCalcParams.Critical.Speed;
+		Result.Velocity.SET_LENGHT(in_pCalcParams.Critical.Speed);
+		if (DataSrc.AbsSpeed < in_pCalcParams.Critical.Speed)
+			ret |= SP_STATE_ABS_CHANGE_LS;
 
-		if (deltaTime <= in_pCalcParams.Time.GetMinStep())
+		if (deltaTime - 5.0e-14 <= in_pCalcParams.Time.GetMinStep())
 		{
-			//упрощение для минимального шага и только для точки перехода.
-			SPos DeltaS; DeltaS.SET_AS_DELTA(DataSrc.Velocity, Result.Velocity);
+			//упрощение для минимального шага и только для точки перехода. Считаем скорость предельной
+			//с большой вероятностью точка посчитана с предельной точностью на предыдущем шаге
+			//CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(Result, DataSrc, deltaTime, in_pCalcParams, ITGL_CALC_NONE);
 
-			Result.Position.X += deltaTimeD2 * DeltaS.X;
-			Result.Position.Y += deltaTimeD2 * DeltaS.Y;
-			Result.Position.Z += deltaTimeD2 * DeltaS.Z;
+			SPos tmpVelocity = DataSrc.Velocity;
+			tmpVelocity.SET_LENGHT_TO_1();
+
+			Result.Position.X = DataSrc.Position.X + deltaTime * (tmpVelocity.X + Result.Velocity.X) * 0.5;
+			Result.Position.Y = DataSrc.Position.Y + deltaTime * (tmpVelocity.Y + Result.Velocity.Y) * 0.5;
+			Result.Position.Z = DataSrc.Position.Z + deltaTime * (tmpVelocity.Z + Result.Velocity.Z) * 0.5;
+
+			////!!!!Из-за потери точности расстояние может быть больше допустимого. Можно скорректировать немного при превышении
 		}
-		else if (DataSrc.AbsSpeed >= in_pCalcParams.maxAbsSpeed) //До этого была предельная
+		else if (DataSrc.AbsSpeed >= in_pCalcParams.Critical.Speed) //До этого была предельная
 		{
 			CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(Result, DataSrc, deltaTime, in_pCalcParams, ITGL_CALC_NONE);
-
-			////Разбиение на два отрезка. Разница дрины проекции половинного результата на половину итогового приблизительно является 1/4 величины перелета по прямой вместо дуги
-			//double deltaTimeD4 = deltaTimeD2 * 0.5;
-			//SPos SpeedDelta05 = DataSrc.Velocity;
-
-			//SpeedDelta05.X += deltaTimeD2 * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * deltaTimeD4);
-			//SpeedDelta05.Y += deltaTimeD2 * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * deltaTimeD4);
-			//SpeedDelta05.Z += deltaTimeD2 * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * deltaTimeD4);
-
-			//SpeedDelta05.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
-
-			//SpeedDelta05 *= deltaTimeD2;
-			//Result.Velocity; Result.Velocity.SET_AS_PROJECTION_OF(SpeedDelta05);
-
-			//double NewLenTime = Result.Velocity.LEN() * 4.0 - deltaTime;
-
-			//Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
-			////так быстрее
-			//Result.Position.X += NewLenTime * Result.Velocity.X;
-			//Result.Position.Y += NewLenTime * Result.Velocity.Y;
-			//Result.Position.Z += NewLenTime * Result.Velocity.Z;
 		}
-		else 
+		else
 		{
 			//// ключевые точки с минимальным шагом позволяют выделить участки траектории с постоянными свойствами. переход между блоками
+			//// !!!!! оптимизировать производительность за счет решения уравнения 4степени и/или Метод Ньютона
+			////ЗИИ - для точки в пространстве известна скорость V0, ускорение A0 и рывок J0 в момент T0. Определить когда модуль скорости достигнет заданного значения после T0, если рывок J0 постоянен.
 			SPos tmpSpeed;
 			double StepDeltaTime = deltaTimeD2;
 			double MaxSpeedDeltaTime = deltaTimeD2;
-			double CurSpeedPwr2;
+			double CurSpeed;
 
+			SPos tmpJerk = DataSrc.Jerk_3_3D;
+			tmpJerk *= 0.5;
 			//поиск точки перехода
+			tmpSpeed.X = SrcVelocity->X + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.X + tmpJerk.X * MaxSpeedDeltaTime);
+			tmpSpeed.Y = SrcVelocity->Y + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Y + tmpJerk.Y * MaxSpeedDeltaTime);
+			tmpSpeed.Z = SrcVelocity->Z + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Z + tmpJerk.Z * MaxSpeedDeltaTime);
+			CurSpeed = tmpSpeed.LEN();
+
 			do
 			{
 				StepDeltaTime *= 0.5;
-				tmpSpeed.X = DataSrc.Velocity.X + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.X + DataSrc.Jerk_3_3D.X * StepDeltaTime);
-				tmpSpeed.Y = DataSrc.Velocity.Y + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Y + DataSrc.Jerk_3_3D.Y * StepDeltaTime);
-				tmpSpeed.Z = DataSrc.Velocity.Z + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Z + DataSrc.Jerk_3_3D.Z * StepDeltaTime);
-
-				if ((CurSpeedPwr2 = tmpSpeed.LENPWR2())> in_pCalcParams.maxAbsSpeedPwr2)
+				if (CurSpeed > in_pCalcParams.Critical.Speed)
 					MaxSpeedDeltaTime -= StepDeltaTime;
 				else
 					MaxSpeedDeltaTime += StepDeltaTime;
+				tmpSpeed.X = SrcVelocity->X + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.X + tmpJerk.X * MaxSpeedDeltaTime);
+				tmpSpeed.Y = SrcVelocity->Y + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Y + tmpJerk.Y * MaxSpeedDeltaTime);
+				tmpSpeed.Z = SrcVelocity->Z + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Z + tmpJerk.Z * MaxSpeedDeltaTime);
+				CurSpeed = tmpSpeed.LEN();
 			}
-			while (StepDeltaTime > in_pCalcParams.Time.GetMinStep());
+			while (StepDeltaTime > 1.0e-14);
 
-			if (CurSpeedPwr2 > in_pCalcParams.maxAbsSpeedPwr2)
+			if (CurSpeed > in_pCalcParams.Critical.Speed && MaxSpeedDeltaTime > 2.0e-14)
+			{
 				MaxSpeedDeltaTime -= StepDeltaTime;
+				tmpSpeed.X = SrcVelocity->X + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.X + tmpJerk.X * MaxSpeedDeltaTime);
+				tmpSpeed.Y = SrcVelocity->Y + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Y + tmpJerk.Y * MaxSpeedDeltaTime);
+				tmpSpeed.Z = SrcVelocity->Z + MaxSpeedDeltaTime * (DataSrc.Accel_2_3D.Z + tmpJerk.Z * MaxSpeedDeltaTime);
+				CurSpeed = tmpSpeed.LEN();
+			}
+			if (out_KeyPoint)
+			{
+				*out_KeyPoint = DataSrc.TimePoint + MaxSpeedDeltaTime;
+				if (*out_KeyPoint == DataSrc.TimePoint)
+					*out_KeyPoint = nextafter(*out_KeyPoint, 1.0e100);
 
-			if (out_KeyPoint)	*out_KeyPoint = DataSrc.TimePoint + in_pCalcParams.Time.CorrectDelta_ByMinStep(MaxSpeedDeltaTime);
+			}
 
-			double dtDiv2 = (1.0 / 2.0) * MaxSpeedDeltaTime;
+			tmpSpeed.SET_LENGHT_TO_1();
+			Result.Velocity = tmpSpeed;
+
+			double dtDiv2 = 0.5 * MaxSpeedDeltaTime;
 			double dtDiv3 = (1.0 / 3.0) * MaxSpeedDeltaTime;
 
 			//перемещение до точки перехода
-			Result.Position.X += MaxSpeedDeltaTime * (DataSrc.Velocity.X + dtDiv2 * (DataSrc.Accel_2_3D.X + dtDiv3 * DataSrc.Jerk_3_3D.X));
-			Result.Position.Y += MaxSpeedDeltaTime * (DataSrc.Velocity.Y + dtDiv2 * (DataSrc.Accel_2_3D.Y + dtDiv3 * DataSrc.Jerk_3_3D.Y));
-			Result.Position.Z += MaxSpeedDeltaTime * (DataSrc.Velocity.Z + dtDiv2 * (DataSrc.Accel_2_3D.Z + dtDiv3 * DataSrc.Jerk_3_3D.Z));
+			Result.Position.X += MaxSpeedDeltaTime * (SrcVelocity->X + dtDiv2 * (DataSrc.Accel_2_3D.X + dtDiv3 * DataSrc.Jerk_3_3D.X));
+			Result.Position.Y += MaxSpeedDeltaTime * (SrcVelocity->Y + dtDiv2 * (DataSrc.Accel_2_3D.Y + dtDiv3 * DataSrc.Jerk_3_3D.Y));
+			Result.Position.Z += MaxSpeedDeltaTime * (SrcVelocity->Z + dtDiv2 * (DataSrc.Accel_2_3D.Z + dtDiv3 * DataSrc.Jerk_3_3D.Z));
 
 			//перемещение после точки перехода
+			// ITGL_CALC_NONE потому, что все кроме позиции уже посчитано
 			CSpParticle::ItgrlFullMoveOnMaxSpeedOnly(Result, DataSrc, deltaTime - MaxSpeedDeltaTime, in_pCalcParams, ITGL_CALC_NONE);
+			if (CurSpeed < in_pCalcParams.Critical.Speed)
+				ret |= SP_STATE_NEXT_STEP_MIN;
 		}
-		//else
-		//{ //////Квадратное уравнение не точно и отключено
-		//	//// ключевые точки с минимальным шагом позволяют выделить участки траектории с постоянными свойствами. переход между блоками
-		//	double MaxSpeedDeltaTime = DataSrc.GetTimeToSpeed(in_pCalcParams.maxAbsSpeed);
-		//	ASSERT(!isnan(MaxSpeedDeltaTime));
-
-		//	MaxSpeedDeltaTime = in_pCalcParams.Time.CorrectDelta_ByMinStep(MaxSpeedDeltaTime);
-
-		//	if (out_KeyPoint)	*out_KeyPoint = DataSrc.TimePoint + MaxSpeedDeltaTime;
-
-		//	Result.Velocity.SET_LENGHT(in_pCalcParams.maxAbsSpeed);
-
-		//	double MaxSpeedDeltaTime05 = MaxSpeedDeltaTime * 0.5; //в интеграле /2
-
-		//	Result.Position.X += MaxSpeedDeltaTime05 * (DataSrc.Velocity.X + Result.Velocity.X);
-		//	Result.Position.Y += MaxSpeedDeltaTime05 * (DataSrc.Velocity.Y + Result.Velocity.Y);
-		//	Result.Position.Z += MaxSpeedDeltaTime05 * (DataSrc.Velocity.Z + Result.Velocity.Z);
-
-		//	double dlt = deltaTime - MaxSpeedDeltaTime;
-		//	Result.Position.X += dlt * Result.Velocity.X;
-		//	Result.Position.Y += dlt * Result.Velocity.Y;
-		//	Result.Position.Z += dlt * Result.Velocity.Z;
-		//}
-		Result.AbsSpeed = in_pCalcParams.maxAbsSpeed;
+		Result.AbsSpeed = in_pCalcParams.Critical.Speed;
 	}
 	else
 	{
 		double dtDiv2 = (1.0 / 2.0) * deltaTime;
 		double dtDiv3 = (1.0 / 3.0) * deltaTime;
 
-		Result.Position.X += deltaTime * (DataSrc.Velocity.X + dtDiv2 * (DataSrc.Accel_2_3D.X + dtDiv3 * DataSrc.Jerk_3_3D.X));
-		Result.Position.Y += deltaTime * (DataSrc.Velocity.Y + dtDiv2 * (DataSrc.Accel_2_3D.Y + dtDiv3 * DataSrc.Jerk_3_3D.Y));
-		Result.Position.Z += deltaTime * (DataSrc.Velocity.Z + dtDiv2 * (DataSrc.Accel_2_3D.Z + dtDiv3 * DataSrc.Jerk_3_3D.Z));
+		Result.Position.X += deltaTime * (SrcVelocity->X + dtDiv2 * (DataSrc.Accel_2_3D.X + dtDiv3 * DataSrc.Jerk_3_3D.X));
+		Result.Position.Y += deltaTime * (SrcVelocity->Y + dtDiv2 * (DataSrc.Accel_2_3D.Y + dtDiv3 * DataSrc.Jerk_3_3D.Y));
+		Result.Position.Z += deltaTime * (SrcVelocity->Z + dtDiv2 * (DataSrc.Accel_2_3D.Z + dtDiv3 * DataSrc.Jerk_3_3D.Z));
 
-		if (DataSrc.AbsSpeed >= in_pCalcParams.maxAbsSpeed)
+		if (DataSrc.AbsSpeed >= in_pCalcParams.Critical.Speed)
 			ret |= SP_STATE_ABS_CHANGE_LS;
 	}
+	Result.Velocity_Linear = Result.Velocity;
+
 	return ret;
 }
 
@@ -1109,7 +1017,7 @@ int CSpParticle::CalcMidData(SData& Result, const SData& Ptr1, const SData& Ptr2
 	else
 	{
 		ret = SP_STATE_MID;
-		ItgrlFull(Result, Ptr1, absMidPoint, *m_pCalc, nullptr);
+		ItgrlFull(Result, Ptr1, absMidPoint, *m_pCalc, nullptr, ITGL_CALC_USELINEAR);
 	}
 	return ret;
 }
@@ -1148,28 +1056,27 @@ char* CSpParticle::GetFlagsDescription(char* out_Str, int in_Flags)
 }
 
 
-
-////////////////////////////////////////////////////////////////////////////////////
-
-
-double Calc_RelativeAcceleration(int in_RelPartType, int in_CalcType, double in_DensityAtBasePoint)
+//////////////////////////////////////// SPRelation
+double SPRelation::Calc_RelativeDensity(int in_CalcType)
 {
-	double AccelerationValue;
-	//расчет ускорения
-	switch ((in_RelPartType & SP_TYPE_FORM_MASK))
+	//расчет плотности
+	switch (ViewParticlePtr->GetTypeFlags())
 	{
 	case SP_TYPE_NEGATIVE://простая античастица - отталкивает
 		switch (in_CalcType)
 		{
 		case 0:
-		default: //AccelerationValue !!!-inf>>>!!! 0 >>> +inf
-			if (in_DensityAtBasePoint >= 1.0)
-				AccelerationValue = -1.0e50;
+		default: 
+			if (DistancePwr1 >= SP_DENSITY_MAX)
+				DensityAtBasePoint = SP_DENSITY_MAX / DistancePwr2;
 			else
-				AccelerationValue = -1.0 / (1.0 - in_DensityAtBasePoint) + 1.0;
+				DensityAtBasePoint = DistancePwr2;
 			break;
-		case 1: //AccelerationValue   !!!-inf>>>!!! 0 >>> +inf
-			AccelerationValue = in_DensityAtBasePoint - 1.0;
+		case 1://dens = 1 - 1 / (1 + S) ^ 2      0.0 < DensityAtBasePoint < 1
+			DensityAtBasePoint = SP_DENSITY_MAX / ((SP_DENSITY_MAX + DistancePwr1) * (SP_DENSITY_MAX + DistancePwr1));
+			break;
+		case 2://dens = 1 - 1 / (1 + S^2)
+			DensityAtBasePoint = SP_DENSITY_MAX / (SP_DENSITY_MAX + DistancePwr2);
 			break;
 		}
 		break;
@@ -1178,68 +1085,167 @@ double Calc_RelativeAcceleration(int in_RelPartType, int in_CalcType, double in_
 		switch (in_CalcType)
 		{
 		case 0:
-		default: //AccelerationValue !!!-inf>>>!!! 0 >>> +inf
-			if (in_DensityAtBasePoint <= 0.0)
-				AccelerationValue = 1.0e50;
+		default: 
+			if (DistancePwr1 >= SP_DENSITY_MAX)
+				DensityAtBasePoint = SP_DENSITY_MAX - SP_DENSITY_MAX / DistancePwr2;
 			else
-				AccelerationValue = (1.0 / in_DensityAtBasePoint) - 1.0;
+				DensityAtBasePoint = SP_DENSITY_MAX - DistancePwr2;
 			break;
-		case 1: //AccelerationValue   !!!-inf>>>!!! 0 >>> +inf
-			AccelerationValue = 1.0 - in_DensityAtBasePoint;
+		case 1://dens = 1 - 1 / (1 + S) ^ 2      0.0 < DensityAtBasePoint < 1
+			DensityAtBasePoint = SP_DENSITY_MAX - SP_DENSITY_MAX / ((SP_DENSITY_MAX + DistancePwr1) * (SP_DENSITY_MAX + DistancePwr1));
+			break;
+		case 2://dens = 1 - 1 / (1 + S^2)
+			DensityAtBasePoint = SP_DENSITY_MAX - SP_DENSITY_MAX / (SP_DENSITY_MAX + DistancePwr2);
 			break;
 		}
 		break;
 	}
+
+	return DensityAtBasePoint;
+}
+
+double SPRelation::Calc_RelativeAcceleration(int in_CalcType)
+{
+	double BarierDistance = DistancePwr1 - SP_DENSITY_MAX;
+	//расчет ускорения. Меньше нуля притягивает, больше нуля отталкивает
+	switch ((ViewParticlePtr->GetTypeFlags() & SP_TYPE_FORM_MASK))
+	{
+	case SP_TYPE_NEGATIVE://простая античастица - отталкивает
+		switch (in_CalcType)
+		{
+		case 0:
+		default:
+			if (BarierDistance < 1.0e-14 && BarierDistance > -1.0e-14)
+				AccelerationValue = 1.0e-50;
+			else
+			{
+				if (BarierDistance > 0.0)
+					AccelerationValue = SP_DENSITY_MAX / (BarierDistance * BarierDistance);
+				else
+					AccelerationValue = -SP_DENSITY_MAX / (BarierDistance * BarierDistance);
+			}
+			break;
+		case 1: //AccelerationValue   !!!-inf>>>!!! 0 >>> +inf
+			AccelerationValue = 1.0 / (1.0 - DensityAtBasePoint);
+			break;
+		case 2: //AccelerationValue !!!-inf>>>!!! 0 >>> +inf
+			if (DensityAtBasePoint == 1.0)
+				AccelerationValue = 1.0e50;
+			else
+				AccelerationValue = 1.0 / (1.0 - DensityAtBasePoint) + 1.0;
+			break;
+		}
+		break;
+	case SP_TYPE_POSITIVE://простая частица - притягивает
+	default:
+		switch (in_CalcType)
+		{
+		case 0:
+		default: 
+			if (BarierDistance < 1.0e-14 && BarierDistance > -1.0e-14)
+				AccelerationValue = -1.0e-50;
+			else
+			{
+				if (BarierDistance > 0.0)
+					AccelerationValue = -SP_DENSITY_MAX / (BarierDistance * BarierDistance);
+				else
+					AccelerationValue = SP_DENSITY_MAX / (BarierDistance * BarierDistance);
+			}
+			break;
+		case 1: //AccelerationValue   !!!-inf>>>!!! 0 >>> +inf
+			AccelerationValue = -1.0 / (1.0 - DensityAtBasePoint);
+			break;
+		case 2://AccelerationValue !!!-inf>>>!!! 0 >>> +inf
+			if (DensityAtBasePoint == 0.0)
+				AccelerationValue = -1.0e50;
+			else
+				AccelerationValue =  1.0- (1.0 / DensityAtBasePoint);
+			break;
+		}
+		break;
+	}
+
+	Acceleration_3D = Distance_3D;
+	Acceleration_3D.SET_LENGHT(AccelerationValue);
+
 	return AccelerationValue;
 }
 
-double Calc_RelativeDensity(int in_RelPartType, int in_CalcType, double in_DistancePwr1, double in_DistancePwr2)
+// Расчёт третьей производной (рывка)
+void SPRelation::CALC_JERK_AS_RELATIVE()
 {
-	double DensityValue;
-	//расчет плотности
-
-
-	switch (in_RelPartType)
+	if (DistancePwr2 != 1.0 && DistancePwr1 > 0.0)
 	{
-	case SP_TYPE_NEGATIVE://простая античастица - отталкивает
-		switch (in_CalcType)
-		{
-		case 0:
-		default: //dens = 1 / S^2        DensityAtBasePoint [-inf] 0 >>>> 1
-			if (in_DistancePwr2 == 0.0)
-				DensityValue = 1.0e-50;
-			else
-				DensityValue = SP_DENSITY_MAX / in_DistancePwr2;
-			break;
-		case 1://dens = 1 - 1 / (1 + S^2)
-			DensityValue = SP_DENSITY_MAX / (SP_DENSITY_MAX + in_DistancePwr2);
-			break;
-		case 2://dens = 1 - 1 / (1 + S) ^ 2      0.0 < DensityAtBasePoint < 1
-			DensityValue = SP_DENSITY_MAX / ((SP_DENSITY_MAX + in_DistancePwr1) * (SP_DENSITY_MAX + in_DistancePwr1));
-			break;
-		}
-		break;
-	case SP_TYPE_POSITIVE://простая частица - притягивает
-	default:
-		switch (in_CalcType)
-		{
-		case 0:
-		default: //dens = 1 - 1 / S^2        DensityAtBasePoint [-inf] 0 >>>> 1
-			if (in_DistancePwr2 == 0.0)
-				DensityValue = 1.0e-50;
-			else
-				DensityValue = SP_DENSITY_MAX - SP_DENSITY_MAX / in_DistancePwr2;
-			break;
-		case 1://dens = 1 - 1 / (1 + S^2)
-			DensityValue = SP_DENSITY_MAX - SP_DENSITY_MAX / (SP_DENSITY_MAX + in_DistancePwr2);
-			break;
-		case 2://dens = 1 - 1 / (1 + S) ^ 2      0.0 < DensityAtBasePoint < 1
-			DensityValue = SP_DENSITY_MAX - SP_DENSITY_MAX / ((SP_DENSITY_MAX + in_DistancePwr1) * (SP_DENSITY_MAX + in_DistancePwr1));
-			break;
-		}
-		break;
-	}
+		double DistPwr2minus1 = DistancePwr2 - 1.0;
+		double a_magnitude = 1.0 / DistPwr2minus1;
+		double DistDotVelocity = Distance_3D.DOT(RelativeVelocity_3D);
+		double d_a_dt = -2.0 * DistancePwr1 * DistDotVelocity / (DistPwr2minus1 * DistPwr2minus1);
 
-	return DensityValue;
+
+		// Производная единичного вектора
+		SPos dn_dt = RelativeVelocity_3D; dn_dt.DIV(DistancePwr1);
+		SPos dn_dt2 = Distance_3D;  dn_dt2.MULT(DistDotVelocity / DistancePwr3);
+		dn_dt.MINUS(dn_dt2);
+		dn_dt.MULT(a_magnitude);
+
+		// Рывок
+		// Единичный вектор направления
+		Jerk_3_3D = Distance_3D;
+		Jerk_3_3D.NORMALIZE();
+		//
+		Jerk_3_3D.MULT(d_a_dt);
+		Jerk_3_3D += dn_dt;
+
+		ASSERT(fabs(Jerk_3_3D.X) < 1.0e80);
+	}
+	else
+	{
+		Jerk_3_3D = { 0 };
+	}
 }
 
+// Расчёт четвёртой производной (snap) численно
+void SPRelation::CALC_SNAP_AS_RELATIVE()
+{
+	double DistPwr2minus1 = DistancePwr2 - 1.0;
+	double DistPwr2minus1Pwr2 = DistPwr2minus1 * DistPwr2minus1;
+	double DistDotVelocity = Distance_3D.DOT(RelativeVelocity_3D);
+	double dot_S = DistDotVelocity / DistancePwr1;  // dS/dt
+	double v_dot_vPLUSr_dot_a = RelativeVelocity_3D.LENPWR2() + Distance_3D.DOT(Acceleration_3D);  // |v|^2
+	double ddv_dotS = DistDotVelocity * dot_S;
+
+	// Компонент A и его производная dA/dt
+	double A = -2.0 * DistDotVelocity / (DistPwr2minus1Pwr2 * DistancePwr1);
+	double numerator_A = v_dot_vPLUSr_dot_a * DistPwr2minus1 * DistancePwr1 - ddv_dotS * (4.0 * DistancePwr2 + DistPwr2minus1);
+	double denominator_A = 1.0 / (DistPwr2minus1Pwr2 * DistancePwr2);
+	double dA_dt = -2.0 * numerator_A * denominator_A;
+
+	// Компонент B и его производная dB/dt
+	double B = 1.0 / (DistPwr2minus1 * DistancePwr1);
+	double dB_dt = -(2.0 * DistancePwr2 * dot_S * DistPwr2minus1 + DistPwr2minus1Pwr2 * dot_S) * denominator_A;
+
+	double  ddv_dotSdivDistancePwr3 = ddv_dotS / DistancePwr3;
+	double factor_dC = v_dot_vPLUSr_dot_a / DistancePwr3 - 3.0 * ddv_dotSdivDistancePwr3;
+
+	SPos tmp = Distance_3D; tmp *= (-ddv_dotSdivDistancePwr3 - ddv_dotSdivDistancePwr3 / DistancePwr1);
+	SPos dC_dt = RelativeVelocity_3D; dC_dt *= factor_dC; dC_dt += tmp;
+
+
+	// Итоговая четвёртая производная
+	// Термы для расчёта snap
+	Snap_4_3D = Distance_3D;  Snap_4_3D *= dA_dt;                             // dA/dt * r
+
+	tmp = RelativeVelocity_3D; tmp *= A;                      // A * v
+	Snap_4_3D += tmp;
+
+	// Вектор C и его производная dC/dt
+	SPos C = Distance_3D; C *= -DistDotVelocity;  C /= DistancePwr3; C += RelativeVelocity_3D;  C *= dB_dt;// dB/dt * (v + C)
+	Snap_4_3D += C;
+
+	tmp = Acceleration_3D;  tmp *= B;  // B * a
+	Snap_4_3D += tmp;
+
+	tmp = dC_dt;  tmp *= B;  // B * dC/dt
+	Snap_4_3D += tmp;
+
+}
